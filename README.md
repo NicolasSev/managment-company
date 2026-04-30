@@ -1,6 +1,6 @@
 # PropManager (managment-company) — iOS
 
-SwiftUI app; bundle ID `com.nicolascooper.managment-company`.
+SwiftUI app; bundle ID `com.nicolascooper.rentfolio`.
 
 Open `managment-company.xcodeproj` in Xcode. Shared scheme: **managment-company** (`xcshareddata/xcschemes`).
 
