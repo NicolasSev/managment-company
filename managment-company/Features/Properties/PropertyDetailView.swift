@@ -7,12 +7,29 @@ struct PropertyDetailView: View {
     @State private var tenants: [Tenant] = []
     @State private var leases: [Lease] = []
     @State private var utilities: [PropertyUtility] = []
+    @State private var utilitiesHistoryExtra: [PropertyUtility] = []
+    @State private var leaseSchedulesByLeaseId: [String: [LeasePaymentSchedule]] = [:]
+    @State private var scheduleForMarkPaidSheet: LeasePaymentSchedule?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showTransactionSheet = false
     @State private var showEditForm = false
     @State private var showUtilityForm = false
     @State private var editingUtility: PropertyUtility?
+
+    /// Merges paginated property utilities with portfolio history (longer horizon) for this object.
+    private var utilitiesForDisplay: [PropertyUtility] {
+        var merged: [String: PropertyUtility] = Dictionary(uniqueKeysWithValues: utilities.map { ($0.id, $0) })
+        for extra in utilitiesHistoryExtra where extra.propertyId == property.id {
+            merged[extra.id] = merged[extra.id] ?? extra
+        }
+        return Array(merged.values).sorted {
+            if $0.periodYear == $1.periodYear {
+                return $0.periodMonth > $1.periodMonth
+            }
+            return $0.periodYear > $1.periodYear
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -42,6 +59,15 @@ struct PropertyDetailView: View {
         .sheet(isPresented: $showUtilityForm) {
             UtilityFormView(propertyId: property.id, utility: editingUtility) {
                 await loadUtilities()
+                await loadUtilitiesHistoryExtra()
+            }
+            .environmentObject(authManager)
+        }
+        .sheet(item: $scheduleForMarkPaidSheet) { schedule in
+            MarkSchedulePaidSheet(schedule: schedule) {
+                await refreshSchedule(leaseID: schedule.leaseId)
+                await loadTransactions()
+                await MainActor.run { errorMessage = nil }
             }
             .environmentObject(authManager)
         }
@@ -52,7 +78,7 @@ struct PropertyDetailView: View {
         if isLoading {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let errorMessage, transactions.isEmpty, leases.isEmpty, utilities.isEmpty {
+        } else if let errorMessage, transactions.isEmpty, leases.isEmpty, utilitiesForDisplay.isEmpty {
             EmptyStateView(
                 title: "Не удалось загрузить активность объекта",
                 message: errorMessage,
@@ -157,6 +183,9 @@ struct PropertyDetailView: View {
                     } ?? "Не указано")
                     detailRow("Район", value: property.district ?? "Не указано")
                     detailRow("Этаж", value: property.floor.map { "Этаж \($0)" } ?? "Не указано")
+                    if let acc = property.utilityAccountNumber, !acc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        detailRow("Лицевой счёт (ЖКХ)", value: acc)
+                    }
                     detailRow("Заметки", value: property.notes ?? "Заметок по объекту пока нет")
                 }
             }
@@ -255,6 +284,15 @@ struct PropertyDetailView: View {
                                 )
                             }
 
+                            if let scheduleRows = leaseSchedulesByLeaseId[lease.id], !scheduleRows.isEmpty {
+                                leaseScheduleSection(rows: scheduleRows)
+                            } else if lease.status.lowercased() == "active" {
+                                Text("График аренды ещё не загружен или не создан — воспользуйтесь сайтом, чтобы сформировать график платежей.")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                                    .padding(.top, 4)
+                            }
+
                             if let terminatedAt = lease.terminatedAt {
                                 Text("Прекращено \(AppFormatting.dateString(from: terminatedAt) ?? terminatedAt)")
                                     .font(.caption)
@@ -291,14 +329,14 @@ struct PropertyDetailView: View {
                     .accessibilityLabel("Добавить коммуналку")
                 }
 
-                if utilities.isEmpty {
+                if utilitiesForDisplay.isEmpty {
                     sectionPlaceholder(
                         title: "Коммуналка пока не добавлена",
-                        message: "Добавляйте ежемесячную коммуналку здесь; загрузка квитанций доступна в вебе.",
+                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.). Загрузка квитанций — в вебе.",
                         icon: "receipt"
                     )
                 } else {
-                    ForEach(utilities.prefix(12)) { utility in
+                    ForEach(utilitiesForDisplay.prefix(36)) { utility in
                         Button {
                             editingUtility = utility
                             showUtilityForm = true
@@ -310,6 +348,65 @@ struct PropertyDetailView: View {
                 }
             }
         }
+    }
+
+    private func leaseScheduleSection(rows: [LeasePaymentSchedule]) -> some View {
+        let sorted = rows.sorted { $0.dueDate < $1.dueDate }
+        let capped = Array(sorted.prefix(24))
+        return VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            Text("График платежей")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+            ForEach(capped) { row in
+                leaseScheduleRow(row)
+            }
+        }
+        .padding(.top, AppTheme.Spacing.sm)
+    }
+
+    private func leaseScheduleRow(_ row: LeasePaymentSchedule) -> some View {
+        let canMark = scheduleRowCanMarkPaid(row)
+
+        return HStack(alignment: .center, spacing: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(AppFormatting.dateString(from: row.dueDate) ?? row.dueDate)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                if row.isOverdue {
+                    Text("Просрочено на \(row.daysOverdue) дн.")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.Colors.warning)
+                } else if let paidAt = row.paidAt, !paidAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Оплачено \(AppFormatting.dateString(from: paidAt) ?? paidAt)")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.Colors.success)
+                }
+            }
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(AppFormatting.compactAmount(row.expectedAmount, currency: row.currency))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                StatusBadge(status: row.status)
+            }
+
+            if canMark {
+                Button {
+                    scheduleForMarkPaidSheet = row
+                } label: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(AppTheme.Colors.success)
+                .accessibilityLabel("Отметить платёж оплаченным")
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, AppTheme.Spacing.sm)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func metricCard(title: String, value: String, fallback: Bool = false) -> some View {
@@ -443,6 +540,60 @@ struct PropertyDetailView: View {
         }
 
         await loadTenants()
+        await loadLeaseSchedules()
+        await loadUtilitiesHistoryExtra()
+    }
+
+    private func loadLeaseSchedules() async {
+        for lease in leases {
+            await refreshSchedule(leaseID: lease.id)
+        }
+    }
+
+    private func refreshSchedule(leaseID: String) async {
+        var next = leaseSchedulesByLeaseId
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/leases/\(leaseID)/payment-schedule",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let env = try JSONDecoder().decode(APIListEnvelope<LeasePaymentSchedule>.self, from: data)
+            if env.data.isEmpty {
+                next.removeValue(forKey: leaseID)
+            } else {
+                next[leaseID] = env.data
+            }
+        } catch {
+            // сохраняем предыдущие строки графика при сетевой ошибке
+        }
+        leaseSchedulesByLeaseId = next
+    }
+
+    private func scheduleRowCanMarkPaid(_ row: LeasePaymentSchedule) -> Bool {
+        if row.actualPaymentId != nil {
+            return false
+        }
+        switch row.status.lowercased() {
+        case "paid", "matched", "skipped":
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func loadUtilitiesHistoryExtra() async {
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/analytics/utilities-history?months=36",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let env = try JSONDecoder().decode(APIListEnvelope<PropertyUtility>.self, from: data)
+            utilitiesHistoryExtra = env.data.filter { $0.propertyId == property.id }
+        } catch {
+            utilitiesHistoryExtra = []
+        }
     }
 
     private func loadTransactions() async {
@@ -500,7 +651,7 @@ struct PropertyDetailView: View {
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
-            let decoded = try JSONDecoder().decode(APIResponse<[PropertyUtility]>.self, from: data)
+            let decoded = try JSONDecoder().decode(APIListEnvelope<PropertyUtility>.self, from: data)
             utilities = decoded.data.sorted {
                 if $0.periodYear == $1.periodYear {
                     return $0.periodMonth > $1.periodMonth

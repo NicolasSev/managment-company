@@ -19,7 +19,9 @@ struct Property: Identifiable, Codable, Hashable {
     let status: String
     let notes: String?
     let tags: [String]?
-    
+    /// Лицевой счёт для сопоставления квитанций ЖКХ (OCR).
+    let utilityAccountNumber: String?
+
     enum CodingKeys: String, CodingKey {
         case id, name, status, notes, tags
         case propertyType = "property_type"
@@ -31,6 +33,7 @@ struct Property: Identifiable, Codable, Hashable {
         case purchaseCurrency = "purchase_currency"
         case currentValue = "current_value"
         case currentValueCurrency = "current_value_currency"
+        case utilityAccountNumber = "utility_account_number"
     }
     
     var displayAddress: String? {

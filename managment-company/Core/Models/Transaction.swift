@@ -14,6 +14,7 @@ struct Transaction: Identifiable, Codable {
     let periodMonth: Int
     let description: String?
     let tenantId: String?
+    let leaseId: String?
     
     enum CodingKeys: String, CodingKey {
         case id, type, amount, currency, description
@@ -25,5 +26,6 @@ struct Transaction: Identifiable, Codable {
         case periodYear = "period_year"
         case periodMonth = "period_month"
         case tenantId = "tenant_id"
+        case leaseId = "lease_id"
     }
 }

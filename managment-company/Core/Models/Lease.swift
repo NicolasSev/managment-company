@@ -3,6 +3,8 @@ import Foundation
 struct Lease: Identifiable, Codable {
     let id: String
     let propertyId: String
+    /// Present when lease is embedded in property-scoped list responses (optional on wire).
+    let propertyName: String?
     let tenantId: String
     let startDate: String
     let endDate: String?
@@ -19,10 +21,15 @@ struct Lease: Identifiable, Codable {
     let terminatedAt: String?
     let terminationReason: String?
     let notes: String?
-    
+    let renewalReminderDays: Int?
+    let autoRenew: Bool?
+    /// `"owner"` | `"tenant"` | `"split"` per contract `UtilitiesPaidBy`.
+    let utilitiesPaidBy: String?
+
     enum CodingKeys: String, CodingKey {
         case id, status, notes
         case propertyId = "property_id"
+        case propertyName = "property_name"
         case tenantId = "tenant_id"
         case startDate = "start_date"
         case endDate = "end_date"
@@ -37,5 +44,8 @@ struct Lease: Identifiable, Codable {
         case paymentDueDay = "payment_due_day"
         case terminatedAt = "terminated_at"
         case terminationReason = "termination_reason"
+        case renewalReminderDays = "renewal_reminder_days"
+        case autoRenew = "auto_renew"
+        case utilitiesPaidBy = "utilities_paid_by"
     }
 }

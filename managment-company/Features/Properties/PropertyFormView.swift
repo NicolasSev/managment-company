@@ -11,6 +11,7 @@ struct PropertyFormView: View {
     @State private var status = "vacant"
     @State private var address = ""
     @State private var city = ""
+    @State private var utilityAccountNumber = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     
@@ -32,6 +33,16 @@ struct PropertyFormView: View {
                 Section("Адрес") {
                     AppTextField(title: "Адрес", text: $address, placeholder: "Улица, дом")
                     AppTextField(title: "Город", text: $city, placeholder: "Город")
+                }
+                Section("Коммунальные платежи (OCR)") {
+                    AppTextField(
+                        title: "Лицевой счёт",
+                        text: $utilityAccountNumber,
+                        placeholder: "Как на квитанции, для автопривязки"
+                    )
+                    Text("Если указать номер совпадающий с квитанцией, объект подставится при загрузке квитанции на вкладке «Операции».")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
                 if let err = errorMessage {
                     Section {
@@ -62,6 +73,7 @@ struct PropertyFormView: View {
         status = p.status
         address = p.address ?? ""
         city = p.city ?? ""
+        utilityAccountNumber = p.utilityAccountNumber ?? ""
     }
     
     private func save() async {
@@ -69,12 +81,14 @@ struct PropertyFormView: View {
         errorMessage = nil
         defer { isLoading = false }
         
+        let trimmedAccount = utilityAccountNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = PropertyInput(
             name: name,
             propertyType: propertyType,
             status: status,
             address: address.isEmpty ? nil : address,
-            city: city.isEmpty ? nil : city
+            city: city.isEmpty ? nil : city,
+            utilityAccountNumber: trimmedAccount.isEmpty ? nil : trimmedAccount
         )
         
         do {
@@ -131,9 +145,11 @@ private struct PropertyInput: Encodable {
     let status: String
     let address: String?
     let city: String?
-    
+    let utilityAccountNumber: String?
+
     enum CodingKeys: String, CodingKey {
         case name, status, address, city
         case propertyType = "property_type"
+        case utilityAccountNumber = "utility_account_number"
     }
 }

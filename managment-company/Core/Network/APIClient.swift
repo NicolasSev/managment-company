@@ -68,7 +68,65 @@ final class APIClient {
         }
         return data
     }
-    
+
+    /// `POST multipart/form-data` with a single file field — response body is decoded without `{ "data": … }` wrapper (e.g. `202 Accepted` uploads).
+    func uploadMultipartUnwrapped<T: Decodable>(
+        _ path: String,
+        fieldName: String,
+        fileData: Data,
+        fileName: String,
+        mimeType: String,
+        tokenProvider: () async -> String?,
+        refreshAndRetry: () async -> Bool
+    ) async throws -> T {
+        func performUpload(token: String) async throws -> Data {
+            let boundary = "Boundary-\(UUID().uuidString)"
+            var body = Data()
+            body.appendString("--\(boundary)\r\n")
+            body.appendString("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n")
+            body.appendString("Content-Type: \(mimeType)\r\n\r\n")
+            body.append(fileData)
+            body.appendString("\r\n--\(boundary)--\r\n")
+
+            let url = URL(string: "\(baseURL)\(path)")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+            request.httpBody = body
+            var (data, response) = try await session.data(for: request)
+            var httpResponse = response as? HTTPURLResponse
+
+            if httpResponse?.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            guard let status = httpResponse?.statusCode else {
+                throw APIError.invalidResponse
+            }
+            guard (200...299).contains(status) else {
+                throw APIError.httpStatus(status)
+            }
+            return data
+        }
+
+        guard let token = await tokenProvider() else {
+            throw APIError.unauthorized
+        }
+
+        do {
+            let data = try await performUpload(token: token)
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch APIError.unauthorized {
+            let refreshed = await refreshAndRetry()
+            guard refreshed, let next = await tokenProvider() else {
+                throw APIError.unauthorized
+            }
+            let data = try await performUpload(token: next)
+            return try JSONDecoder().decode(T.self, from: data)
+        }
+    }
+
     private func buildRequest(path: String, method: String, body: Encodable?, token: String) -> URLRequest {
         let url = URL(string: "\(baseURL)\(path)")!
         var request = URLRequest(url: url)
@@ -96,4 +154,12 @@ enum APIError: Error {
     case unauthorized
     case invalidResponse
     case httpStatus(Int)
+}
+
+private extension Data {
+    mutating func appendString(_ string: String) {
+        if let chunk = string.data(using: .utf8) {
+            append(chunk)
+        }
+    }
 }

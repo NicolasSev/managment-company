@@ -7,6 +7,8 @@ struct HomeDashboardView: View {
     @State private var properties: [Property] = []
     @State private var tasks: [AppTask] = []
     @State private var analytics: AnalyticsDashboard?
+    /// Server-derived occupancy counts (GET `/v1/analytics/occupancy`).
+    @State private var occupancy: OccupancyPayload?
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -230,11 +232,15 @@ struct HomeDashboardView: View {
     }
 
     private var occupiedPropertiesCount: Int {
-        properties.filter { $0.status.lowercased() == "occupied" }.count
+        if let occupancy { return occupancy.occupied }
+        return properties.filter { $0.status.lowercased() == "occupied" }.count
     }
 
     private var vacantPropertiesCount: Int {
-        properties.filter { $0.status.lowercased() == "vacant" }.count
+        if let occupancy {
+            return max(0, occupancy.total - occupancy.occupied)
+        }
+        return properties.filter { $0.status.lowercased() == "vacant" }.count
     }
 
     private var openTasksCount: Int {
@@ -268,7 +274,10 @@ struct HomeDashboardView: View {
         if properties.isEmpty {
             return "Объекты еще не добавлены. Добавьте первый объект, чтобы видеть заселенность."
         }
-        return "Сейчас занято \(occupiedPropertiesCount) из \(properties.count) объектов, еще \(vacantPropertiesCount) свободно или готовится к аренде."
+        if let occupancy {
+            return "По серверу: занято \(occupancy.occupied) из \(occupancy.total) (\(occupancy.ratePct)%). Локально в списке \(properties.count) объектов."
+        }
+        return "Сейчас занято \(occupiedPropertiesCount) из \(properties.count) объектов по статусам в приложении."
     }
 
     private var taskInsight: String {
@@ -281,7 +290,7 @@ struct HomeDashboardView: View {
         if dueTodayCount > 0 {
             return "На сегодня задач: \(dueTodayCount). Хороший момент быстро пройтись по доске."
         }
-        return "The task queue is under control, with \(openTasksCount) open items still in motion."
+        return "Открытых задач пока немного (\(openTasksCount)). Хороший момент заранее запланировать обслуживание."
     }
 
     private var cashflowInsight: String {
@@ -311,17 +320,7 @@ struct HomeDashboardView: View {
         guard let analytics else {
             return "Текущий период"
         }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "MMMM yyyy"
-        guard
-            let date = calendar.date(
-                from: DateComponents(year: analytics.periodYear, month: analytics.periodMonth, day: 1)
-            )
-        else {
-            return "Период \(analytics.periodMonth)/\(analytics.periodYear)"
-        }
-        return formatter.string(from: date)
+        return analytics.displayPeriodLabel
     }
 
     private var calendar: Calendar {
@@ -335,6 +334,7 @@ struct HomeDashboardView: View {
     private func loadOverview() async {
         isLoading = true
         defer { isLoading = false }
+        occupancy = nil
 
         do {
             async let propertiesRequest: [Property] = APIClient.shared.request(
@@ -355,7 +355,7 @@ struct HomeDashboardView: View {
 
             do {
                 analytics = try await APIClient.shared.request(
-                    "/v1/analytics/dashboard",
+                    "/v1/analytics/dashboard?period=all",
                     tokenProvider: { await MainActor.run { authManager.accessToken } },
                     refreshAndRetry: { await authManager.refreshToken() }
                 )
@@ -363,6 +363,11 @@ struct HomeDashboardView: View {
                 analytics = nil
                 errorMessage = "Данные портфеля загружены, но аналитика пока недоступна."
             }
+            occupancy = try? await APIClient.shared.request(
+                "/v1/analytics/occupancy",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
         } catch {
             errorMessage = "Не удалось подключиться к API. Проверьте, что сервер доступен."
         }

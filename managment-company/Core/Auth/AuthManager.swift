@@ -18,10 +18,40 @@ class AuthManager: ObservableObject {
         let name: String?
         let timezone: String
         let baseCurrency: String
-        
+        /// Optional fields returned by `/v1/auth/me` (contract `User`).
+        let mfaEnabled: Bool?
+        let theme: String?
+        let locale: String?
+
         enum CodingKeys: String, CodingKey {
             case id, email, name, timezone
             case baseCurrency = "base_currency"
+            case mfaEnabled = "mfa_enabled"
+            case theme, locale
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
+            name = try container.decodeIfPresent(String.self, forKey: .name)
+            timezone = try container.decodeIfPresent(String.self, forKey: .timezone) ?? "Asia/Almaty"
+            baseCurrency = try container.decodeIfPresent(String.self, forKey: .baseCurrency) ?? "KZT"
+            mfaEnabled = try container.decodeIfPresent(Bool.self, forKey: .mfaEnabled)
+            theme = try container.decodeIfPresent(String.self, forKey: .theme)
+            locale = try container.decodeIfPresent(String.self, forKey: .locale)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(email, forKey: .email)
+            try container.encodeIfPresent(name, forKey: .name)
+            try container.encode(timezone, forKey: .timezone)
+            try container.encode(baseCurrency, forKey: .baseCurrency)
+            try container.encodeIfPresent(mfaEnabled, forKey: .mfaEnabled)
+            try container.encodeIfPresent(theme, forKey: .theme)
+            try container.encodeIfPresent(locale, forKey: .locale)
         }
     }
     
