@@ -26,13 +26,41 @@ final class APIClient {
         _ path: String,
         method: String = "GET",
         body: Encodable? = nil,
+        idempotencyKey: String? = nil,
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> T {
-        let data = try await requestData(path, method: method, body: body, tokenProvider: tokenProvider, refreshAndRetry: refreshAndRetry)
+        let data = try await requestData(
+            path,
+            method: method,
+            body: body,
+            idempotencyKey: idempotencyKey,
+            tokenProvider: tokenProvider,
+            refreshAndRetry: refreshAndRetry
+        )
         let decoder = JSONDecoder()
         let wrapped = try decoder.decode(APIResponse<T>.self, from: data)
         return wrapped.data
+    }
+
+    /// Декодирует тело ответа как `T` без обёртки `{ "data": … }` (например `GET /v1/notifications` с пагинацией в корне).
+    func requestRoot<T: Decodable>(
+        _ path: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        idempotencyKey: String? = nil,
+        tokenProvider: () async -> String?,
+        refreshAndRetry: () async -> Bool
+    ) async throws -> T {
+        let data = try await requestData(
+            path,
+            method: method,
+            body: body,
+            idempotencyKey: idempotencyKey,
+            tokenProvider: tokenProvider,
+            refreshAndRetry: refreshAndRetry
+        )
+        return try JSONDecoder().decode(T.self, from: data)
     }
     
     /// Performs an authorized request returning raw data.
@@ -40,13 +68,14 @@ final class APIClient {
         _ path: String,
         method: String = "GET",
         body: Encodable? = nil,
+        idempotencyKey: String? = nil,
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> Data {
         guard let token = await tokenProvider() else {
             throw APIError.unauthorized
         }
-        var req = buildRequest(path: path, method: method, body: body, token: token)
+        var req = buildRequest(path: path, method: method, body: body, token: token, idempotencyKey: idempotencyKey)
         var (data, response) = try await session.data(for: req)
         var httpResponse = response as? HTTPURLResponse
         
@@ -55,7 +84,7 @@ final class APIClient {
             guard refreshed, let newToken = await tokenProvider() else {
                 throw APIError.unauthorized
             }
-            req = buildRequest(path: path, method: method, body: body, token: newToken)
+            req = buildRequest(path: path, method: method, body: body, token: newToken, idempotencyKey: idempotencyKey)
             (data, response) = try await session.data(for: req)
             httpResponse = response as? HTTPURLResponse
         }
@@ -127,12 +156,15 @@ final class APIClient {
         }
     }
 
-    private func buildRequest(path: String, method: String, body: Encodable?, token: String) -> URLRequest {
+    private func buildRequest(path: String, method: String, body: Encodable?, token: String, idempotencyKey: String?) -> URLRequest {
         let url = URL(string: "\(baseURL)\(path)")!
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let idempotencyKey {
+            request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        }
         if let body = body {
             request.httpBody = try? JSONEncoder().encode(AnyEncodable(body))
         }

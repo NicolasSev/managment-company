@@ -1,7 +1,7 @@
 import Foundation
 
 /// Body for `POST /v1/payment-schedules/:id/mark-paid` (optional fields mirror OpenAPI).
-struct MarkSchedulePaidRequest: Encodable {
+struct MarkSchedulePaidRequest: Codable {
     var amount: Double?
     var currency: String?
     var paymentDate: String?

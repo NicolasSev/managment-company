@@ -1,0 +1,17 @@
+{
+  "data": {
+    "total_income": 100,
+    "total_expense": 40,
+    "net_cashflow": 60,
+    "expected_rent": 80,
+    "rent_received": 70,
+    "rent_outstanding": 10,
+    "deposit_income": 0,
+    "period_year": 2026,
+    "period_month": 4,
+    "period": "all",
+    "period_label": "За всё время",
+    "period_from": null,
+    "period_to": null
+  }
+}

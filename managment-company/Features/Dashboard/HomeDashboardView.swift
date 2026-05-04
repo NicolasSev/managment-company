@@ -11,6 +11,8 @@ struct HomeDashboardView: View {
     @State private var occupancy: OccupancyPayload?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var showNotifications = false
+    @State private var notificationUnreadCount = 0
 
     var body: some View {
         NavigationStack {
@@ -20,8 +22,48 @@ struct HomeDashboardView: View {
                 content
             }
             .navigationTitle("Главная")
-            .task { await loadOverview() }
-            .refreshable { await loadOverview() }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showNotifications = true
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                            if notificationUnreadCount > 0 {
+                                Text(notificationUnreadCount > 99 ? "99+" : "\(notificationUnreadCount)")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(AppTheme.Colors.danger.clipShape(Capsule()))
+                                    .offset(x: 10, y: -10)
+                            }
+                        }
+                        .frame(minWidth: 36, minHeight: 36)
+                    }
+                    .accessibilityLabel(
+                        notificationUnreadCount > 0
+                            ? "Уведомления, непрочитано: \(notificationUnreadCount)"
+                            : "Уведомления"
+                    )
+                }
+            }
+            .sheet(isPresented: $showNotifications) {
+                NotificationsInboxView(onDataChanged: {
+                    await refreshNotificationUnread()
+                })
+                .environmentObject(authManager)
+            }
+            .onChange(of: showNotifications) { _, open in
+                if !open { Task { await refreshNotificationUnread() } }
+            }
+            .task {
+                await loadOverview()
+                await refreshNotificationUnread()
+            }
+            .refreshable { await loadOverview(); await refreshNotificationUnread() }
         }
     }
 
@@ -331,7 +373,21 @@ struct HomeDashboardView: View {
         calendar.startOfDay(for: Date())
     }
 
+    private func refreshNotificationUnread() async {
+        do {
+            let u: UnreadCountData = try await APIClient.shared.request(
+                "/v1/notifications/unread-count",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            await MainActor.run { notificationUnreadCount = u.count }
+        } catch {
+            await MainActor.run { notificationUnreadCount = 0 }
+        }
+    }
+
     private func loadOverview() async {
+        guard let userId = authManager.user?.id else { return }
         isLoading = true
         defer { isLoading = false }
         occupancy = nil
@@ -353,24 +409,56 @@ struct HomeDashboardView: View {
             tasks = loadedTasks
             errorMessage = nil
 
+            var loadedAnalytics: AnalyticsDashboard?
             do {
-                analytics = try await APIClient.shared.request(
+                loadedAnalytics = try await APIClient.shared.request(
                     "/v1/analytics/dashboard?period=all",
                     tokenProvider: { await MainActor.run { authManager.accessToken } },
                     refreshAndRetry: { await authManager.refreshToken() }
                 )
+                analytics = loadedAnalytics
             } catch {
+                loadedAnalytics = nil
                 analytics = nil
                 errorMessage = "Данные портфеля загружены, но аналитика пока недоступна."
             }
-            occupancy = try? await APIClient.shared.request(
+
+            let occ: OccupancyPayload? = try? await APIClient.shared.request(
                 "/v1/analytics/occupancy",
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
+            occupancy = occ
+
+            DashboardOverviewCache.save(
+                DashboardOverviewSnapshot(
+                    userId: userId,
+                    properties: loadedProperties,
+                    tasks: loadedTasks,
+                    analytics: loadedAnalytics,
+                    occupancy: occ,
+                    savedAt: Date()
+                )
+            )
         } catch {
-            errorMessage = "Не удалось подключиться к API. Проверьте, что сервер доступен."
+            if let cached = DashboardOverviewCache.load(), cached.userId == userId {
+                properties = cached.properties
+                tasks = cached.tasks
+                analytics = cached.analytics
+                occupancy = cached.occupancy
+                errorMessage = Self.offlineStaleMessage(savedAt: cached.savedAt)
+            } else {
+                errorMessage = "Не удалось подключиться к API. Проверьте, что сервер доступен."
+            }
         }
+    }
+
+    private static func offlineStaleMessage(savedAt: Date) -> String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "ru_RU")
+        fmt.dateStyle = .short
+        fmt.timeStyle = .short
+        return "Нет связи с сервером. Показаны сохранённые данные (\(fmt.string(from: savedAt)))."
     }
 
     private func heroMetric(title: String, value: String) -> some View {

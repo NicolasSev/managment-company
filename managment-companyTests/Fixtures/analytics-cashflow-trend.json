@@ -1,0 +1,13 @@
+{
+  "data": {
+    "months": [
+      {
+        "year": 2026,
+        "month": 3,
+        "total_income": 10,
+        "total_expense": 4,
+        "net_cashflow": 6
+      }
+    ]
+  }
+}

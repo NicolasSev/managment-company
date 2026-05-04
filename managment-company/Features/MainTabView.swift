@@ -11,10 +11,13 @@ enum AppTab: Hashable {
 
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @ObservedObject private var pendingMutations = PendingMutationQueue.shared
     @State private var selectedTab: AppTab = .dashboard
-    
+
     var body: some View {
-        TabView(selection: $selectedTab) {
+        ZStack(alignment: .top) {
+            TabView(selection: $selectedTab) {
             HomeDashboardView(selectedTab: $selectedTab)
                 .environmentObject(authManager)
                 .tag(AppTab.dashboard)
@@ -49,6 +52,26 @@ struct MainTabView: View {
                 }
         }
         .tint(AppTheme.Colors.accent)
+
+            if pendingMutations.pendingCount > 0 {
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Text("Ожидают отправки: \(pendingMutations.pendingCount)")
+                        .font(.subheadline.weight(.medium))
+                }
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.vertical, AppTheme.Spacing.sm)
+                .frame(maxWidth: .infinity)
+                .background(AppTheme.Colors.accent.opacity(0.15))
+            }
+        }
+        .onChange(of: notificationRouter.selectTab) { _, tab in
+            if let tab {
+                selectedTab = tab
+                notificationRouter.clearTabSelection()
+            }
+        }
     }
 }
 

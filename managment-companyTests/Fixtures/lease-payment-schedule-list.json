@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "lease_id": "00000000-0000-0000-0000-000000000002",
+      "due_date": "2026-04-05",
+      "period_start_date": null,
+      "period_end_date": null,
+      "notification_due_date": null,
+      "notification_sent_at": null,
+      "expected_amount": 95000,
+      "currency": "KZT",
+      "actual_payment_id": null,
+      "actual_amount": null,
+      "paid_at": null,
+      "transaction_id": null,
+      "status": "pending",
+      "is_overdue": false,
+      "days_overdue": 0
+    }
+  ],
+  "page": 1,
+  "per_page": 1,
+  "total": 1
+}

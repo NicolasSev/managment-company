@@ -11,6 +11,15 @@ import Testing
 @Suite(.serialized)
 struct ManagmentCompanyTests {
 
+    private func loadFixtureJSON(_ name: String) throws -> Data {
+        let bundle = Bundle(for: ManagmentCompanyTests.self)
+        guard let url = bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures") else {
+            struct MissingFixture: Error {}
+            throw MissingFixture()
+        }
+        return try Data(contentsOf: url)
+    }
+
     @Test func apiURLBuilderJoinsRelativeDownloadPath() {
         let url = APIURLBuilder.absoluteDownloadURL(
             base: "http://127.0.0.1:8080",
@@ -37,68 +46,48 @@ struct ManagmentCompanyTests {
         #expect(keychain.getRefreshToken() == nil)
     }
 
-    @Test func decodesOccupancyEnvelopeBody() throws {
-        let raw = #"{"data":{"occupied":2,"total":5,"rate_pct":40}}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(APIResponse<OccupancyPayload>.self, from: raw).data
+    @Test func decodesAnalyticsOccupancyFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("analytics-occupancy")
+        let decoded = try JSONDecoder().decode(APIResponse<OccupancyPayload>.self, from: data).data
         #expect(decoded.occupied == 2)
         #expect(decoded.total == 5)
         #expect(decoded.ratePct == 40)
     }
 
-    @Test func decodesAnalyticsDashboardEnvelopeBody() throws {
-        let json = """
-        {"data":{
-          "total_income":100,"total_expense":40,"net_cashflow":60,
-          "expected_rent":80,"rent_received":70,"rent_outstanding":10,"deposit_income":0,
-          "period_year":2026,"period_month":4,"period":"all","period_label":"За всё время",
-          "period_from":null,"period_to":null
-        }}
-        """
-        let decoded = try JSONDecoder().decode(APIResponse<AnalyticsDashboard>.self, from: json.data(using: .utf8)!).data
+    @Test func decodesAnalyticsDashboardFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("analytics-dashboard")
+        let decoded = try JSONDecoder().decode(APIResponse<AnalyticsDashboard>.self, from: data).data
         #expect(decoded.period == "all")
         #expect(decoded.rentOutstanding == 10)
         #expect(decoded.displayPeriodLabel == "За всё время")
     }
 
-    @Test func decodesOverduePaymentsEnvelopeBody() throws {
-        let raw = #"{"data":{"overdue_count":3}}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(APIResponse<OverduePaymentsPayload>.self, from: raw).data
+    @Test func decodesOverduePaymentsFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("analytics-overdue-payments")
+        let decoded = try JSONDecoder().decode(APIResponse<OverduePaymentsPayload>.self, from: data).data
         #expect(decoded.overdueCount == 3)
     }
 
-    @Test func decodesCashflowTrendEnvelopeBody() throws {
-        let json = #"{"data":{"months":[{"year":2026,"month":3,"total_income":10,"total_expense":4,"net_cashflow":6}]}}"#
-        let decoded = try JSONDecoder().decode(APIResponse<CashflowTrendBody>.self, from: json.data(using: .utf8)!).data
+    @Test func decodesCashflowTrendFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("analytics-cashflow-trend")
+        let decoded = try JSONDecoder().decode(APIResponse<CashflowTrendBody>.self, from: data).data
         #expect(decoded.months.count == 1)
         #expect(decoded.months[0].year == 2026)
         #expect(decoded.months[0].netCashflow == 6)
     }
 
-    @Test func decodesLeasePaymentScheduleListEnvelopeBody() throws {
-        let json = """
-        {"data":[{"id":"00000000-0000-0000-0000-000000000001","lease_id":"00000000-0000-0000-0000-000000000002",
-        "due_date":"2026-04-05","period_start_date":null,"period_end_date":null,
-        "notification_due_date":null,"notification_sent_at":null,
-        "expected_amount":95000,"currency":"KZT",
-        "actual_payment_id":null,"actual_amount":null,"paid_at":null,"transaction_id":null,
-        "status":"pending","is_overdue":false,"days_overdue":0}],"page":1,"per_page":1,"total":1}
-        """
-        let decoded = try JSONDecoder().decode(APIListEnvelope<LeasePaymentSchedule>.self, from: json.data(using: .utf8)!)
+    @Test func decodesLeasePaymentScheduleListFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("lease-payment-schedule-list")
+        let decoded = try JSONDecoder().decode(APIListEnvelope<LeasePaymentSchedule>.self, from: data)
         #expect(decoded.data.count == 1)
         #expect(decoded.data[0].expectedAmount == 95000)
         #expect(decoded.data[0].leaseId == "00000000-0000-0000-0000-000000000002")
         #expect(decoded.total == 1)
     }
 
-    @Test func decodesProfitabilityEnvelopeBody() throws {
-        let json = """
-        {"data":{"group_by":"month","from":"2025-05-01","to":"2026-05-01",
-        "points":[],
-        "totals":[{"period_key":"2026-03","period_label":"март 2026","period_year":2026,"period_month":3,
-        "total_income":900,"total_expense":400,"utility_expense":50,"operating_cost":350,
-        "net_cashflow":500,"profit_margin_pct":55.5}]}}
-        """
-        let decoded = try JSONDecoder().decode(APIResponse<ProfitabilityReport>.self, from: json.data(using: .utf8)!).data
+    @Test func decodesProfitabilityFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("analytics-profitability")
+        let decoded = try JSONDecoder().decode(APIResponse<ProfitabilityReport>.self, from: data).data
         #expect(decoded.totals.count == 1)
         #expect(decoded.totals[0].netCashflow == 500)
         #expect(abs(decoded.totals[0].profitMarginPct - 55.5) < 0.01)
@@ -123,5 +112,34 @@ struct ManagmentCompanyTests {
         #expect(decoded.payment.amount == decoded.schedule.expectedAmount)
         #expect(decoded.schedule.status == "paid")
         #expect(decoded.payment.periodMonth == 4)
+    }
+
+    @Test func decodesPropertyWithUtilityAccountNumber() throws {
+        let json = """
+        {"data":{"id":"00000000-0000-0000-0000-000000000001","name":"Flat A","property_type":"apartment",
+        "country":null,"city":"Almaty","address":"Street 1","district":null,"area_sqm":null,"rooms":null,"floor":null,
+        "purchase_date":null,"purchase_price":null,"purchase_currency":"KZT","current_value":null,"current_value_currency":null,
+        "status":"vacant","notes":null,"tags":null,"utility_account_number":"1194968"}}
+        """
+        let decoded = try JSONDecoder().decode(APIResponse<Property>.self, from: json.data(using: .utf8)!).data
+        #expect(decoded.utilityAccountNumber == "1194968")
+    }
+
+    /// Same JSON as `packages/api-contracts/fixtures/notifications-list.json`; refresh with `make ios-contract-fixtures`.
+    @Test func decodesNotificationsListFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("notifications-list")
+        let page = try JSONDecoder().decode(NotificationsListResponse.self, from: data)
+        #expect(page.data.count == 1)
+        #expect(page.data[0].id == "550e8400-e29b-41d4-a716-446655440000")
+        #expect(page.data[0].title == "Rent")
+        #expect(page.perPage == 30)
+        #expect(page.unreadCount == 1)
+    }
+
+    /// Same JSON as `packages/api-contracts/fixtures/notifications-unread-count.json`.
+    @Test func decodesNotificationsUnreadCountFixtureFromBundle() throws {
+        let data = try loadFixtureJSON("notifications-unread-count")
+        let inner = try JSONDecoder().decode(APIResponse<UnreadCountData>.self, from: data).data
+        #expect(inner.count == 3)
     }
 }

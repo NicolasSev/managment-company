@@ -1,0 +1,22 @@
+{
+  "data": {
+    "group_by": "month",
+    "from": "2025-05-01",
+    "to": "2026-05-01",
+    "points": [],
+    "totals": [
+      {
+        "period_key": "2026-03",
+        "period_label": "март 2026",
+        "period_year": 2026,
+        "period_month": 3,
+        "total_income": 900,
+        "total_expense": 400,
+        "utility_expense": 50,
+        "operating_cost": 350,
+        "net_cashflow": 500,
+        "profit_margin_pct": 55.5
+      }
+    ]
+  }
+}

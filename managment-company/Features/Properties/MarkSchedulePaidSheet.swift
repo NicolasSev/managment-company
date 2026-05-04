@@ -117,6 +117,21 @@ struct MarkSchedulePaidSheet: View {
         return f.string(from: n) ?? String(value)
     }
 
+    private func queueAndDismiss(payload: MarkSchedulePaidRequest, idempotencyKey: String) {
+        do {
+            try PendingMutationQueue.shared.enqueueMarkPaid(
+                scheduleId: schedule.id,
+                leaseId: schedule.leaseId,
+                body: payload,
+                idempotencyKey: idempotencyKey
+            )
+            Task { await PendingMutationQueue.shared.processQueue(authManager: authManager) }
+            dismiss()
+        } catch {
+            errorMessage = "Не удалось сохранить операцию в очередь."
+        }
+    }
+
     private func save() async {
         guard !isSaving else { return }
         isSaving = true
@@ -140,6 +155,7 @@ struct MarkSchedulePaidSheet: View {
         let payDay = Self.apiDayFormatter.string(from: paymentDate)
 
         let noteTrimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let idempotencyKey = UUID().uuidString
         let payload = MarkSchedulePaidRequest(
             amount: amountPayload,
             currency: trimmedCurrency.isEmpty ? nil : trimmedCurrency.uppercased(),
@@ -152,6 +168,7 @@ struct MarkSchedulePaidSheet: View {
                 "/v1/payment-schedules/\(schedule.id)/mark-paid",
                 method: "POST",
                 body: payload,
+                idempotencyKey: idempotencyKey,
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             ) as SchedulePaymentResult
@@ -165,14 +182,26 @@ struct MarkSchedulePaidSheet: View {
                 case .httpStatus(422):
                     errorMessage = "Не удалось провести оплату: проверьте категорию дохода по аренде или курс валюты."
                 case .httpStatus(let code):
+                    if PendingMutationQueue.isRetryableTransportError(api) {
+                        queueAndDismiss(payload: payload, idempotencyKey: idempotencyKey)
+                        return
+                    }
                     errorMessage = "Не удалось отметить оплату (код \(code))."
                 default:
+                    if PendingMutationQueue.isRetryableTransportError(api) {
+                        queueAndDismiss(payload: payload, idempotencyKey: idempotencyKey)
+                        return
+                    }
                     errorMessage = "Не удалось отметить оплату."
                 }
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Не удалось отметить оплату."
+                if PendingMutationQueue.isRetryableTransportError(error) {
+                    queueAndDismiss(payload: payload, idempotencyKey: idempotencyKey)
+                } else {
+                    errorMessage = "Не удалось отметить оплату."
+                }
             }
         }
     }

@@ -12,6 +12,11 @@ struct PropertyFormView: View {
     @State private var address = ""
     @State private var city = ""
     @State private var utilityAccountNumber = ""
+    @State private var purchaseDate = Date()
+    @State private var purchasePrice = ""
+    @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
+    @State private var purchaseRateMessage: String?
+    @State private var isLoadingPurchaseRate = false
     @State private var isLoading = false
     @State private var errorMessage: String?
     
@@ -44,6 +49,29 @@ struct PropertyFormView: View {
                         .font(.caption)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
+                Section("Покупка") {
+                    DatePicker("Дата покупки", selection: $purchaseDate, displayedComponents: .date)
+                    AppTextField(
+                        title: "Стоимость покупки (KZT)",
+                        text: $purchasePrice,
+                        placeholder: "0",
+                        keyboardType: .decimalPad,
+                        autocapitalization: .never
+                    )
+                    if isLoadingPurchaseRate {
+                        Text("Считаем эквивалент в USD по курсу Нацбанка РК...")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    } else if let purchaseUSDEquivalent {
+                        Text("≈ \(AppFormatting.compactAmount(purchaseUSDEquivalent.convertedAmount, currency: "USD")) по курсу на \(AppFormatting.dateString(from: purchaseUSDEquivalent.rateDate) ?? purchaseUSDEquivalent.rateDate)")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    } else if let purchaseRateMessage {
+                        Text(purchaseRateMessage)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.warning)
+                    }
+                }
                 if let err = errorMessage {
                     Section {
                         Text(err)
@@ -63,7 +91,27 @@ struct PropertyFormView: View {
                 }
             }
             .onAppear { populateFromProperty() }
+            .task(id: purchaseRateKey) { await loadPurchaseUSDEquivalent() }
         }
+    }
+
+    private var parsedPurchasePrice: Double? {
+        let normalized = purchasePrice
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(normalized), value > 0 else { return nil }
+        return value
+    }
+
+    private var purchaseDateString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: purchaseDate)
+    }
+
+    private var purchaseRateKey: String {
+        "\(parsedPurchasePrice ?? 0)-\(purchaseDateString)"
     }
     
     private func populateFromProperty() {
@@ -74,6 +122,12 @@ struct PropertyFormView: View {
         address = p.address ?? ""
         city = p.city ?? ""
         utilityAccountNumber = p.utilityAccountNumber ?? ""
+        if let date = p.purchaseDate, let parsed = AppFormatting.parsedDate(from: date) {
+            purchaseDate = parsed
+        }
+        if let price = p.purchasePrice {
+            purchasePrice = String(Int(price.rounded()))
+        }
     }
     
     private func save() async {
@@ -82,12 +136,16 @@ struct PropertyFormView: View {
         defer { isLoading = false }
         
         let trimmedAccount = utilityAccountNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let price = parsedPurchasePrice
         let body = PropertyInput(
             name: name,
             propertyType: propertyType,
             status: status,
             address: address.isEmpty ? nil : address,
             city: city.isEmpty ? nil : city,
+            purchaseDate: price == nil ? nil : purchaseDateString,
+            purchasePrice: price,
+            purchaseCurrency: price == nil ? nil : "KZT",
             utilityAccountNumber: trimmedAccount.isEmpty ? nil : trimmedAccount
         )
         
@@ -113,6 +171,31 @@ struct PropertyFormView: View {
             dismiss()
         } catch {
             errorMessage = "Не удалось сохранить объект"
+        }
+    }
+
+    private func loadPurchaseUSDEquivalent() async {
+        guard let amount = parsedPurchasePrice else {
+            purchaseUSDEquivalent = nil
+            purchaseRateMessage = nil
+            return
+        }
+        isLoadingPurchaseRate = true
+        defer { isLoadingPurchaseRate = false }
+
+        do {
+            let path = "/v1/exchange-rates/convert?amount=\(amount)&base=KZT&target=USD&date=\(purchaseDateString)"
+            let data = try await APIClient.shared.requestData(
+                path,
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let decoded = try JSONDecoder().decode(APIResponse<ExchangeRateConversionDTO>.self, from: data)
+            purchaseUSDEquivalent = decoded.data
+            purchaseRateMessage = nil
+        } catch {
+            purchaseUSDEquivalent = nil
+            purchaseRateMessage = "Курс USD пока не загрузился"
         }
     }
 
@@ -145,11 +228,27 @@ private struct PropertyInput: Encodable {
     let status: String
     let address: String?
     let city: String?
+    let purchaseDate: String?
+    let purchasePrice: Double?
+    let purchaseCurrency: String?
     let utilityAccountNumber: String?
 
     enum CodingKeys: String, CodingKey {
         case name, status, address, city
         case propertyType = "property_type"
+        case purchaseDate = "purchase_date"
+        case purchasePrice = "purchase_price"
+        case purchaseCurrency = "purchase_currency"
         case utilityAccountNumber = "utility_account_number"
+    }
+}
+
+private struct ExchangeRateConversionDTO: Decodable {
+    let convertedAmount: Double
+    let rateDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case convertedAmount = "converted_amount"
+        case rateDate = "rate_date"
     }
 }

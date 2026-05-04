@@ -16,6 +16,7 @@ struct PropertyDetailView: View {
     @State private var showEditForm = false
     @State private var showUtilityForm = false
     @State private var editingUtility: PropertyUtility?
+    @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
 
     /// Merges paginated property utilities with portfolio history (longer horizon) for this object.
     private var utilitiesForDisplay: [PropertyUtility] {
@@ -29,6 +30,13 @@ struct PropertyDetailView: View {
             }
             return $0.periodYear > $1.periodYear
         }
+    }
+
+    private var purchasePriceText: String {
+        guard let price = property.purchasePrice else { return "Не указано" }
+        let kztValue = AppFormatting.currency(price, currency: property.purchaseCurrency ?? "KZT")
+        guard let purchaseUSDEquivalent else { return kztValue }
+        return "\(kztValue) / ≈ \(AppFormatting.compactAmount(purchaseUSDEquivalent.convertedAmount, currency: "USD"))"
     }
 
     var body: some View {
@@ -48,6 +56,15 @@ struct PropertyDetailView: View {
         }
         .task { await loadData() }
         .refreshable { await loadData() }
+        .onReceive(NotificationCenter.default.publisher(for: .pendingMarkPaidQueueLeaseAffected)) { note in
+            guard let leaseId = note.userInfo?["leaseId"] as? String,
+                  leases.contains(where: { $0.id == leaseId }) else { return }
+            Task {
+                await refreshSchedule(leaseID: leaseId)
+                await loadTransactions()
+                await MainActor.run { errorMessage = nil }
+            }
+        }
         .sheet(isPresented: $showTransactionSheet) {
             QuickTransactionSheet(propertyId: property.id) { await loadData() }
                 .environmentObject(authManager)
@@ -178,9 +195,7 @@ struct PropertyDetailView: View {
 
                 VStack(spacing: AppTheme.Spacing.sm) {
                     detailRow("Дата покупки", value: AppFormatting.dateString(from: property.purchaseDate) ?? "Не указано")
-                    detailRow("Цена покупки", value: property.purchasePrice.map {
-                        AppFormatting.currency($0, currency: property.purchaseCurrency ?? "KZT")
-                    } ?? "Не указано")
+                    detailRow("Цена покупки", value: purchasePriceText)
                     detailRow("Район", value: property.district ?? "Не указано")
                     detailRow("Этаж", value: property.floor.map { "Этаж \($0)" } ?? "Не указано")
                     if let acc = property.utilityAccountNumber, !acc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -542,6 +557,32 @@ struct PropertyDetailView: View {
         await loadTenants()
         await loadLeaseSchedules()
         await loadUtilitiesHistoryExtra()
+        await loadPurchaseUSDEquivalent()
+    }
+
+    private func loadPurchaseUSDEquivalent() async {
+        guard let amount = property.purchasePrice, amount > 0 else {
+            purchaseUSDEquivalent = nil
+            return
+        }
+
+        let base = (property.purchaseCurrency ?? "KZT").uppercased()
+        var path = "/v1/exchange-rates/convert?amount=\(amount)&base=\(base)&target=USD"
+        if let date = property.purchaseDate, !date.isEmpty {
+            path += "&date=\(date)"
+        }
+
+        do {
+            let data = try await APIClient.shared.requestData(
+                path,
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let decoded = try JSONDecoder().decode(APIResponse<ExchangeRateConversionDTO>.self, from: data)
+            purchaseUSDEquivalent = decoded.data
+        } catch {
+            purchaseUSDEquivalent = nil
+        }
     }
 
     private func loadLeaseSchedules() async {
@@ -704,6 +745,16 @@ struct PropertyDetailView: View {
         case "other": return "Другое"
         default: return value.replacingOccurrences(of: "_", with: " ").capitalized
         }
+    }
+}
+
+private struct ExchangeRateConversionDTO: Decodable {
+    let convertedAmount: Double
+    let rateDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case convertedAmount = "converted_amount"
+        case rateDate = "rate_date"
     }
 }
 
