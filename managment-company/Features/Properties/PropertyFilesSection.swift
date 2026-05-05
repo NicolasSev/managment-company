@@ -50,7 +50,7 @@ struct PropertyFilesSection: View {
                         .font(.footnote)
                         .foregroundStyle(AppTheme.Colors.warning)
                 } else if files.isEmpty {
-                    Text("Файлов пока нет. Загрузите их через веб-приложение, чтобы видеть здесь.")
+                    Text("Файлов пока нет. Upload from the web app to see them here.")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                 } else {

@@ -14,7 +14,7 @@ struct MainTabView: View {
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @ObservedObject private var pendingMutations = PendingMutationQueue.shared
     @State private var selectedTab: AppTab = .dashboard
-
+    
     var body: some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedTab) {

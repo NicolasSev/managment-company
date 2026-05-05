@@ -2,18 +2,10 @@ import SwiftUI
 
 private enum TaskScope: String, CaseIterable, Identifiable {
     case open = "Открыто"
-    case all = "Все"
+    case all = "All"
     case completed = "Завершено"
 
     var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .open: return "Открытые"
-        case .all: return "Все"
-        case .completed: return "Завершенные"
-        }
-    }
 }
 
 struct TasksListView: View {
@@ -237,7 +229,7 @@ struct TasksListView: View {
 
                 Picker("Фильтр", selection: $selectedScope) {
                     ForEach(TaskScope.allCases) { scope in
-                        Text(scope.label).tag(scope)
+                        Text(scope.rawValue).tag(scope)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -375,14 +367,15 @@ struct TasksListView: View {
     }
 
     private var filterSummaryText: String {
+        let scopeLabel = selectedScope.rawValue.lowercased()
         let count = scopedTasks.count
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if query.isEmpty {
-            return "Показано задач: \(count). Фильтр: \(selectedScope.label.lowercased())."
+            return "Showing \(count) \(scopeLabel) task\(count == 1 ? "" : "s") across the mobile board."
         }
 
-        return "По запросу “\(query)” найдено задач: \(count). Фильтр: \(selectedScope.label.lowercased())."
+        return "Showing \(count) \(scopeLabel) task\(count == 1 ? "" : "s") matching “\(query)”."
     }
 
     private var activeBannerMessage: String? {

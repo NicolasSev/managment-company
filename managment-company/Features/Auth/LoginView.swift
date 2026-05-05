@@ -152,15 +152,15 @@ struct LoginView: View {
         do {
             let (_, response) = try await URLSession.shared.data(from: url)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                apiStatusMessage = "Проверка API не прошла: \(AppEnvironment.apiBaseURL)."
+                apiStatusMessage = "API health failed at \(AppEnvironment.apiBaseURL)."
                 return
             }
         } catch {
             if let urlError = error as? URLError {
-                apiStatusMessage = "Проверка API не прошла: \(AppEnvironment.apiBaseURL): \(urlError.localizedDescription) (\(urlError.code.rawValue))"
+                apiStatusMessage = "API health failed at \(AppEnvironment.apiBaseURL): \(urlError.localizedDescription) (\(urlError.code.rawValue))"
                 return
             }
-            apiStatusMessage = "Проверка API не прошла: \(AppEnvironment.apiBaseURL): \(error.localizedDescription)"
+            apiStatusMessage = "API health failed at \(AppEnvironment.apiBaseURL): \(error.localizedDescription)"
         }
     }
     #endif

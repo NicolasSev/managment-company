@@ -218,7 +218,7 @@ struct AnalyticsDashboardView: View {
             .refreshable { await loadDashboard() }
         }
     }
-    
+
     private func loadDashboard() async {
         isLoading = true
         defer { isLoading = false }

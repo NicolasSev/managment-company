@@ -195,14 +195,9 @@ struct TaskFormView: View {
     }
 
     private func displayStatus(_ value: String) -> String {
-        switch value {
-        case "pending": return "Ожидает"
-        case "in_progress": return "В работе"
-        case "done", "completed": return "Готово"
-        case "cancelled": return "Отменено"
-        default:
-            return value.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        value
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
     }
 
     private func priorityLabel(_ value: String) -> String {

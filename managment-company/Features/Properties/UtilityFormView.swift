@@ -187,25 +187,11 @@ struct UtilityFormView: View {
 
     private func monthName(_ month: Int) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
         return formatter.monthSymbols[max(0, min(month - 1, 11))]
     }
 
     private func displayValue(_ value: String) -> String {
-        switch value {
-        case "utilities": return "Коммунальные услуги"
-        case "electricity": return "Электричество"
-        case "water": return "Вода"
-        case "gas": return "Газ"
-        case "heating": return "Отопление"
-        case "internet": return "Интернет"
-        case "maintenance": return "Обслуживание"
-        case "other": return "Другое"
-        case "pending": return "Ожидает"
-        case "paid": return "Оплачено"
-        case "cancelled": return "Отменено"
-        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        value.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     private func dateString(_ date: Date) -> String {

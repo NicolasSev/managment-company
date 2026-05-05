@@ -42,7 +42,6 @@ struct StatusBadge: View {
         case "completed": return "Завершено"
         case "in_progress": return "В работе"
         case "cancelled": return "Отменено"
-        case "paid": return "Оплачено"
         case "low": return "Низкий"
         case "medium": return "Средний"
         case "high": return "Высокий"

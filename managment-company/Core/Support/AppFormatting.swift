@@ -46,7 +46,6 @@ enum AppFormatting {
         guard let parsedDate = parsedDate(from: value) else { return value }
 
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateStyle = dateStyle
         formatter.timeStyle = timeStyle ?? (value.contains("T") ? .short : .none)
         return formatter.string(from: parsedDate)

@@ -191,10 +191,10 @@ struct PropertiesListView: View {
         let count = filteredProperties.count
 
         if query.isEmpty {
-            return "Показано объектов: \(count)."
+            return "Showing \(count) tracked propert\(count == 1 ? "y" : "ies") in the mobile portfolio."
         }
 
-        return "По запросу “\(query)” найдено объектов: \(count)."
+        return "Showing \(count) propert\(count == 1 ? "y" : "ies") matching “\(query)”."
     }
 
     private func statusBanner(_ message: String, color: Color) -> some View {
@@ -267,14 +267,7 @@ struct PropertyRowView: View {
     }
 
     private var propertyTypeText: String {
-        switch property.propertyType {
-        case "apartment": return "Квартира"
-        case "house": return "Дом"
-        case "commercial": return "Коммерция"
-        case "land": return "Земля"
-        case "other": return "Другое"
-        default: return property.propertyType.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        property.propertyType.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     private var areaText: String {
@@ -284,12 +277,12 @@ struct PropertyRowView: View {
 
     private var roomsText: String {
         guard let rooms = property.rooms else { return "Комнаты не указаны" }
-        return "Комнат: \(rooms)"
+        return "\(rooms) rooms"
     }
 
     private var floorText: String {
         guard let floor = property.floor else { return "Этаж не указан" }
-        return "Этаж \(floor)"
+        return "Floor \(floor)"
     }
 
     private func propertyFact(icon: String, text: String) -> some View {
