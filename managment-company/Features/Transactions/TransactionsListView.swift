@@ -13,6 +13,11 @@ struct TransactionsListView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showReceiptSheet = false
+    @State private var showAddTransactionSheet = false
+
+    private var propertiesList: [Property] {
+        Array(propertiesById.values).sorted { $0.name < $1.name }
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,6 +28,14 @@ struct TransactionsListView: View {
             }
             .navigationTitle("Операции")
             .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showAddTransactionSheet = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                    .accessibilityLabel("Добавить операцию")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showReceiptSheet = true
@@ -37,6 +50,15 @@ struct TransactionsListView: View {
             .sheet(isPresented: $showReceiptSheet) {
                 UtilityReceiptUploadSheet {
                     Task { await loadPortfolioTransactions() }
+                }
+                .environmentObject(authManager)
+            }
+            .sheet(isPresented: $showAddTransactionSheet) {
+                QuickTransactionSheet(
+                    propertyId: nil,
+                    properties: propertiesList
+                ) {
+                    await loadPortfolioTransactions()
                 }
                 .environmentObject(authManager)
             }

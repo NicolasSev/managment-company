@@ -9,6 +9,8 @@ struct HomeDashboardView: View {
     @State private var analytics: AnalyticsDashboard?
     /// Server-derived occupancy counts (GET `/v1/analytics/occupancy`).
     @State private var occupancy: OccupancyPayload?
+    /// Overdue rent payments (GET `/v1/analytics/overdue-payments`).
+    @State private var overduePayments: OverduePaymentsPayload?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showNotifications = false
@@ -88,6 +90,8 @@ struct HomeDashboardView: View {
                     if let errorMessage {
                         infoBanner(message: errorMessage)
                     }
+
+                    overdueRentSection
 
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
@@ -172,6 +176,66 @@ struct HomeDashboardView: View {
                 .padding(.vertical, AppTheme.Spacing.lg)
             }
         }
+    }
+
+    @ViewBuilder
+    private var overdueRentSection: some View {
+        if let overdue = overduePayments, overdue.overdueCount > 0 {
+            SurfaceCard(padding: AppTheme.Spacing.md) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                    HStack(alignment: .top) {
+                        HStack(spacing: AppTheme.Spacing.sm) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(AppTheme.Colors.warning)
+                            Text("Просроченных арендных платежей: \(overdue.overdueCount)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                        }
+                        Spacer()
+                        Button("Объекты") { selectedTab = .properties }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.accent)
+                    }
+
+                    VStack(spacing: 6) {
+                        ForEach(overdue.items) { item in
+                            HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.propertyName)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                                    Text(overdueItemPeriodLabel(item))
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                                }
+                                Spacer()
+                                Text("до \(AppFormatting.dateString(from: item.dueDate) ?? item.dueDate)")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.Colors.warning)
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, AppTheme.Spacing.sm)
+                            .background(AppTheme.Colors.warning.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                    }
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(AppTheme.Colors.warning.opacity(0.35), lineWidth: 1)
+            )
+        }
+    }
+
+    private func overdueItemPeriodLabel(_ item: OverduePaymentItem) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "LLLL yyyy"
+        if let date = Calendar.current.date(from: DateComponents(year: item.periodYear, month: item.periodMonth, day: 1)) {
+            return formatter.string(from: date).capitalized
+        }
+        return "\(item.periodMonth)/\(item.periodYear)"
     }
 
     private var heroCard: some View {
@@ -391,6 +455,7 @@ struct HomeDashboardView: View {
         isLoading = true
         defer { isLoading = false }
         occupancy = nil
+        overduePayments = nil
 
         do {
             async let propertiesRequest: [Property] = APIClient.shared.request(
@@ -429,6 +494,13 @@ struct HomeDashboardView: View {
                 refreshAndRetry: { await authManager.refreshToken() }
             )
             occupancy = occ
+
+            let overdue: OverduePaymentsPayload? = try? await APIClient.shared.request(
+                "/v1/analytics/overdue-payments",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            overduePayments = overdue
 
             DashboardOverviewCache.save(
                 DashboardOverviewSnapshot(

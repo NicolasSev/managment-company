@@ -1,11 +1,15 @@
 import SwiftUI
 
 struct QuickTransactionSheet: View {
-    let propertyId: String
+    /// Fixed property ID (used from PropertyDetailView). Pass `nil` when `properties` is provided.
+    let propertyId: String?
+    /// When non-nil, shows a property picker as the first field.
+    var properties: [Property]? = nil
     var onSave: () async -> Void
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
-    
+
+    @State private var selectedPropertyId: String = ""
     @State private var amount = ""
     @State private var selectedCategoryId: String?
     @State private var date = Date()
@@ -13,10 +17,27 @@ struct QuickTransactionSheet: View {
     @State private var categories: [Category] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    private var effectivePropertyId: String? {
+        if let pid = propertyId, !pid.isEmpty { return pid }
+        let s = selectedPropertyId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty ? nil : s
+    }
     
     var body: some View {
         NavigationStack {
             Form {
+                if let props = properties {
+                    Section("Объект") {
+                        Picker("Объект", selection: $selectedPropertyId) {
+                            Text("Выберите объект").tag("")
+                            ForEach(props) { p in
+                                Text(p.name).tag(p.id)
+                            }
+                        }
+                        .pickerStyle(.navigationLink)
+                    }
+                }
                 Section("Сумма") {
                     HStack {
                         TextField("0", text: $amount)
@@ -74,6 +95,7 @@ struct QuickTransactionSheet: View {
     
     private var isValid: Bool {
         guard let a = Double(amount), a > 0 else { return false }
+        guard effectivePropertyId != nil else { return false }
         return selectedCategoryId != nil
     }
     
@@ -94,11 +116,12 @@ struct QuickTransactionSheet: View {
     
     private func save() async {
         guard let catId = selectedCategoryId,
-              let amt = Double(amount), amt > 0 else { return }
+              let amt = Double(amount), amt > 0,
+              let pid = effectivePropertyId else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        
+
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let body = TransactionInput(
@@ -108,10 +131,10 @@ struct QuickTransactionSheet: View {
             currency: authManager.user?.baseCurrency ?? "KZT",
             transactionDate: formatter.string(from: date)
         )
-        
+
         do {
             _ = try await APIClient.shared.requestData(
-                "/v1/properties/\(propertyId)/transactions",
+                "/v1/properties/\(pid)/transactions",
                 method: "POST",
                 body: body,
                 tokenProvider: { await MainActor.run { authManager.accessToken } },

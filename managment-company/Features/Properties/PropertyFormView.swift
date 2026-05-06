@@ -17,6 +17,9 @@ struct PropertyFormView: View {
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
     @State private var purchaseRateMessage: String?
     @State private var isLoadingPurchaseRate = false
+    @State private var currentValue = ""
+    @State private var currentUSDEquivalent: ExchangeRateConversionDTO?
+    @State private var isLoadingCurrentRate = false
     @State private var isLoading = false
     @State private var errorMessage: String?
     
@@ -72,6 +75,24 @@ struct PropertyFormView: View {
                             .foregroundStyle(AppTheme.Colors.warning)
                     }
                 }
+                Section("Оценочная стоимость") {
+                    AppTextField(
+                        title: "Оценочная стоимость (KZT)",
+                        text: $currentValue,
+                        placeholder: "0",
+                        keyboardType: .decimalPad,
+                        autocapitalization: .never
+                    )
+                    if isLoadingCurrentRate {
+                        Text("Считаем эквивалент в USD по курсу Нацбанка РК...")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    } else if let currentUSDEquivalent {
+                        Text("≈ \(AppFormatting.compactAmount(currentUSDEquivalent.convertedAmount, currency: "USD")) по курсу на сегодня")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                }
                 if let err = errorMessage {
                     Section {
                         Text(err)
@@ -92,8 +113,19 @@ struct PropertyFormView: View {
             }
             .onAppear { populateFromProperty() }
             .task(id: purchaseRateKey) { await loadPurchaseUSDEquivalent() }
+            .task(id: currentRateKey) { await loadCurrentUSDEquivalent() }
         }
     }
+
+    private var parsedCurrentValue: Double? {
+        let normalized = currentValue
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(normalized), value > 0 else { return nil }
+        return value
+    }
+
+    private var currentRateKey: String { "\(parsedCurrentValue ?? 0)-today" }
 
     private var parsedPurchasePrice: Double? {
         let normalized = purchasePrice
@@ -128,6 +160,9 @@ struct PropertyFormView: View {
         if let price = p.purchasePrice {
             purchasePrice = String(Int(price.rounded()))
         }
+        if let val = p.currentValue {
+            currentValue = String(Int(val.rounded()))
+        }
     }
     
     private func save() async {
@@ -137,6 +172,7 @@ struct PropertyFormView: View {
         
         let trimmedAccount = utilityAccountNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let price = parsedPurchasePrice
+        let currVal = parsedCurrentValue
         let body = PropertyInput(
             name: name,
             propertyType: propertyType,
@@ -146,6 +182,8 @@ struct PropertyFormView: View {
             purchaseDate: price == nil ? nil : purchaseDateString,
             purchasePrice: price,
             purchaseCurrency: price == nil ? nil : "KZT",
+            currentValue: currVal,
+            currentValueCurrency: currVal == nil ? nil : "KZT",
             utilityAccountNumber: trimmedAccount.isEmpty ? nil : trimmedAccount
         )
         
@@ -171,6 +209,27 @@ struct PropertyFormView: View {
             dismiss()
         } catch {
             errorMessage = "Не удалось сохранить объект"
+        }
+    }
+
+    private func loadCurrentUSDEquivalent() async {
+        guard let amount = parsedCurrentValue else {
+            currentUSDEquivalent = nil
+            return
+        }
+        isLoadingCurrentRate = true
+        defer { isLoadingCurrentRate = false }
+        do {
+            let path = "/v1/exchange-rates/convert?amount=\(amount)&base=KZT&target=USD"
+            let data = try await APIClient.shared.requestData(
+                path,
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let decoded = try JSONDecoder().decode(APIResponse<ExchangeRateConversionDTO>.self, from: data)
+            currentUSDEquivalent = decoded.data
+        } catch {
+            currentUSDEquivalent = nil
         }
     }
 
@@ -231,6 +290,8 @@ private struct PropertyInput: Encodable {
     let purchaseDate: String?
     let purchasePrice: Double?
     let purchaseCurrency: String?
+    let currentValue: Double?
+    let currentValueCurrency: String?
     let utilityAccountNumber: String?
 
     enum CodingKeys: String, CodingKey {
@@ -239,6 +300,8 @@ private struct PropertyInput: Encodable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case purchaseCurrency = "purchase_currency"
+        case currentValue = "current_value"
+        case currentValueCurrency = "current_value_currency"
         case utilityAccountNumber = "utility_account_number"
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct PropertyDetailView: View {
     let property: Property
@@ -16,6 +17,7 @@ struct PropertyDetailView: View {
     @State private var showEditForm = false
     @State private var showUtilityForm = false
     @State private var editingUtility: PropertyUtility?
+    @State private var expandedUtilityMonths: Set<String> = []
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
 
     /// Merges paginated property utilities with portfolio history (longer horizon) for this object.
@@ -321,17 +323,64 @@ struct PropertyDetailView: View {
         }
     }
 
+    private struct UtilityMonthGroup: Identifiable {
+        let id: String
+        let year: Int
+        let month: Int
+        let items: [PropertyUtility]
+        var total: Double { items.map { $0.amount }.reduce(0, +) }
+        var currency: String { items.first?.currency ?? "KZT" }
+    }
+
+    private var utilityMonthGroups: [UtilityMonthGroup] {
+        var dict: [String: [PropertyUtility]] = [:]
+        for u in utilitiesForDisplay {
+            let key = String(format: "%04d-%02d", u.periodYear, u.periodMonth)
+            dict[key, default: []].append(u)
+        }
+        return dict.map { key, items in
+            let parts = key.split(separator: "-")
+            let year = Int(parts[0]) ?? 0
+            let month = Int(parts[1]) ?? 0
+            let sorted = items.sorted { $0.amount > $1.amount }
+            return UtilityMonthGroup(id: key, year: year, month: month, items: sorted)
+        }
+        .sorted { ($0.year, $0.month) > ($1.year, $1.month) }
+    }
+
+    private struct ChartPoint: Identifiable {
+        let id: String
+        let label: String
+        let total: Double
+    }
+
+    private var utilityChartData: [ChartPoint] {
+        utilityMonthGroups
+            .sorted { ($0.year, $0.month) < ($1.year, $1.month) }
+            .suffix(12)
+            .map { g in
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "ru_RU")
+                formatter.dateFormat = "MMM"
+                let label: String
+                if let date = Calendar.current.date(from: DateComponents(year: g.year, month: g.month, day: 1)) {
+                    label = formatter.string(from: date)
+                } else {
+                    label = "\(g.month)"
+                }
+                return ChartPoint(id: g.id, label: label, total: g.total)
+            }
+    }
+
     private var utilitiesSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 HStack(alignment: .top) {
                     sectionHeader(
                         title: "Коммуналка",
-                        subtitle: "Ежемесячные коммунальные расходы и квитанции по объекту."
+                        subtitle: "Ежемесячные коммунальные расходы по объекту."
                     )
-
                     Spacer()
-
                     Button {
                         editingUtility = nil
                         showUtilityForm = true
@@ -347,11 +396,84 @@ struct PropertyDetailView: View {
                 if utilitiesForDisplay.isEmpty {
                     sectionPlaceholder(
                         title: "Коммуналка пока не добавлена",
-                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.). Загрузка квитанций — в вебе.",
+                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.).",
                         icon: "receipt"
                     )
                 } else {
-                    ForEach(utilitiesForDisplay.prefix(36)) { utility in
+                    if utilityChartData.count >= 2 {
+                        Chart(utilityChartData) { point in
+                            BarMark(
+                                x: .value("Месяц", point.label),
+                                y: .value("Сумма", point.total)
+                            )
+                            .foregroundStyle(AppTheme.Colors.accent.gradient)
+                            .cornerRadius(6)
+                        }
+                        .frame(height: 130)
+                        .chartXAxis {
+                            AxisMarks(values: .automatic) { _ in
+                                AxisValueLabel()
+                                    .font(.caption2)
+                            }
+                        }
+                        .chartYAxis {
+                            AxisMarks(values: .automatic) { _ in
+                                AxisValueLabel()
+                                    .font(.caption2)
+                                AxisGridLine()
+                            }
+                        }
+                        .padding(.bottom, AppTheme.Spacing.sm)
+                    }
+
+                    VStack(spacing: AppTheme.Spacing.sm) {
+                        ForEach(utilityMonthGroups) { group in
+                            utilityMonthAccordion(group)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func utilityMonthAccordion(_ group: UtilityMonthGroup) -> some View {
+        let isExpanded = expandedUtilityMonths.contains(group.id)
+        return VStack(spacing: 0) {
+            Button {
+                if isExpanded {
+                    expandedUtilityMonths.remove(group.id)
+                } else {
+                    expandedUtilityMonths.insert(group.id)
+                }
+            } label: {
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(monthLabel(year: group.year, month: group.month))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                        Text("\(group.items.count) \(pluralServices(group.items.count))")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                    Spacer()
+                    Text(AppFormatting.compactAmount(group.total, currency: group.currency))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textTertiary)
+                        .padding(.leading, 6)
+                }
+                .padding(.vertical, AppTheme.Spacing.sm)
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 18 : 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(spacing: 6) {
+                    ForEach(group.items) { utility in
                         Button {
                             editingUtility = utility
                             showUtilityForm = true
@@ -361,7 +483,27 @@ struct PropertyDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.top, 6)
+                .padding(.leading, AppTheme.Spacing.sm)
             }
+        }
+    }
+
+    private func monthLabel(year: Int, month: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "LLLL yyyy"
+        if let date = Calendar.current.date(from: DateComponents(year: year, month: month, day: 1)) {
+            return formatter.string(from: date).capitalized
+        }
+        return "\(month)/\(year)"
+    }
+
+    private func pluralServices(_ count: Int) -> String {
+        switch count % 10 {
+        case 1 where count % 100 != 11: return "услуга"
+        case 2...4 where !(11...14).contains(count % 100): return "услуги"
+        default: return "услуг"
         }
     }
 

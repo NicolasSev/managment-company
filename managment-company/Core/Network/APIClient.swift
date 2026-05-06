@@ -98,6 +98,65 @@ final class APIClient {
         return data
     }
 
+    /// `POST multipart/form-data` with a file field plus additional text fields.
+    /// Response body is decoded as `{ "data": T }`.
+    func uploadMultipartWithFields<T: Decodable>(
+        _ path: String,
+        fileFieldName: String,
+        fileData: Data,
+        fileName: String,
+        mimeType: String,
+        fields: [String: String],
+        tokenProvider: () async -> String?,
+        refreshAndRetry: () async -> Bool
+    ) async throws -> T {
+        func performUpload(token: String) async throws -> Data {
+            let boundary = "Boundary-\(UUID().uuidString)"
+            var body = Data()
+
+            for (key, value) in fields {
+                body.appendString("--\(boundary)\r\n")
+                body.appendString("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n")
+                body.appendString("\(value)\r\n")
+            }
+
+            body.appendString("--\(boundary)\r\n")
+            body.appendString("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"\r\n")
+            body.appendString("Content-Type: \(mimeType)\r\n\r\n")
+            body.append(fileData)
+            body.appendString("\r\n--\(boundary)--\r\n")
+
+            let url = URL(string: "\(baseURL)\(path)")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+
+            let (data, response) = try await session.data(for: request)
+            let httpResponse = response as? HTTPURLResponse
+
+            if httpResponse?.statusCode == 401 { throw APIError.unauthorized }
+            guard let status = httpResponse?.statusCode else { throw APIError.invalidResponse }
+            guard (200...299).contains(status) else { throw APIError.httpStatus(status) }
+            return data
+        }
+
+        guard let token = await tokenProvider() else { throw APIError.unauthorized }
+
+        do {
+            let data = try await performUpload(token: token)
+            let wrapped = try JSONDecoder().decode(APIResponse<T>.self, from: data)
+            return wrapped.data
+        } catch APIError.unauthorized {
+            let refreshed = await refreshAndRetry()
+            guard refreshed, let next = await tokenProvider() else { throw APIError.unauthorized }
+            let data = try await performUpload(token: next)
+            let wrapped = try JSONDecoder().decode(APIResponse<T>.self, from: data)
+            return wrapped.data
+        }
+    }
+
     /// `POST multipart/form-data` with a single file field — response body is decoded without `{ "data": … }` wrapper (e.g. `202 Accepted` uploads).
     func uploadMultipartUnwrapped<T: Decodable>(
         _ path: String,

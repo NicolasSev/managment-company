@@ -59,12 +59,30 @@ struct OccupancyPayload: Codable {
     }
 }
 
+/// Single overdue rent payment item from GET `/v1/analytics/overdue-payments`.
+struct OverduePaymentItem: Codable, Identifiable {
+    var id: String { "\(propertyName)-\(periodYear)-\(periodMonth)" }
+    let propertyName: String
+    let periodYear: Int
+    let periodMonth: Int
+    let dueDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case propertyName = "property_name"
+        case periodYear = "period_year"
+        case periodMonth = "period_month"
+        case dueDate = "due_date"
+    }
+}
+
 /// GET `/v1/analytics/overdue-payments` → `data`.
 struct OverduePaymentsPayload: Codable {
     let overdueCount: Int
+    let items: [OverduePaymentItem]
 
     enum CodingKeys: String, CodingKey {
         case overdueCount = "overdue_count"
+        case items
     }
 }
 
