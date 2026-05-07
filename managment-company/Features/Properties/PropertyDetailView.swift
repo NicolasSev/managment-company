@@ -17,6 +17,8 @@ struct PropertyDetailView: View {
     @State private var showEditForm = false
     @State private var showUtilityForm = false
     @State private var editingUtility: PropertyUtility?
+    @State private var editingTransaction: Transaction?
+    @State private var transactionToDelete: Transaction?
     @State private var expandedUtilityMonths: Set<String> = []
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
 
@@ -71,6 +73,12 @@ struct PropertyDetailView: View {
             QuickTransactionSheet(propertyId: property.id) { await loadData() }
                 .environmentObject(authManager)
         }
+        .sheet(item: $editingTransaction) { transaction in
+            QuickTransactionSheet(propertyId: property.id, transaction: transaction) {
+                await loadData()
+            }
+            .environmentObject(authManager)
+        }
         .sheet(isPresented: $showEditForm) {
             PropertyFormView(property: property) { await loadData() }
                 .environmentObject(authManager)
@@ -89,6 +97,25 @@ struct PropertyDetailView: View {
                 await MainActor.run { errorMessage = nil }
             }
             .environmentObject(authManager)
+        }
+        .confirmationDialog(
+            "Удалить операцию?",
+            isPresented: Binding(
+                get: { transactionToDelete != nil },
+                set: { if !$0 { transactionToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Удалить", role: .destructive) {
+                if let transaction = transactionToDelete {
+                    Task { await deleteTransaction(transaction) }
+                }
+            }
+            Button("Отмена", role: .cancel) {
+                transactionToDelete = nil
+            }
+        } message: {
+            Text("Операция будет удалена из журнала объекта и финансовой статистики.")
         }
     }
 
@@ -227,7 +254,9 @@ struct PropertyDetailView: View {
                     ForEach(transactions.prefix(10)) { transaction in
                         TransactionRow(
                             transaction: transaction,
-                            baseCurrency: authManager.user?.baseCurrency ?? "KZT"
+                            baseCurrency: authManager.user?.baseCurrency ?? "KZT",
+                            onEdit: { editingTransaction = transaction },
+                            onDelete: { transactionToDelete = transaction }
                         )
                     }
                 }
@@ -794,6 +823,21 @@ struct PropertyDetailView: View {
         }
     }
 
+    private func deleteTransaction(_ transaction: Transaction) async {
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/transactions/\(transaction.id)",
+                method: "DELETE",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            transactionToDelete = nil
+            await loadData()
+        } catch {
+            errorMessage = "Не удалось удалить операцию. Потяните для обновления и попробуйте еще раз."
+        }
+    }
+
     private func loadLeases() async {
         do {
             let data = try await APIClient.shared.requestData(
@@ -903,6 +947,8 @@ private struct ExchangeRateConversionDTO: Decodable {
 struct TransactionRow: View {
     let transaction: Transaction
     let baseCurrency: String
+    var onEdit: () -> Void = {}
+    var onDelete: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
@@ -933,6 +979,16 @@ struct TransactionRow: View {
                 Text("База \(AppFormatting.currency(transaction.amountBase, currency: baseCurrency))")
                     .font(.caption)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+
+            Menu {
+                Button("Редактировать", systemImage: "pencil", action: onEdit)
+                Button("Удалить", systemImage: "trash", role: .destructive, action: onDelete)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .frame(width: 32, height: 32)
             }
         }
         .padding(.vertical, AppTheme.Spacing.sm)

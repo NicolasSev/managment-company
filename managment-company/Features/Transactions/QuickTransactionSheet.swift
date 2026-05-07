@@ -5,6 +5,7 @@ struct QuickTransactionSheet: View {
     let propertyId: String?
     /// When non-nil, shows a property picker as the first field.
     var properties: [Property]? = nil
+    var transaction: Transaction? = nil
     var onSave: () async -> Void
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
@@ -14,11 +15,14 @@ struct QuickTransactionSheet: View {
     @State private var selectedCategoryId: String?
     @State private var date = Date()
     @State private var isIncome = true
+    @State private var transactionDescription = ""
     @State private var categories: [Category] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var didPopulate = false
 
     private var effectivePropertyId: String? {
+        if let transaction { return transaction.propertyId }
         if let pid = propertyId, !pid.isEmpty { return pid }
         let s = selectedPropertyId.trimmingCharacters(in: .whitespacesAndNewlines)
         return s.isEmpty ? nil : s
@@ -27,7 +31,7 @@ struct QuickTransactionSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                if let props = properties {
+                if transaction == nil, let props = properties {
                     Section("Объект") {
                         Picker("Объект", selection: $selectedPropertyId) {
                             Text("Выберите объект").tag("")
@@ -67,6 +71,9 @@ struct QuickTransactionSheet: View {
                 Section("Дата") {
                     DatePicker("Дата", selection: $date, displayedComponents: .date)
                 }
+                Section("Описание") {
+                    AppTextField(title: "Описание", text: $transactionDescription, placeholder: "Необязательно")
+                }
                 if let err = errorMessage {
                     Section {
                         Text(err)
@@ -74,17 +81,18 @@ struct QuickTransactionSheet: View {
                     }
                 }
             }
-            .navigationTitle("Быстрая операция")
+            .navigationTitle(transaction == nil ? "Новая операция" : "Редактировать операцию")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отмена") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") { Task { await save() } }
+                    Button(transaction == nil ? "Сохранить" : "Готово") { Task { await save() } }
                         .disabled(!isValid || isLoading)
                 }
             }
+            .onAppear { populateFromTransactionIfNeeded() }
             .task { await loadCategories() }
         }
     }
@@ -94,9 +102,38 @@ struct QuickTransactionSheet: View {
     }
     
     private var isValid: Bool {
-        guard let a = Double(amount), a > 0 else { return false }
+        guard let a = parsedAmount, a > 0 else { return false }
         guard effectivePropertyId != nil else { return false }
         return selectedCategoryId != nil
+    }
+
+    private var parsedAmount: Double? {
+        Double(
+            amount
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: ",", with: ".")
+        )
+    }
+
+    private func populateFromTransactionIfNeeded() {
+        guard !didPopulate else { return }
+        didPopulate = true
+
+        if let transaction {
+            selectedPropertyId = transaction.propertyId
+            amount = String(transaction.amount)
+            selectedCategoryId = transaction.categoryId
+            isIncome = transaction.type == "income"
+            transactionDescription = transaction.description ?? ""
+            if let parsed = AppFormatting.parsedDate(from: transaction.transactionDate) {
+                date = parsed
+            }
+            return
+        }
+
+        if selectedPropertyId.isEmpty, propertyId == nil, let first = properties?.first {
+            selectedPropertyId = first.id
+        }
     }
     
     private func loadCategories() async {
@@ -116,7 +153,7 @@ struct QuickTransactionSheet: View {
     
     private func save() async {
         guard let catId = selectedCategoryId,
-              let amt = Double(amount), amt > 0,
+              let amt = parsedAmount, amt > 0,
               let pid = effectivePropertyId else { return }
         isLoading = true
         errorMessage = nil
@@ -124,18 +161,29 @@ struct QuickTransactionSheet: View {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        let trimmedDescription = transactionDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = TransactionInput(
             type: isIncome ? "income" : "expense",
             categoryId: catId,
             amount: amt,
             currency: authManager.user?.baseCurrency ?? "KZT",
-            transactionDate: formatter.string(from: date)
+            transactionDate: formatter.string(from: date),
+            description: transaction == nil && trimmedDescription.isEmpty ? nil : trimmedDescription
         )
 
         do {
+            let path: String
+            let method: String
+            if let transaction {
+                path = "/v1/transactions/\(transaction.id)"
+                method = "PUT"
+            } else {
+                path = "/v1/properties/\(pid)/transactions"
+                method = "POST"
+            }
             _ = try await APIClient.shared.requestData(
-                "/v1/properties/\(pid)/transactions",
-                method: "POST",
+                path,
+                method: method,
                 body: body,
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
@@ -154,9 +202,10 @@ private struct TransactionInput: Encodable {
     let amount: Double
     let currency: String
     let transactionDate: String
+    let description: String?
     
     enum CodingKeys: String, CodingKey {
-        case type, amount, currency
+        case type, amount, currency, description
         case categoryId = "category_id"
         case transactionDate = "transaction_date"
     }
