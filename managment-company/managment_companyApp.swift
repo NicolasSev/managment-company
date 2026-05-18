@@ -59,6 +59,7 @@ struct managment_companyApp: App {
     @StateObject private var authManager = AuthManager()
     @StateObject private var pushRegistration = PushDeviceRegistrationController()
     @StateObject private var notificationRouter = NotificationDeepLinkRouter()
+    @StateObject private var liveActivityCoordinator = LiveActivityCoordinator()
 
     var body: some Scene {
         WindowGroup {
@@ -75,6 +76,8 @@ struct managment_companyApp: App {
                             await pushRegistration.syncRegistration(with: authManager)
                         }
                     }
+                    RentReminderActions.authManager = authManager
+                    liveActivityCoordinator.start(with: authManager)
                 }
                 .onChange(of: authManager.isAuthenticated) { _, _ in
                     appDelegate.authManager = authManager
