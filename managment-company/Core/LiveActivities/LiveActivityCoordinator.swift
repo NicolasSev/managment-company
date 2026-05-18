@@ -34,6 +34,61 @@ final class LiveActivityCoordinator: ObservableObject {
         activityListenerTask = nil
     }
 
+    /// Asks the backend for currently-due rent reminders and starts a local
+    /// Live Activity for each one that does not already have a running
+    /// activity. This is the fallback path that bootstraps Live Activities on
+    /// first use — once iOS has seen `RentPaymentAttributes` once, push-to-start
+    /// payloads from the backend will also work for future cycles.
+    func syncLocalActivities() async {
+        guard let auth = authManager, auth.isAuthenticated else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let reminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
+        guard !reminders.isEmpty else { return }
+
+        let existing = Set(Activity<RentPaymentAttributes>.activities.map { $0.attributes.scheduleId })
+
+        for reminder in reminders {
+            if existing.contains(reminder.schedule_id) { continue }
+            let attributes = RentPaymentAttributes(
+                scheduleId: reminder.schedule_id,
+                leaseId: reminder.lease_id,
+                propertyName: reminder.property_name,
+                tenantName: reminder.tenant_name,
+                periodLabel: Self.periodLabel(from: reminder.period_start),
+                dueDate: reminder.due_date,
+                amount: reminder.expected_amount,
+                currency: reminder.currency
+            )
+            let state = RentPaymentAttributes.ContentState(status: "awaiting")
+            do {
+                _ = try Activity.request(
+                    attributes: attributes,
+                    content: ActivityContent(state: state, staleDate: nil),
+                    pushType: .token
+                )
+            } catch {
+                // Typically thrown when the user has disabled Live Activities
+                // in Settings or the concurrent cap is reached.
+            }
+        }
+    }
+
+    private static func periodLabel(from periodStartISO: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        guard let date = formatter.date(from: periodStartISO) else { return periodStartISO }
+        let months = ["январь", "февраль", "март", "апрель", "май", "июнь",
+                      "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"]
+        let cal = Calendar(identifier: .gregorian)
+        let month = cal.component(.month, from: date)
+        let year = cal.component(.year, from: date)
+        let name = (1...12).contains(month) ? months[month - 1] : ""
+        return "\(name) \(year)".trimmingCharacters(in: .whitespaces)
+    }
+
     private func startPushToStartListener() {
         pushToStartTask?.cancel()
         pushToStartTask = Task { [weak self] in

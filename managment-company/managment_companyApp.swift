@@ -8,6 +8,7 @@ private struct AppRootView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var pushRegistration: PushDeviceRegistrationController
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @EnvironmentObject private var liveActivityCoordinator: LiveActivityCoordinator
 
     var body: some View {
         Group {
@@ -27,6 +28,7 @@ private struct AppRootView: View {
                 PendingMutationQueue.shared.startMonitoring(authManager: authManager)
                 await PendingMutationQueue.shared.processQueue(authManager: authManager)
                 await pushRegistration.syncRegistration(with: authManager)
+                await liveActivityCoordinator.syncLocalActivities()
             } else {
                 PendingMutationQueue.shared.stopMonitoring()
                 DashboardOverviewCache.clear()
@@ -38,6 +40,7 @@ private struct AppRootView: View {
             Task {
                 await PendingMutationQueue.shared.processQueue(authManager: authManager)
                 await pushRegistration.syncRegistration(with: authManager)
+                await liveActivityCoordinator.syncLocalActivities()
             }
         }
     }
@@ -67,6 +70,7 @@ struct managment_companyApp: App {
                 .environmentObject(authManager)
                 .environmentObject(pushRegistration)
                 .environmentObject(notificationRouter)
+                .environmentObject(liveActivityCoordinator)
                 .onAppear {
                     appDelegate.deepLinkRouter = notificationRouter
                     appDelegate.authManager = authManager

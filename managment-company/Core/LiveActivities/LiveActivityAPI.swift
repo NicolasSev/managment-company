@@ -76,6 +76,37 @@ enum LiveActivityAPI {
             refreshAndRetry: { await auth.refreshToken() }
         )
     }
+
+    /// One row from `GET /v1/payment-schedules/active-reminders`.
+    struct ActiveReminder: Decodable {
+        let schedule_id: String
+        let lease_id: String
+        let property_name: String
+        let tenant_name: String
+        let due_date: String
+        let period_start: String
+        let expected_amount: Double
+        let currency: String
+    }
+
+    private struct ActiveRemindersEnvelope: Decodable {
+        let data: [ActiveReminder]
+    }
+
+    static func fetchActiveReminders(auth: AuthManager) async -> [ActiveReminder] {
+        guard auth.isAuthenticated else { return [] }
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/payment-schedules/active-reminders",
+                method: "GET",
+                tokenProvider: { auth.accessToken },
+                refreshAndRetry: { await auth.refreshToken() }
+            )
+            return try JSONDecoder().decode(ActiveRemindersEnvelope.self, from: data).data
+        } catch {
+            return []
+        }
+    }
 }
 
 private extension ISO8601DateFormatter {
