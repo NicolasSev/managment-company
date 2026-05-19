@@ -56,13 +56,14 @@ final class LiveActivityCoordinator: ObservableObject {
         let allReminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
         liveActivityLog.notice("fetched \(allReminders.count) active reminders")
 
-        // Reap orphan activities — any Live Activity whose scheduleId is no
-        // longer in the active-reminders list (paid, snoozed-away, or stuck
-        // with a cached empty Archive). This frees slots so push-to-start /
-        // sync can start fresh ones.
-        let reminderIds = Set(allReminders.map { $0.schedule_id })
-        for activity in Activity<RentPaymentAttributes>.activities where !reminderIds.contains(activity.attributes.scheduleId) {
-            liveActivityLog.notice("ending orphan activity id=\(activity.id, privacy: .public) schedule=\(activity.attributes.scheduleId, privacy: .public)")
+        // End every running activity so the next sync starts from a clean
+        // state. iOS can hold "orphan" Live Activities with a cached empty
+        // WidgetRenderer Archive (created when the extension was missing from
+        // an earlier build); they would otherwise occupy slots forever. We
+        // re-spawn fresh ones below using the current widget binary so the
+        // Lock Screen UI actually renders.
+        for activity in Activity<RentPaymentAttributes>.activities {
+            liveActivityLog.notice("ending existing activity id=\(activity.id, privacy: .public) schedule=\(activity.attributes.scheduleId, privacy: .public)")
             await activity.end(nil, dismissalPolicy: .immediate)
         }
 
@@ -72,14 +73,8 @@ final class LiveActivityCoordinator: ObservableObject {
         // free for a backend push-to-start so the worker can still spawn the
         // most recent reminder later if a paid one frees up a slot.
         let reminders = Array(allReminders.prefix(4))
-        let existing = Set(Activity<RentPaymentAttributes>.activities.map { $0.attributes.scheduleId })
-        liveActivityLog.notice("currently running activities: \(existing.count)")
 
         for reminder in reminders {
-            if existing.contains(reminder.schedule_id) {
-                liveActivityLog.notice("skip \(reminder.schedule_id): already running")
-                continue
-            }
             let attributes = RentPaymentAttributes(
                 scheduleId: reminder.schedule_id,
                 leaseId: reminder.lease_id,
