@@ -53,10 +53,14 @@ final class LiveActivityCoordinator: ObservableObject {
             return
         }
 
-        let reminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
-        liveActivityLog.notice("fetched \(reminders.count) active reminders")
-        guard !reminders.isEmpty else { return }
+        let allReminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
+        liveActivityLog.notice("fetched \(allReminders.count) active reminders")
+        guard !allReminders.isEmpty else { return }
 
+        // iOS limits one app to ~5 concurrent Live Activities. Leave one slot
+        // free for a backend push-to-start so the worker can still spawn the
+        // most recent reminder later if a paid one frees up a slot.
+        let reminders = Array(allReminders.prefix(4))
         let existing = Set(Activity<RentPaymentAttributes>.activities.map { $0.attributes.scheduleId })
         liveActivityLog.notice("currently running activities: \(existing.count)")
 
