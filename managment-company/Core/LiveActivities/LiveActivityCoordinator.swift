@@ -55,6 +55,17 @@ final class LiveActivityCoordinator: ObservableObject {
 
         let allReminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
         liveActivityLog.notice("fetched \(allReminders.count) active reminders")
+
+        // Reap orphan activities — any Live Activity whose scheduleId is no
+        // longer in the active-reminders list (paid, snoozed-away, or stuck
+        // with a cached empty Archive). This frees slots so push-to-start /
+        // sync can start fresh ones.
+        let reminderIds = Set(allReminders.map { $0.schedule_id })
+        for activity in Activity<RentPaymentAttributes>.activities where !reminderIds.contains(activity.attributes.scheduleId) {
+            liveActivityLog.notice("ending orphan activity id=\(activity.id, privacy: .public) schedule=\(activity.attributes.scheduleId, privacy: .public)")
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+
         guard !allReminders.isEmpty else { return }
 
         // iOS limits one app to ~5 concurrent Live Activities. Leave one slot
@@ -81,9 +92,10 @@ final class LiveActivityCoordinator: ObservableObject {
             )
             let state = RentPaymentAttributes.ContentState(status: "awaiting")
             do {
+                let staleDate = Date().addingTimeInterval(4 * 60 * 60) // 4h — matches worker rearm cadence
                 let activity = try Activity.request(
                     attributes: attributes,
-                    content: ActivityContent(state: state, staleDate: nil),
+                    content: ActivityContent(state: state, staleDate: staleDate),
                     pushType: .token
                 )
                 liveActivityLog.notice("STARTED activity id=\(activity.id, privacy: .public) schedule=\(reminder.schedule_id, privacy: .public)")
