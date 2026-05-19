@@ -40,16 +40,28 @@ final class LiveActivityCoordinator: ObservableObject {
     /// first use — once iOS has seen `RentPaymentAttributes` once, push-to-start
     /// payloads from the backend will also work for future cycles.
     func syncLocalActivities() async {
-        guard let auth = authManager, auth.isAuthenticated else { return }
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard let auth = authManager, auth.isAuthenticated else {
+            print("[LiveActivity] sync skipped: not authenticated")
+            return
+        }
+        let authInfo = ActivityAuthorizationInfo()
+        guard authInfo.areActivitiesEnabled else {
+            print("[LiveActivity] sync skipped: areActivitiesEnabled=false (enable Live Activities in Settings → app → Live Activities)")
+            return
+        }
 
         let reminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
+        print("[LiveActivity] fetched \(reminders.count) active reminders")
         guard !reminders.isEmpty else { return }
 
         let existing = Set(Activity<RentPaymentAttributes>.activities.map { $0.attributes.scheduleId })
+        print("[LiveActivity] currently running activities: \(existing.count)")
 
         for reminder in reminders {
-            if existing.contains(reminder.schedule_id) { continue }
+            if existing.contains(reminder.schedule_id) {
+                print("[LiveActivity] skip \(reminder.schedule_id): already running")
+                continue
+            }
             let attributes = RentPaymentAttributes(
                 scheduleId: reminder.schedule_id,
                 leaseId: reminder.lease_id,
@@ -62,14 +74,14 @@ final class LiveActivityCoordinator: ObservableObject {
             )
             let state = RentPaymentAttributes.ContentState(status: "awaiting")
             do {
-                _ = try Activity.request(
+                let activity = try Activity.request(
                     attributes: attributes,
                     content: ActivityContent(state: state, staleDate: nil),
                     pushType: .token
                 )
+                print("[LiveActivity] STARTED activity id=\(activity.id) schedule=\(reminder.schedule_id)")
             } catch {
-                // Typically thrown when the user has disabled Live Activities
-                // in Settings or the concurrent cap is reached.
+                print("[LiveActivity] FAILED to start activity for schedule=\(reminder.schedule_id): \(error.localizedDescription) — \(error)")
             }
         }
     }

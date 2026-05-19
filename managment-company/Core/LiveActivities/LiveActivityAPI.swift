@@ -94,7 +94,10 @@ enum LiveActivityAPI {
     }
 
     static func fetchActiveReminders(auth: AuthManager) async -> [ActiveReminder] {
-        guard auth.isAuthenticated else { return [] }
+        guard auth.isAuthenticated else {
+            print("[LiveActivity] fetchActiveReminders: not authenticated")
+            return []
+        }
         do {
             let data = try await APIClient.shared.requestData(
                 "/v1/payment-schedules/active-reminders",
@@ -102,8 +105,11 @@ enum LiveActivityAPI {
                 tokenProvider: { auth.accessToken },
                 refreshAndRetry: { await auth.refreshToken() }
             )
-            return try JSONDecoder().decode(ActiveRemindersEnvelope.self, from: data).data
+            let envelope = try JSONDecoder().decode(ActiveRemindersEnvelope.self, from: data)
+            print("[LiveActivity] /active-reminders returned \(envelope.data.count) row(s)")
+            return envelope.data
         } catch {
+            print("[LiveActivity] /active-reminders FAILED: \(error)")
             return []
         }
     }
