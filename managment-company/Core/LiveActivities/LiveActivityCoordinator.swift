@@ -2,6 +2,9 @@
 import ActivityKit
 import Combine
 import Foundation
+import os.log
+
+private let liveActivityLog = Logger(subsystem: "com.nicolascooper.rentfolio", category: "LiveActivity")
 
 /// Subscribes to ActivityKit token streams and reports them back to the API so
 /// the backend can deliver push-to-start and update pushes for rent payment
@@ -41,25 +44,25 @@ final class LiveActivityCoordinator: ObservableObject {
     /// payloads from the backend will also work for future cycles.
     func syncLocalActivities() async {
         guard let auth = authManager, auth.isAuthenticated else {
-            print("[LiveActivity] sync skipped: not authenticated")
+            liveActivityLog.notice("sync skipped: not authenticated")
             return
         }
         let authInfo = ActivityAuthorizationInfo()
         guard authInfo.areActivitiesEnabled else {
-            print("[LiveActivity] sync skipped: areActivitiesEnabled=false (enable Live Activities in Settings → app → Live Activities)")
+            liveActivityLog.error("sync skipped: areActivitiesEnabled=false (enable Live Activities in Settings → app → Live Activities)")
             return
         }
 
         let reminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
-        print("[LiveActivity] fetched \(reminders.count) active reminders")
+        liveActivityLog.notice("fetched \(reminders.count) active reminders")
         guard !reminders.isEmpty else { return }
 
         let existing = Set(Activity<RentPaymentAttributes>.activities.map { $0.attributes.scheduleId })
-        print("[LiveActivity] currently running activities: \(existing.count)")
+        liveActivityLog.notice("currently running activities: \(existing.count)")
 
         for reminder in reminders {
             if existing.contains(reminder.schedule_id) {
-                print("[LiveActivity] skip \(reminder.schedule_id): already running")
+                liveActivityLog.notice("skip \(reminder.schedule_id): already running")
                 continue
             }
             let attributes = RentPaymentAttributes(
@@ -79,9 +82,9 @@ final class LiveActivityCoordinator: ObservableObject {
                     content: ActivityContent(state: state, staleDate: nil),
                     pushType: .token
                 )
-                print("[LiveActivity] STARTED activity id=\(activity.id) schedule=\(reminder.schedule_id)")
+                liveActivityLog.notice("STARTED activity id=\(activity.id, privacy: .public) schedule=\(reminder.schedule_id, privacy: .public)")
             } catch {
-                print("[LiveActivity] FAILED to start activity for schedule=\(reminder.schedule_id): \(error.localizedDescription) — \(error)")
+                liveActivityLog.error("FAILED to start activity for schedule=\(reminder.schedule_id, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
     }

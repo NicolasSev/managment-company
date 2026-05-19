@@ -1,5 +1,8 @@
 #if os(iOS)
 import Foundation
+import os.log
+
+private let liveActivityAPILog = Logger(subsystem: "com.nicolascooper.rentfolio", category: "LiveActivity")
 
 /// Lightweight helpers that wrap the rent-payment endpoints used by Live Activity
 /// intents and the coordinator. They use the shared `APIClient` so JWT
@@ -95,7 +98,7 @@ enum LiveActivityAPI {
 
     static func fetchActiveReminders(auth: AuthManager) async -> [ActiveReminder] {
         guard auth.isAuthenticated else {
-            print("[LiveActivity] fetchActiveReminders: not authenticated")
+            liveActivityAPILog.notice("fetchActiveReminders: not authenticated")
             return []
         }
         do {
@@ -106,10 +109,10 @@ enum LiveActivityAPI {
                 refreshAndRetry: { await auth.refreshToken() }
             )
             let envelope = try JSONDecoder().decode(ActiveRemindersEnvelope.self, from: data)
-            print("[LiveActivity] /active-reminders returned \(envelope.data.count) row(s)")
+            liveActivityAPILog.notice("/active-reminders returned \(envelope.data.count, privacy: .public) row(s)")
             return envelope.data
         } catch {
-            print("[LiveActivity] /active-reminders FAILED: \(error)")
+            liveActivityAPILog.error("/active-reminders FAILED: \(String(describing: error), privacy: .public)")
             return []
         }
     }
