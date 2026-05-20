@@ -82,28 +82,29 @@ private struct LockScreenView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Header: что и за какой период
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ОПЛАТА АРЕНДЫ · \(context.attributes.periodLabel)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(context.attributes.propertyName)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(context.attributes.tenantName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            // Сумма + дедлайн
             HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Оплата аренды")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                    Text(context.attributes.propertyName)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Text("\(context.attributes.tenantName) · \(context.attributes.periodLabel)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                Text(amountString)
+                    .font(.title2.monospacedDigit().weight(.semibold))
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(amountString)
-                        .font(.title3.monospacedDigit().weight(.semibold))
-                    Text("до \(context.attributes.dueDate)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Text("до \(context.attributes.dueDate)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if context.state.status == "paid" {
@@ -111,12 +112,21 @@ private struct LockScreenView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.green)
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Button(intent: MarkRentNotPaidIntent(scheduleId: context.attributes.scheduleId)) {
                         Label("Не оплачено", systemImage: "clock")
+                            .labelStyle(.iconOnly)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+
+                    Link(destination: URL(string: "propmanager://schedule/\(context.attributes.scheduleId)/preview")!) {
+                        Label("Просмотреть", systemImage: "eye")
+                            .labelStyle(.iconOnly)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .background(Color.gray.opacity(0.2), in: .rect(cornerRadius: 8))
 
                     Button(intent: MarkRentPaidIntent(
                         scheduleId: context.attributes.scheduleId,

@@ -9,6 +9,7 @@ private struct AppRootView: View {
     @EnvironmentObject private var pushRegistration: PushDeviceRegistrationController
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @EnvironmentObject private var liveActivityCoordinator: LiveActivityCoordinator
+    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
 
     var body: some View {
         Group {
@@ -21,6 +22,16 @@ private struct AppRootView: View {
         .sheet(isPresented: $notificationRouter.presentNotificationsInbox) {
             NotificationsInboxView(onDataChanged: { })
                 .environmentObject(authManager)
+        }
+        .sheet(item: Binding(
+            get: { rentPreviewRouter.pendingScheduleId.map(RentPreviewItem.init) },
+            set: { newValue in if newValue == nil { rentPreviewRouter.clear() } }
+        )) { item in
+            RentPreviewSheet(scheduleId: item.id, onClose: { rentPreviewRouter.clear() })
+                .environmentObject(authManager)
+        }
+        .onOpenURL { url in
+            _ = rentPreviewRouter.handle(url: url)
         }
         .task(id: authManager.isAuthenticated) {
             if authManager.isAuthenticated {
@@ -63,6 +74,7 @@ struct managment_companyApp: App {
     @StateObject private var pushRegistration = PushDeviceRegistrationController()
     @StateObject private var notificationRouter = NotificationDeepLinkRouter()
     @StateObject private var liveActivityCoordinator = LiveActivityCoordinator()
+    @StateObject private var rentPreviewRouter = RentPreviewRouter()
 
     var body: some Scene {
         WindowGroup {
@@ -71,6 +83,7 @@ struct managment_companyApp: App {
                 .environmentObject(pushRegistration)
                 .environmentObject(notificationRouter)
                 .environmentObject(liveActivityCoordinator)
+                .environmentObject(rentPreviewRouter)
                 .onAppear {
                     appDelegate.deepLinkRouter = notificationRouter
                     appDelegate.authManager = authManager
