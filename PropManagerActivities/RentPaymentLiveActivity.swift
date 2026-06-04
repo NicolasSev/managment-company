@@ -103,54 +103,50 @@ private struct LockScreenView: View {
     let context: ActivityViewContext<RentPaymentAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Top: section label + period accent badge.
-            HStack(alignment: .center, spacing: 8) {
-                Label("ОПЛАТА АРЕНДЫ", systemImage: "house.fill")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        // Lock Screen Live Activities are capped at ~160pt tall and overflow is
+        // clipped, so the layout stays to three tight rows:
+        //   1. object + tenant  ·  period badge (the primary accent)
+        //   2. amount  ·  due date
+        //   3. actions
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(context.attributes.propertyName)
+                        .font(.headline.weight(.semibold))
+                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(context.attributes.tenantName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 Spacer(minLength: 8)
                 PeriodBadge(label: context.attributes.periodLabel)
             }
 
-            // Object + tenant — the "who & where".
-            VStack(alignment: .leading, spacing: 4) {
-                Text(context.attributes.propertyName)
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(1)
-                HStack(spacing: 5) {
-                    Image(systemName: "person.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text(context.attributes.tenantName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            // Amount — the headline figure — with the due date kept quiet.
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(RentFormatting.amount(context.attributes.amount, currency: context.attributes.currency))
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .font(.system(.title, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text("СРОК")
-                        .font(.system(size: 9).weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                    Text(RentFormatting.dueDate(context.attributes.dueDate))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
+                Spacer(minLength: 8)
+                Text("СРОК")
+                    .font(.system(size: 9).weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                Text(RentFormatting.dueDate(context.attributes.dueDate))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
             }
 
             actionRow
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder
@@ -160,24 +156,24 @@ private struct LockScreenView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.green)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
                 .background(Color.green.opacity(0.15), in: .rect(cornerRadius: 10))
         } else {
             HStack(spacing: 8) {
                 Button(intent: MarkRentNotPaidIntent(scheduleId: context.attributes.scheduleId)) {
                     Image(systemName: "clock")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
-                .frame(width: 60)
+                .frame(width: 56)
 
                 Link(destination: URL(string: "propmanager://schedule/\(context.attributes.scheduleId)/preview")!) {
                     Image(systemName: "eye")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 6)
                 }
-                .frame(width: 60)
+                .frame(width: 56)
                 .background(Color.gray.opacity(0.2), in: .rect(cornerRadius: 8))
 
                 Button(intent: MarkRentPaidIntent(
@@ -188,7 +184,7 @@ private struct LockScreenView: View {
                     Label("Оплачено", systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.green)
