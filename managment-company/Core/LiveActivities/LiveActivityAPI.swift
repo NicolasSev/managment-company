@@ -96,10 +96,13 @@ enum LiveActivityAPI {
         let data: [ActiveReminder]
     }
 
-    static func fetchActiveReminders(auth: AuthManager) async -> [ActiveReminder] {
+    /// Returns `nil` when the backend call genuinely failed (network/auth/decode)
+    /// so the coordinator can distinguish "empty success" from "we don't know"
+    /// and avoid tearing down running Live Activities on a transient error.
+    static func fetchActiveReminders(auth: AuthManager) async -> [ActiveReminder]? {
         guard auth.isAuthenticated else {
             liveActivityAPILog.notice("fetchActiveReminders: not authenticated")
-            return []
+            return nil
         }
         do {
             let data = try await APIClient.shared.requestData(
@@ -113,7 +116,7 @@ enum LiveActivityAPI {
             return envelope.data
         } catch {
             liveActivityAPILog.error("/active-reminders FAILED: \(String(describing: error), privacy: .public)")
-            return []
+            return nil
         }
     }
 }

@@ -53,26 +53,35 @@ final class LiveActivityCoordinator: ObservableObject {
             return
         }
 
-        let allReminders = await LiveActivityAPI.fetchActiveReminders(auth: auth)
-        liveActivityLog.notice("fetched \(allReminders.count) active reminders")
-
-        // End every running activity so the next sync starts from a clean
-        // state. iOS can hold "orphan" Live Activities with a cached empty
-        // WidgetRenderer Archive (created when the extension was missing from
-        // an earlier build); they would otherwise occupy slots forever. We
-        // re-spawn fresh ones below using the current widget binary so the
-        // Lock Screen UI actually renders.
-        for activity in Activity<RentPaymentAttributes>.activities {
-            liveActivityLog.notice("ending existing activity id=\(activity.id, privacy: .public) schedule=\(activity.attributes.scheduleId, privacy: .public)")
-            await activity.end(nil, dismissalPolicy: .immediate)
+        guard let allReminders = await LiveActivityAPI.fetchActiveReminders(auth: auth) else {
+            // Transient backend error: leave running activities alone so the
+            // user does not lose the Lock Screen card while the network /
+            // token recovers. The next sync will reconcile.
+            liveActivityLog.notice("sync skipped: /active-reminders fetch failed")
+            return
         }
-
-        guard !allReminders.isEmpty else { return }
+        liveActivityLog.notice("fetched \(allReminders.count) active reminders")
 
         // iOS limits one app to ~5 concurrent Live Activities. Leave one slot
         // free for a backend push-to-start so the worker can still spawn the
         // most recent reminder later if a paid one frees up a slot.
         let reminders = Array(allReminders.prefix(4))
+        let wantedIds = Set(reminders.map { $0.schedule_id })
+
+        // End activities the backend no longer wants (paid / snoozed away).
+        // For ones still in the wanted set we ALSO end them here and respawn
+        // below — that drops any "orphan" duplicate iOS may be holding with a
+        // cached empty WidgetRenderer Archive (created when the extension was
+        // missing from an earlier build), so the Lock Screen UI re-renders
+        // from the current widget binary. Either way: we only reach this loop
+        // after a successful fetch, so we never wipe activities on a network
+        // blip.
+        for activity in Activity<RentPaymentAttributes>.activities {
+            let scheduleId = activity.attributes.scheduleId
+            let reason = wantedIds.contains(scheduleId) ? "respawning" : "orphan"
+            liveActivityLog.notice("ending \(reason, privacy: .public) activity id=\(activity.id, privacy: .public) schedule=\(scheduleId, privacy: .public)")
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
 
         for reminder in reminders {
             let attributes = RentPaymentAttributes(

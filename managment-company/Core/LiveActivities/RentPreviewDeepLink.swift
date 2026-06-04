@@ -92,7 +92,7 @@ struct RentPreviewSheet: View {
     }
 
     private func load() async {
-        let reminders = await LiveActivityAPI.fetchActiveReminders(auth: authManager)
+        let reminders = await LiveActivityAPI.fetchActiveReminders(auth: authManager) ?? []
         reminder = reminders.first(where: { $0.schedule_id == scheduleId })
         loading = false
     }
