@@ -12,6 +12,7 @@ enum AppTab: Hashable {
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
     @ObservedObject private var pendingMutations = PendingMutationQueue.shared
     @State private var selectedTab: AppTab = .dashboard
     
@@ -71,6 +72,11 @@ struct MainTabView: View {
                 selectedTab = tab
                 notificationRouter.clearTabSelection()
             }
+        }
+        .onChange(of: rentPreviewRouter.paidSignal) { _, _ in
+            // Rent payment recorded from the Live Activity preview — surface the
+            // dashboard so the user sees the refreshed pending-payment counts.
+            selectedTab = .dashboard
         }
     }
 }

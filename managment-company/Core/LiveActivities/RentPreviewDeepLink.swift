@@ -16,6 +16,10 @@ struct RentPreviewItem: Identifiable, Hashable {
 @MainActor
 final class RentPreviewRouter: ObservableObject {
     @Published var pendingScheduleId: String?
+    /// Bumped each time a rent payment is recorded from the preview sheet. The
+    /// dashboard observes it to switch into view and re-fetch pending data, so
+    /// the user immediately sees the paid reminder drop out of the list.
+    @Published var paidSignal: Int = 0
 
     func handle(url: URL) -> Bool {
         guard url.scheme == "propmanager" else { return false }
@@ -24,6 +28,10 @@ final class RentPreviewRouter: ObservableObject {
         guard url.host == "schedule", parts.count >= 2, parts[1] == "preview" else { return false }
         pendingScheduleId = parts[0]
         return true
+    }
+
+    func markPaidRecorded() {
+        paidSignal += 1
     }
 
     func clear() {
@@ -37,6 +45,9 @@ final class RentPreviewRouter: ObservableObject {
 /// flow from the UI.
 struct RentPreviewSheet: View {
     let scheduleId: String
+    /// Called after the payment is successfully recorded (before the sheet
+    /// closes) so the host can switch to the dashboard and refresh its data.
+    let onPaid: () -> Void
     let onClose: () -> Void
 
     @State private var reminder: LiveActivityAPI.ActiveReminder?
@@ -107,6 +118,7 @@ struct RentPreviewSheet: View {
             )
             statusMessage = "✅ Транзакция записана"
             try? await Task.sleep(nanoseconds: 800_000_000)
+            onPaid()
             onClose()
         } catch {
             statusMessage = "❌ Ошибка: \(error.localizedDescription)"

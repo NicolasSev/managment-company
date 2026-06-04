@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeDashboardView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
     @Binding var selectedTab: AppTab
 
     @State private var properties: [Property] = []
@@ -66,6 +67,15 @@ struct HomeDashboardView: View {
                 await refreshNotificationUnread()
             }
             .refreshable { await loadOverview(); await refreshNotificationUnread() }
+            .onChange(of: rentPreviewRouter.paidSignal) { _, _ in
+                // A rent payment was just recorded from the Live Activity preview.
+                // Re-fetch so the pending-payment counts reflect it instead of a
+                // stale cached snapshot.
+                Task {
+                    await loadOverview()
+                    await refreshNotificationUnread()
+                }
+            }
         }
     }
 

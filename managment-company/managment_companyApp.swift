@@ -27,8 +27,12 @@ private struct AppRootView: View {
             get: { rentPreviewRouter.pendingScheduleId.map(RentPreviewItem.init) },
             set: { newValue in if newValue == nil { rentPreviewRouter.clear() } }
         )) { item in
-            RentPreviewSheet(scheduleId: item.id, onClose: { rentPreviewRouter.clear() })
-                .environmentObject(authManager)
+            RentPreviewSheet(
+                scheduleId: item.id,
+                onPaid: { rentPreviewRouter.markPaidRecorded() },
+                onClose: { rentPreviewRouter.clear() }
+            )
+            .environmentObject(authManager)
         }
         .onOpenURL { url in
             _ = rentPreviewRouter.handle(url: url)
