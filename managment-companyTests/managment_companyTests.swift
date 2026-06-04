@@ -7,12 +7,17 @@ import Foundation
 import Testing
 @testable import managment_company
 
+/// Token class so `Bundle(for:)` can resolve the test bundle from a struct suite.
+private final class BundleToken {}
+
 /// Shared `KeychainManager` + parallel default execution can race; serialize this suite.
 @Suite(.serialized)
 struct ManagmentCompanyTests {
 
     private func loadFixtureJSON(_ name: String) throws -> Data {
-        let bundle = Bundle(for: ManagmentCompanyTests.self)
+        // `Bundle(for:)` needs a class; this suite is a struct (Swift Testing),
+        // so anchor on a token class compiled into the test bundle.
+        let bundle = Bundle(for: BundleToken.self)
         guard let url = bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures") else {
             struct MissingFixture: Error {}
             throw MissingFixture()
