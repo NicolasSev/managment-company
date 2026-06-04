@@ -23,16 +23,19 @@ private struct AppRootView: View {
             NotificationsInboxView(onDataChanged: { })
                 .environmentObject(authManager)
         }
-        .sheet(item: Binding(
-            get: { rentPreviewRouter.pendingScheduleId.map(RentPreviewItem.init) },
-            set: { newValue in if newValue == nil { rentPreviewRouter.clear() } }
-        )) { item in
-            RentPreviewSheet(
-                scheduleId: item.id,
-                onPaid: { rentPreviewRouter.markPaidRecorded() },
-                onClose: { rentPreviewRouter.clear() }
-            )
-            .environmentObject(authManager)
+        .sheet(isPresented: Binding(
+            get: { rentPreviewRouter.pendingScheduleId != nil },
+            set: { isPresented in if !isPresented { rentPreviewRouter.clear() } }
+        )) {
+            if let scheduleId = rentPreviewRouter.pendingScheduleId {
+                RentPreviewSheet(
+                    scheduleId: scheduleId,
+                    onPaid: { rentPreviewRouter.markPaidRecorded() },
+                    onClose: { rentPreviewRouter.clear() }
+                )
+                .environmentObject(authManager)
+                .id(scheduleId)
+            }
         }
         .onOpenURL { url in
             _ = rentPreviewRouter.handle(url: url)
