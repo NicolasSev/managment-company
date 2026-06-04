@@ -4,6 +4,7 @@ enum AppTab: Hashable {
     case dashboard
     case transactions
     case properties
+    case tenants
     case tasks
     case analytics
     case settings
@@ -35,6 +36,12 @@ struct MainTabView: View {
                 .tag(AppTab.properties)
                 .tabItem {
                     Label("Объекты", systemImage: "building.2")
+                }
+            TenantsListView()
+                .environmentObject(authManager)
+                .tag(AppTab.tenants)
+                .tabItem {
+                    Label("Арендаторы", systemImage: "person.2")
                 }
             TasksListView()
                 .tag(AppTab.tasks)

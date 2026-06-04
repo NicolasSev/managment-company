@@ -20,6 +20,8 @@ final class NotificationDeepLinkRouter: ObservableObject {
         switch entityType {
         case "task":
             selectTab = .tasks
+        case "tenant":
+            selectTab = .tenants
         case "lease":
             selectTab = .properties
         default:

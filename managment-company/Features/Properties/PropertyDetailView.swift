@@ -1,5 +1,5 @@
 import SwiftUI
-import Charts
+import UIKit
 
 struct PropertyDetailView: View {
     let property: Property
@@ -19,8 +19,13 @@ struct PropertyDetailView: View {
     @State private var editingUtility: PropertyUtility?
     @State private var editingTransaction: Transaction?
     @State private var transactionToDelete: Transaction?
-    @State private var expandedUtilityMonths: Set<String> = []
+    @State private var showLeaseForm = false
+    @State private var editingLease: Lease?
+    @State private var leaseToTerminate: Lease?
+    @State private var generatingScheduleLeaseId: String?
+    @State private var linkedTransaction: LinkedTransactionRoute?
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
+    @State private var welcomeCopyMessage: String?
 
     /// Merges paginated property utilities with portfolio history (longer horizon) for this object.
     private var utilitiesForDisplay: [PropertyUtility] {
@@ -41,6 +46,33 @@ struct PropertyDetailView: View {
         let kztValue = AppFormatting.currency(price, currency: property.purchaseCurrency ?? "KZT")
         guard let purchaseUSDEquivalent else { return kztValue }
         return "\(kztValue) / ≈ \(AppFormatting.compactAmount(purchaseUSDEquivalent.convertedAmount, currency: "USD"))"
+    }
+
+    private var tenantWelcomeText: String {
+        let address = property.displayAddress?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let wifiLogin = property.wifiLogin?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let wifiPassword = property.wifiPassword?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let utilityAccount = property.utilityAccountNumber?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return [
+            "Здравствуйте! Добро пожаловать.",
+            "",
+            "Адрес объекта: \(address?.isEmpty == false ? address! : property.name)",
+            "Wi-Fi: \(wifiLogin?.isEmpty == false ? wifiLogin! : "не указан")",
+            "Пароль Wi-Fi: \(wifiPassword?.isEmpty == false ? wifiPassword! : "не указан")",
+            "Лицевой счёт для оплаты коммунальных услуг: \(utilityAccount?.isEmpty == false ? utilityAccount! : "не указан")",
+            "",
+            "Если появятся вопросы по заезду, оплате или коммунальным услугам, напишите мне."
+        ].joined(separator: "\n")
+    }
+
+    private var sortedLeases: [Lease] {
+        leases.sorted {
+            if $0.status.lowercased() == $1.status.lowercased() {
+                return ($0.moveInDate ?? $0.startDate) > ($1.moveInDate ?? $1.startDate)
+            }
+            return $0.status.lowercased() == "active"
+        }
     }
 
     var body: some View {
@@ -90,12 +122,33 @@ struct PropertyDetailView: View {
             }
             .environmentObject(authManager)
         }
-        .sheet(item: $scheduleForMarkPaidSheet) { schedule in
-            MarkSchedulePaidSheet(schedule: schedule) {
-                await refreshSchedule(leaseID: schedule.leaseId)
-                await loadTransactions()
-                await MainActor.run { errorMessage = nil }
+        .sheet(isPresented: $showLeaseForm) {
+            LeaseFormSheet(propertyId: property.id, tenants: tenants) {
+                await loadData()
             }
+            .environmentObject(authManager)
+        }
+        .sheet(item: $editingLease) { lease in
+            LeaseFormSheet(propertyId: property.id, tenants: tenants, lease: lease) {
+                await loadData()
+            }
+            .environmentObject(authManager)
+        }
+        .sheet(item: $leaseToTerminate) { lease in
+            TerminateLeaseSheet(
+                lease: lease,
+                tenant: tenants.first(where: { $0.id == lease.tenantId })
+            ) {
+                await loadData()
+            }
+            .environmentObject(authManager)
+        }
+        .sheet(item: $linkedTransaction) { route in
+            TransactionDetailSheet(
+                transactionId: route.id,
+                propertyName: property.name,
+                baseCurrency: authManager.user?.baseCurrency ?? "KZT"
+            )
             .environmentObject(authManager)
         }
         .confirmationDialog(
@@ -116,6 +169,14 @@ struct PropertyDetailView: View {
             }
         } message: {
             Text("Операция будет удалена из журнала объекта и финансовой статистики.")
+        }
+        .sheet(item: $scheduleForMarkPaidSheet) { schedule in
+            MarkSchedulePaidSheet(schedule: schedule) {
+                await refreshSchedule(leaseID: schedule.leaseId)
+                await loadTransactions()
+                await MainActor.run { errorMessage = nil }
+            }
+            .environmentObject(authManager)
         }
     }
 
@@ -139,6 +200,9 @@ struct PropertyDetailView: View {
 
                     if let errorMessage {
                         statusBanner(errorMessage, color: AppTheme.Colors.warning)
+                    }
+                    if let welcomeCopyMessage {
+                        statusBanner(welcomeCopyMessage, color: AppTheme.Colors.success)
                     }
 
                     factsSection
@@ -230,8 +294,22 @@ struct PropertyDetailView: View {
                     if let acc = property.utilityAccountNumber, !acc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         detailRow("Лицевой счёт (ЖКХ)", value: acc)
                     }
+                    if let login = property.wifiLogin, !login.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        detailRow("Wi-Fi", value: login)
+                    }
+                    if let password = property.wifiPassword, !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        detailRow("Пароль Wi-Fi", value: password)
+                    }
                     detailRow("Заметки", value: property.notes ?? "Заметок по объекту пока нет")
                 }
+
+                Button {
+                    copyTenantWelcomeText()
+                } label: {
+                    Label("Скопировать памятку арендатору", systemImage: "doc.on.doc")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
             }
         }
     }
@@ -267,19 +345,33 @@ struct PropertyDetailView: View {
     private var tenantsSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeader(
-                    title: "Арендаторы",
-                    subtitle: "Аренда и контакты в одном месте."
-                )
+                HStack(alignment: .top) {
+                    sectionHeader(
+                        title: "Арендаторы",
+                        subtitle: "Аренда, график платежей и контакты в одном месте."
+                    )
+
+                    Spacer()
+
+                    Button {
+                        showLeaseForm = true
+                    } label: {
+                        Image(systemName: "person.badge.plus")
+                            .font(.headline)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(AppTheme.Colors.accent)
+                    .accessibilityLabel("Заселить арендатора")
+                }
 
                 if leases.isEmpty {
                     sectionPlaceholder(
                         title: "Арендаторы пока не привязаны",
-                        message: "Записи аренды появятся здесь, когда у объекта будет активный арендатор.",
+                        message: "Заселите арендатора, чтобы отслеживать условия аренды, окно оплаты и график платежей.",
                         icon: "person.2"
                     )
                 } else {
-                    ForEach(leases) { lease in
+                    ForEach(sortedLeases) { lease in
                         let tenant = tenants.first(where: { $0.id == lease.tenantId })
 
                         VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
@@ -315,6 +407,12 @@ struct PropertyDetailView: View {
                                 StatusBadge(status: lease.status)
                             }
 
+                            if isLeaseEarlyMoveOut(lease) {
+                                Label("Выехал раньше срока", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.Colors.warning)
+                            }
+
                             HStack(spacing: AppTheme.Spacing.sm) {
                                 metricCard(
                                     title: "Аренда",
@@ -330,14 +428,56 @@ struct PropertyDetailView: View {
                                 )
                             }
 
+                            HStack(spacing: AppTheme.Spacing.sm) {
+                                leaseActionButton(
+                                    title: "Изменить",
+                                    icon: "pencil",
+                                    color: AppTheme.Colors.accent
+                                ) {
+                                    editingLease = lease
+                                }
+
+                                if lease.status.lowercased() == "active" {
+                                    leaseActionButton(
+                                        title: leaseSchedulesByLeaseId[lease.id]?.isEmpty == false ? "Обновить график" : "Создать график",
+                                        icon: generatingScheduleLeaseId == lease.id ? "arrow.triangle.2.circlepath" : "calendar.badge.plus",
+                                        color: AppTheme.Colors.info
+                                    ) {
+                                        Task { await generateSchedule(for: lease) }
+                                    }
+                                    .disabled(generatingScheduleLeaseId != nil)
+
+                                    leaseActionButton(
+                                        title: "Прекратить",
+                                        icon: "power",
+                                        color: AppTheme.Colors.danger
+                                    ) {
+                                        leaseToTerminate = lease
+                                    }
+                                }
+                            }
+
                             if let scheduleRows = leaseSchedulesByLeaseId[lease.id], !scheduleRows.isEmpty {
                                 leaseScheduleSection(rows: scheduleRows)
                             } else if lease.status.lowercased() == "active" {
-                                Text("График аренды ещё не загружен или не создан — воспользуйтесь сайтом, чтобы сформировать график платежей.")
+                                Text("График аренды ещё не загружен или не создан. Его можно сформировать здесь.")
                                     .font(.caption)
                                     .foregroundStyle(AppTheme.Colors.textSecondary)
                                     .padding(.top, 4)
                             }
+
+                            EntityFilesSection(
+                                entityType: "lease",
+                                entityId: lease.id,
+                                title: "Файлы договора аренды",
+                                isEmbedded: true,
+                                fileTypes: [
+                                    EntityFileType(value: "lease_agreement", label: "Договор"),
+                                    EntityFileType(value: "document", label: "Документ"),
+                                    EntityFileType(value: "receipt", label: "Квитанция")
+                                ]
+                            )
+                            .environmentObject(authManager)
 
                             if let terminatedAt = lease.terminatedAt {
                                 Text("Прекращено \(AppFormatting.dateString(from: terminatedAt) ?? terminatedAt)")
@@ -352,64 +492,17 @@ struct PropertyDetailView: View {
         }
     }
 
-    private struct UtilityMonthGroup: Identifiable {
-        let id: String
-        let year: Int
-        let month: Int
-        let items: [PropertyUtility]
-        var total: Double { items.map { $0.amount }.reduce(0, +) }
-        var currency: String { items.first?.currency ?? "KZT" }
-    }
-
-    private var utilityMonthGroups: [UtilityMonthGroup] {
-        var dict: [String: [PropertyUtility]] = [:]
-        for u in utilitiesForDisplay {
-            let key = String(format: "%04d-%02d", u.periodYear, u.periodMonth)
-            dict[key, default: []].append(u)
-        }
-        return dict.map { key, items in
-            let parts = key.split(separator: "-")
-            let year = Int(parts[0]) ?? 0
-            let month = Int(parts[1]) ?? 0
-            let sorted = items.sorted { $0.amount > $1.amount }
-            return UtilityMonthGroup(id: key, year: year, month: month, items: sorted)
-        }
-        .sorted { ($0.year, $0.month) > ($1.year, $1.month) }
-    }
-
-    private struct ChartPoint: Identifiable {
-        let id: String
-        let label: String
-        let total: Double
-    }
-
-    private var utilityChartData: [ChartPoint] {
-        utilityMonthGroups
-            .sorted { ($0.year, $0.month) < ($1.year, $1.month) }
-            .suffix(12)
-            .map { g in
-                let formatter = DateFormatter()
-                formatter.locale = Locale(identifier: "ru_RU")
-                formatter.dateFormat = "MMM"
-                let label: String
-                if let date = Calendar.current.date(from: DateComponents(year: g.year, month: g.month, day: 1)) {
-                    label = formatter.string(from: date)
-                } else {
-                    label = "\(g.month)"
-                }
-                return ChartPoint(id: g.id, label: label, total: g.total)
-            }
-    }
-
     private var utilitiesSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 HStack(alignment: .top) {
                     sectionHeader(
                         title: "Коммуналка",
-                        subtitle: "Ежемесячные коммунальные расходы по объекту."
+                        subtitle: "Ежемесячные коммунальные расходы и квитанции по объекту."
                     )
+
                     Spacer()
+
                     Button {
                         editingUtility = nil
                         showUtilityForm = true
@@ -425,84 +518,11 @@ struct PropertyDetailView: View {
                 if utilitiesForDisplay.isEmpty {
                     sectionPlaceholder(
                         title: "Коммуналка пока не добавлена",
-                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.).",
+                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.). Загрузка квитанций — в вебе.",
                         icon: "receipt"
                     )
                 } else {
-                    if utilityChartData.count >= 2 {
-                        Chart(utilityChartData) { point in
-                            BarMark(
-                                x: .value("Месяц", point.label),
-                                y: .value("Сумма", point.total)
-                            )
-                            .foregroundStyle(AppTheme.Colors.accent.gradient)
-                            .cornerRadius(6)
-                        }
-                        .frame(height: 130)
-                        .chartXAxis {
-                            AxisMarks(values: .automatic) { _ in
-                                AxisValueLabel()
-                                    .font(.caption2)
-                            }
-                        }
-                        .chartYAxis {
-                            AxisMarks(values: .automatic) { _ in
-                                AxisValueLabel()
-                                    .font(.caption2)
-                                AxisGridLine()
-                            }
-                        }
-                        .padding(.bottom, AppTheme.Spacing.sm)
-                    }
-
-                    VStack(spacing: AppTheme.Spacing.sm) {
-                        ForEach(utilityMonthGroups) { group in
-                            utilityMonthAccordion(group)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func utilityMonthAccordion(_ group: UtilityMonthGroup) -> some View {
-        let isExpanded = expandedUtilityMonths.contains(group.id)
-        return VStack(spacing: 0) {
-            Button {
-                if isExpanded {
-                    expandedUtilityMonths.remove(group.id)
-                } else {
-                    expandedUtilityMonths.insert(group.id)
-                }
-            } label: {
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(monthLabel(year: group.year, month: group.month))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                        Text("\(group.items.count) \(pluralServices(group.items.count))")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-                    Spacer()
-                    Text(AppFormatting.compactAmount(group.total, currency: group.currency))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textTertiary)
-                        .padding(.leading, 6)
-                }
-                .padding(.vertical, AppTheme.Spacing.sm)
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 18 : 18, style: .continuous))
-            }
-            .buttonStyle(.plain)
-
-            if isExpanded {
-                VStack(spacing: 6) {
-                    ForEach(group.items) { utility in
+                    ForEach(utilitiesForDisplay.prefix(36)) { utility in
                         Button {
                             editingUtility = utility
                             showUtilityForm = true
@@ -512,27 +532,7 @@ struct PropertyDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.top, 6)
-                .padding(.leading, AppTheme.Spacing.sm)
             }
-        }
-    }
-
-    private func monthLabel(year: Int, month: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "LLLL yyyy"
-        if let date = Calendar.current.date(from: DateComponents(year: year, month: month, day: 1)) {
-            return formatter.string(from: date).capitalized
-        }
-        return "\(month)/\(year)"
-    }
-
-    private func pluralServices(_ count: Int) -> String {
-        switch count % 10 {
-        case 1 where count % 100 != 11: return "услуга"
-        case 2...4 where !(11...14).contains(count % 100): return "услуги"
-        default: return "услуг"
         }
     }
 
@@ -577,7 +577,17 @@ struct PropertyDetailView: View {
                 StatusBadge(status: row.status)
             }
 
-            if canMark {
+            if let transactionId = row.transactionId, !transactionId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    linkedTransaction = LinkedTransactionRoute(id: transactionId)
+                } label: {
+                    Image(systemName: "receipt")
+                        .font(.title3)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(AppTheme.Colors.accent)
+                .accessibilityLabel("Открыть связанную операцию")
+            } else if canMark {
                 Button {
                     scheduleForMarkPaidSheet = row
                 } label: {
@@ -593,6 +603,27 @@ struct PropertyDetailView: View {
         .padding(.horizontal, AppTheme.Spacing.sm)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func leaseActionButton(
+        title: String,
+        icon: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .background(color.opacity(0.12))
+                .foregroundStyle(color)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private func metricCard(title: String, value: String, fallback: Bool = false) -> some View {
@@ -782,6 +813,32 @@ struct PropertyDetailView: View {
         leaseSchedulesByLeaseId = next
     }
 
+    private func generateSchedule(for lease: Lease) async {
+        guard generatingScheduleLeaseId == nil else { return }
+        generatingScheduleLeaseId = lease.id
+        errorMessage = nil
+        defer { generatingScheduleLeaseId = nil }
+
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/leases/\(lease.id)/generate-schedule",
+                method: "POST",
+                body: GenerateScheduleBody(),
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let env = try JSONDecoder().decode(APIListEnvelope<LeasePaymentSchedule>.self, from: data)
+            if env.data.isEmpty {
+                leaseSchedulesByLeaseId.removeValue(forKey: lease.id)
+            } else {
+                leaseSchedulesByLeaseId[lease.id] = env.data
+            }
+            await loadTransactions()
+        } catch {
+            errorMessage = "Не удалось сформировать график аренды. Потяните для обновления и попробуйте еще раз."
+        }
+    }
+
     private func scheduleRowCanMarkPaid(_ row: LeasePaymentSchedule) -> Bool {
         if row.actualPaymentId != nil {
             return false
@@ -838,6 +895,11 @@ struct PropertyDetailView: View {
         }
     }
 
+    private func copyTenantWelcomeText() {
+        UIPasteboard.general.string = tenantWelcomeText
+        welcomeCopyMessage = "Памятка для арендатора скопирована."
+    }
+
     private func loadLeases() async {
         do {
             let data = try await APIClient.shared.requestData(
@@ -854,17 +916,14 @@ struct PropertyDetailView: View {
     }
 
     private func loadTenants() async {
-        guard !leases.isEmpty else { return }
-
         do {
             let data = try await APIClient.shared.requestData(
-                "/v1/tenants",
+                "/v1/tenants?per_page=100",
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
             let decoded = try JSONDecoder().decode(APIResponse<[Tenant]>.self, from: data)
-            let ids = Set(leases.map(\.tenantId))
-            tenants = decoded.data.filter { ids.contains($0.id) }
+            tenants = decoded.data
         } catch {
             tenants = []
             errorMessage = "Контакты арендатора не загрузились. Потяните для обновления и попробуйте еще раз."
@@ -895,6 +954,17 @@ struct PropertyDetailView: View {
         let start = lease.paymentWindowStartDay ?? lease.paymentDay ?? 1
         let end = lease.paymentWindowEndDay ?? lease.paymentDueDay ?? lease.paymentDay ?? start
         return "\(start)-\(end)"
+    }
+
+    private func isLeaseEarlyMoveOut(_ lease: Lease) -> Bool {
+        if lease.terminationReason?.trimmingCharacters(in: .whitespacesAndNewlines) == "Выехал раньше срока" {
+            return true
+        }
+        guard let terminatedAt = lease.terminatedAt,
+              let endDate = lease.endDate else {
+            return false
+        }
+        return terminatedAt < endDate
     }
 
     private func utilityPeriodLabel(_ utility: PropertyUtility) -> String {
@@ -932,6 +1002,12 @@ struct PropertyDetailView: View {
         default: return value.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
+}
+
+private struct GenerateScheduleBody: Encodable {}
+
+private struct LinkedTransactionRoute: Identifiable {
+    let id: String
 }
 
 private struct ExchangeRateConversionDTO: Decodable {

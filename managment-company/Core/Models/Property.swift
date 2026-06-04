@@ -21,6 +21,9 @@ struct Property: Identifiable, Codable, Hashable {
     let tags: [String]?
     /// Лицевой счёт для сопоставления квитанций ЖКХ (OCR).
     let utilityAccountNumber: String?
+    /// Wi-Fi login / network name shown in tenant welcome text.
+    let wifiLogin: String?
+    let wifiPassword: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, status, notes, tags
@@ -34,6 +37,8 @@ struct Property: Identifiable, Codable, Hashable {
         case currentValue = "current_value"
         case currentValueCurrency = "current_value_currency"
         case utilityAccountNumber = "utility_account_number"
+        case wifiLogin = "wifi_login"
+        case wifiPassword = "wifi_password"
     }
     
     var displayAddress: String? {

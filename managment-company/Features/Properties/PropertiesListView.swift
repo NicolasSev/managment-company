@@ -74,8 +74,9 @@ struct PropertiesListView: View {
             )
         } else {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: AppTheme.Spacing.md) {
+                VStack(spacing: AppTheme.Spacing.lg) {
                     portfolioSummary
+                    filterSummary
                     if let errorMessage, !properties.isEmpty {
                         statusBanner(errorMessage, color: AppTheme.Colors.warning)
                     }
@@ -84,7 +85,6 @@ struct PropertiesListView: View {
                         ForEach(filteredProperties) { property in
                             NavigationLink(value: property) {
                                 PropertyRowView(property: property)
-                                    .environmentObject(authManager)
                             }
                             .buttonStyle(.plain)
                         }
@@ -118,22 +118,58 @@ struct PropertiesListView: View {
     }
 
     private var portfolioSummary: some View {
-        HStack(spacing: AppTheme.Spacing.sm) {
-            portfolioMetric(title: "Всего", value: "\(properties.count)")
-            portfolioMetric(
-                title: "Занято",
-                value: "\(properties.filter { $0.status == "occupied" }.count)",
-                valueColor: AppTheme.Colors.success
-            )
-            portfolioMetric(
-                title: "Свободно",
-                value: "\(properties.filter { $0.status == "vacant" }.count)",
-                valueColor: AppTheme.Colors.danger
-            )
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                Text("Портфель")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Text("Чистый обзор всех объектов.")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    portfolioMetric(title: "Всего", value: "\(properties.count)")
+                    portfolioMetric(
+                        title: "Занято",
+                        value: "\(properties.filter { $0.status == "occupied" }.count)"
+                    )
+                    portfolioMetric(
+                        title: "Свободно",
+                        value: "\(properties.filter { $0.status == "vacant" }.count)"
+                    )
+                }
+            }
         }
     }
 
-    private func portfolioMetric(title: String, value: String, valueColor: Color? = nil) -> some View {
+    private var filterSummary: some View {
+        SurfaceCard(padding: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Текущий вид")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Text(filterSummaryText)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Поиск идет по названию, типу, адресу, району, городу и стране.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+            }
+        }
+    }
+
+    private func portfolioMetric(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption)
@@ -141,13 +177,24 @@ struct PropertiesListView: View {
 
             Text(value)
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(valueColor ?? AppTheme.Colors.textPrimary)
+                .foregroundStyle(AppTheme.Colors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, AppTheme.Spacing.sm)
         .padding(.horizontal, AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var filterSummaryText: String {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let count = filteredProperties.count
+
+        if query.isEmpty {
+            return "Showing \(count) tracked propert\(count == 1 ? "y" : "ies") in the mobile portfolio."
+        }
+
+        return "Showing \(count) propert\(count == 1 ? "y" : "ies") matching “\(query)”."
     }
 
     private func statusBanner(_ message: String, color: Color) -> some View {
@@ -179,194 +226,79 @@ struct PropertiesListView: View {
     }
 }
 
-private struct CoverPhotoRow: Decodable {
-    let id: String
-    let fileType: String
-    let downloadURL: String?
-    enum CodingKeys: String, CodingKey {
-        case id
-        case fileType = "file_type"
-        case downloadURL = "download_url"
-    }
-}
-private struct CoverPhotoPayload: Decodable {
-    let data: [CoverPhotoRow]
-}
-
 struct PropertyRowView: View {
     let property: Property
-    @EnvironmentObject var authManager: AuthManager
-
-    @State private var coverPhotoURL: URL?
-
-    private var statusColor: Color {
-        switch property.status {
-        case "occupied":    return AppTheme.Colors.success
-        case "vacant":      return AppTheme.Colors.danger
-        default:            return AppTheme.Colors.textTertiary.opacity(0.5)
-        }
-    }
-
+    
     var body: some View {
-        SurfaceCard(padding: .zero) {
-            HStack(spacing: 0) {
-                // Status stripe
-                Rectangle()
-                    .fill(statusColor)
-                    .frame(width: 4)
-                    .clipShape(
-                        .rect(topLeadingRadius: 20, bottomLeadingRadius: 20)
-                    )
+        SurfaceCard(padding: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(propertyTypeText)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .textCase(.uppercase)
+                            .tracking(1.2)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
 
-                // Cover photo
-                Group {
-                    if let url = coverPhotoURL {
-                        AsyncImage(url: url) { phase in
-                            if case .success(let img) = phase {
-                                img.resizable().aspectRatio(contentMode: .fill)
-                            } else {
-                                photoPlaceholder
-                            }
-                        }
-                    } else {
-                        photoPlaceholder
-                    }
-                }
-                .frame(width: 72)
-                .clipped()
+                        Text(property.name)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
 
-                // Content
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(propertyTypeText)
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .textCase(.uppercase)
-                                .tracking(1.1)
+                        if let addr = property.displayAddress {
+                            Label(addr, systemImage: "mappin.and.ellipse")
+                                .font(.subheadline)
                                 .foregroundStyle(AppTheme.Colors.textSecondary)
-                            Text(property.name)
-                                .font(.headline)
-                                .foregroundStyle(AppTheme.Colors.textPrimary)
-                                .lineLimit(1)
-                        }
-                        Spacer(minLength: 4)
-                        StatusBadge(status: property.status)
-                    }
-
-                    if let city = property.city, !city.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption2)
-                                .foregroundStyle(AppTheme.Colors.accent)
-                            Text(city)
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.Colors.textSecondary)
-                            if let addr = property.address, !addr.isEmpty {
-                                Text("· \(addr)")
-                                    .font(.caption)
-                                    .foregroundStyle(AppTheme.Colors.textTertiary)
-                                    .lineLimit(1)
-                            }
                         }
                     }
 
-                    HStack(spacing: AppTheme.Spacing.sm) {
-                        if let area = property.areaSqm {
-                            propertyFact(icon: "ruler", text: "\(Int(area.rounded())) м²")
-                        }
-                        if let rooms = property.rooms {
-                            propertyFact(icon: "bed.double", text: "\(rooms) комн.")
-                        }
-                        if let floor = property.floor {
-                            propertyFact(icon: "square.3.layers.3d", text: "\(floor) эт.")
-                        }
-                    }
+                    Spacer()
 
-                    if let price = property.purchasePrice, price > 0 {
-                        HStack(spacing: 12) {
-                            valuationChip(
-                                label: "Покупка",
-                                amount: price,
-                                currency: property.purchaseCurrency ?? "KZT"
-                            )
-                            if let curr = property.currentValue, curr > 0 {
-                                valuationChip(
-                                    label: "Оценка",
-                                    amount: curr,
-                                    currency: property.currentValueCurrency ?? "KZT"
-                                )
-                            }
-                        }
-                    }
+                    StatusBadge(status: property.status)
                 }
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.md)
 
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textTertiary)
-                    .padding(.trailing, AppTheme.Spacing.md)
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    propertyFact(icon: "ruler", text: areaText)
+                    propertyFact(icon: "bed.double", text: roomsText)
+                    propertyFact(icon: "square.3.layers.3d", text: floorText)
+                }
             }
         }
-        .task { await loadCoverPhoto() }
-    }
-
-    private var photoPlaceholder: some View {
-        Rectangle()
-            .fill(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-            .overlay(
-                Image(systemName: "photo")
-                    .font(.title3)
-                    .foregroundStyle(AppTheme.Colors.textTertiary.opacity(0.5))
-            )
     }
 
     private var propertyTypeText: String {
         property.propertyType.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
+    private var areaText: String {
+        guard let area = property.areaSqm else { return "Площадь не указана" }
+        return "\(Int(area.rounded())) m²"
+    }
+
+    private var roomsText: String {
+        guard let rooms = property.rooms else { return "Комнаты не указаны" }
+        return "\(rooms) rooms"
+    }
+
+    private var floorText: String {
+        guard let floor = property.floor else { return "Этаж не указан" }
+        return "Floor \(floor)"
+    }
+
     private func propertyFact(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(AppTheme.Colors.accent)
+
             Text(text)
                 .font(.caption)
                 .foregroundStyle(AppTheme.Colors.textSecondary)
         }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private func valuationChip(label: String, amount: Double, currency: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(AppTheme.Colors.textTertiary)
-            Text(AppFormatting.compactAmount(amount, currency: currency))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-        }
-    }
-
-    private func loadCoverPhoto() async {
-        let path = "/v1/files?entity_type=property&entity_id=\(property.id)&per_page=10"
-        do {
-            let payload: CoverPhotoPayload = try await APIClient.shared.requestRoot(
-                path,
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            if let first = payload.data.first(where: { $0.fileType == "photo" }),
-               let urlString = first.downloadURL,
-               let url = APIURLBuilder.absoluteDownloadURL(base: AppEnvironment.apiBaseURL, downloadPath: urlString) {
-                coverPhotoURL = url
-            }
-        } catch {
-            // no cover photo available — show placeholder
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
