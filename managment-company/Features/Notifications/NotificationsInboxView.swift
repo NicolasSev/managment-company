@@ -3,6 +3,7 @@ import SwiftUI
 /// Список уведомлений (`GET /v1/notifications`) и отметка прочитанным.
 struct NotificationsInboxView: View {
     @EnvironmentObject private var authManager: AuthManager
+    @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @Environment(\.dismiss) private var dismiss
 
     /// Вызвать после изменения списка (обновить бейдж на главной).
@@ -60,7 +61,7 @@ struct NotificationsInboxView: View {
     @ViewBuilder
     private func notificationRow(_ n: AppNotification) -> some View {
         Button {
-            Task { await markReadIfNeeded(n) }
+            Task { await openNotification(n) }
         } label: {
             HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
                 Image(systemName: n.readAt == nil ? "circle.fill" : "circle")
@@ -88,6 +89,14 @@ struct NotificationsInboxView: View {
             .padding(.vertical, AppTheme.Spacing.xs)
         }
         .buttonStyle(.plain)
+    }
+
+    private func openNotification(_ n: AppNotification) async {
+        await markReadIfNeeded(n)
+        await MainActor.run {
+            notificationRouter.handleNotificationOpen(n)
+            dismiss()
+        }
     }
 
     private func dateLabel(_ iso: String) -> String {
@@ -141,6 +150,7 @@ struct NotificationsInboxView: View {
                         type: row.type,
                         title: row.title,
                         body: row.body,
+                        data: row.data,
                         readAt: nowIso,
                         createdAt: row.createdAt
                     )

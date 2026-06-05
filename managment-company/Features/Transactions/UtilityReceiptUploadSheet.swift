@@ -16,6 +16,8 @@ struct UtilityReceiptUploadSheet: View {
     @State private var pollTask: Task<Void, Never>?
     @State private var pickedFileLabel: String?
     @State private var manualPropertySelection: String = ""
+    @State private var manualPaymentDate: String = ""
+    @State private var receiptConflictDetected = false
     @State private var amountEdits: [String: String] = [:]
 
     var body: some View {
@@ -163,6 +165,29 @@ struct UtilityReceiptUploadSheet: View {
                     .foregroundStyle(AppTheme.Colors.success)
             }
 
+            receiptSummary(receipt)
+
+            if needsManualBillingDate(receipt) {
+                SurfaceCard(padding: AppTheme.Spacing.md) {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                        Text("Дата операции оплаты")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                        Text("Период начисления не распознан. Укажите дату платежа — сервер возьмёт месяц учёта из неё.")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                        AppTextField(
+                            title: "Дата",
+                            text: $manualPaymentDate,
+                            placeholder: "YYYY-MM-DD",
+                            keyboardType: .numbersAndPunctuation,
+                            autocapitalization: .never
+                        )
+                    }
+                }
+            }
+
             if let items = receipt.items, !items.isEmpty {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
                     Text("Начисления")
@@ -185,13 +210,17 @@ struct UtilityReceiptUploadSheet: View {
                     }
                 }
 
-                PrimaryButton(
-                    title: isConfirming ? "Сохраняем…" : "Подтвердить",
-                    action: { Task { await confirmReceipt(original: receipt) } },
-                    isLoading: isConfirming,
-                    isDisabled: !canConfirm(receipt: receipt) || isConfirming,
-                    systemImage: "checkmark.circle"
-                )
+                if receiptConflictDetected {
+                    conflictResolutionBody(receipt)
+                } else {
+                    PrimaryButton(
+                        title: isConfirming ? "Сохраняем…" : "Подтвердить",
+                        action: { Task { await confirmReceipt(original: receipt) } },
+                        isLoading: isConfirming,
+                        isDisabled: !canConfirm(receipt: receipt) || isConfirming,
+                        systemImage: "checkmark.circle"
+                    )
+                }
             } else {
                 Text("Строк начислений не найдено.")
                     .font(.subheadline)
@@ -206,8 +235,70 @@ struct UtilityReceiptUploadSheet: View {
                 if let edited = amountEdits[item.id] { return edited }
                 return Self.formatAmount(item.amount)
             },
-            set: { amountEdits[item.id] = $0 }
+            set: {
+                amountEdits[item.id] = $0
+                receiptConflictDetected = false
+            }
         )
+    }
+
+    @ViewBuilder
+    private func receiptSummary(_ receipt: UtilityReceiptPayload) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+            if let provider = receipt.provider, !provider.isEmpty {
+                Text("Поставщик: \(provider)")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+            if let paymentDate = receipt.paymentDate, !paymentDate.isEmpty {
+                Text("Оплата: \(paymentDate)")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+            if let year = receipt.periodYear, let month = receipt.periodMonth {
+                Text("Период: \(String(format: "%02d", month)).\(year)")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            } else {
+                Text("Период: не распознан")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+            if let total = receipt.totalAmount {
+                Text("Итого: \(Self.formatAmount(total)) \(receipt.currency ?? "KZT")")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func conflictResolutionBody(_ receipt: UtilityReceiptPayload) -> some View {
+        SurfaceCard(padding: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                Label("За этот объект и месяц уже есть ком. услуга.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(AppTheme.Colors.warning)
+                Text("Выберите, оставить текущую запись или заменить её распознанной квитанцией.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    Button("Оставить текущую") {
+                        Task { await confirmReceipt(original: receipt, conflictStrategy: "keep_existing") }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isConfirming)
+
+                    Button("Заменить") {
+                        Task { await confirmReceipt(original: receipt, conflictStrategy: "replace") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isConfirming)
+                }
+            }
+        }
     }
 
     private static func formatAmount(_ value: Double) -> String {
@@ -227,10 +318,24 @@ struct UtilityReceiptUploadSheet: View {
     }
 
     private func canConfirm(receipt remote: UtilityReceiptPayload) -> Bool {
-        if remote.propertyId != nil {
-            return true
+        let hasProperty = remote.propertyId != nil || !manualPropertySelection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard hasProperty else { return false }
+        if needsManualBillingDate(remote) {
+            return Self.isISODate(manualPaymentDate)
         }
-        return !manualPropertySelection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return true
+    }
+
+    private func needsManualBillingDate(_ receipt: UtilityReceiptPayload) -> Bool {
+        let periodMissing = receipt.periodYear == nil || receipt.periodMonth == nil
+        let paymentMissing = receipt.paymentDate?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        return receipt.status == "parsed" && periodMissing && paymentMissing
+    }
+
+    private static func isISODate(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count == 10 else { return false }
+        return Self.apiDayFormatter.date(from: trimmed) != nil
     }
 
     private func loadProperties() async {
@@ -277,6 +382,8 @@ struct UtilityReceiptUploadSheet: View {
             receipt = nil
             amountEdits = [:]
             manualPropertySelection = ""
+            manualPaymentDate = ""
+            receiptConflictDetected = false
             pickedFileLabel = fileURL.lastPathComponent
             isUploading = true
         }
@@ -326,6 +433,9 @@ struct UtilityReceiptUploadSheet: View {
             next[item.id] = Self.formatAmount(item.amount)
         }
         amountEdits = next
+        if let paymentDate = receipt?.paymentDate?.prefix(10), Self.isISODate(String(paymentDate)), manualPaymentDate.isEmpty {
+            manualPaymentDate = String(paymentDate)
+        }
     }
 
     private func startPolling(receiptId: String) {
@@ -341,6 +451,7 @@ struct UtilityReceiptUploadSheet: View {
                     await MainActor.run {
                         receipt = latest
                         syncAmountEditsFromReceipt()
+                        receiptConflictDetected = false
                         errorMessage = nil
                     }
                     if ["parsed", "failed", "confirmed"].contains(latest.status) {
@@ -357,7 +468,7 @@ struct UtilityReceiptUploadSheet: View {
     }
 
     @MainActor
-    private func confirmReceipt(original: UtilityReceiptPayload) async {
+    private func confirmReceipt(original: UtilityReceiptPayload, conflictStrategy: String? = nil) async {
         let manualChoice = manualPropertySelection.trimmingCharacters(in: .whitespacesAndNewlines)
         let assignedId: String?
         if let pid = original.propertyId {
@@ -378,11 +489,14 @@ struct UtilityReceiptUploadSheet: View {
         defer { isConfirming = false }
 
         let editsPayload = editsForConfirm(items: original.items ?? [])
+        let paymentDate = manualPaymentDate.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             let body = UtilityReceiptConfirmBody(
                 propertyId: original.propertyId == nil ? chosen : nil,
-                edits: editsPayload
+                edits: editsPayload,
+                conflictStrategy: conflictStrategy,
+                paymentDate: paymentDate.count >= 10 ? String(paymentDate.prefix(10)) : nil
             )
 
             _ = try await APIClient.shared.request(
@@ -393,10 +507,18 @@ struct UtilityReceiptUploadSheet: View {
                 refreshAndRetry: { await authManager.refreshToken() }
             ) as UtilityReceiptPayload
 
+            receiptConflictDetected = false
             dismiss()
             onCompleted()
         } catch APIError.httpStatus(let code) {
-            errorMessage = "Не удалось сохранить (\(code))."
+            if code == 409 && conflictStrategy == nil {
+                receiptConflictDetected = true
+                errorMessage = nil
+            } else if code == 422 && needsManualBillingDate(original) {
+                errorMessage = "Укажите дату оплаты в формате YYYY-MM-DD."
+            } else {
+                errorMessage = "Не удалось сохранить (\(code))."
+            }
         } catch {
             errorMessage = "Не удалось сохранить квитанцию."
         }
@@ -417,6 +539,14 @@ struct UtilityReceiptUploadSheet: View {
     init(onCompleted: @escaping () -> Void) {
         self.onCompleted = onCompleted
     }
+
+    private static let apiDayFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt
+    }()
 }
 
 private enum UtilityReceiptLabels {

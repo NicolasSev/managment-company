@@ -2,14 +2,16 @@ import SwiftUI
 
 struct PropertiesListView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @State private var properties: [Property] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showPropertyForm = false
     @State private var searchText = ""
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 AppScreenBackground()
 
@@ -31,6 +33,9 @@ struct PropertiesListView: View {
             }
             .task {
                 await loadProperties()
+            }
+            .onChange(of: notificationRouter.pendingRoute) { _, _ in
+                Task { await handlePendingNotificationRoute() }
             }
             .navigationDestination(for: Property.self) { prop in
                 PropertyDetailView(property: prop)
@@ -219,10 +224,26 @@ struct PropertiesListView: View {
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
+            await handlePendingNotificationRoute()
         } catch {
             errorMessage = "Не удалось загрузить"
             properties = []
         }
+    }
+
+    private func handlePendingNotificationRoute() async {
+        guard let route = notificationRouter.pendingRoute,
+              case .property(let propertyId) = route.kind else { return }
+
+        if isLoading && properties.isEmpty { return }
+
+        searchText = ""
+        if let property = properties.first(where: { $0.id == propertyId }) {
+            navigationPath.append(property)
+        } else {
+            errorMessage = "Объект из уведомления не найден в текущем портфеле."
+        }
+        notificationRouter.clearRoute(route)
     }
 }
 

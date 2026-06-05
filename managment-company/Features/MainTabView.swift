@@ -13,7 +13,6 @@ enum AppTab: Hashable {
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
-    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
     @ObservedObject private var pendingMutations = PendingMutationQueue.shared
     @State private var selectedTab: AppTab = .dashboard
     
@@ -80,11 +79,6 @@ struct MainTabView: View {
                 notificationRouter.clearTabSelection()
             }
         }
-        .onChange(of: rentPreviewRouter.paidSignal) { _, _ in
-            // Rent payment recorded from the Live Activity preview — surface the
-            // dashboard so the user sees the refreshed pending-payment counts.
-            selectedTab = .dashboard
-        }
     }
 }
 
@@ -96,6 +90,12 @@ struct SettingsView: View {
     @State private var isSaving = false
     @State private var saveMessage: String?
     @State private var errorMessage: String?
+    @State private var mfaSetup: MFASetupResult?
+    @State private var mfaCode = ""
+    @State private var disableMFACode = ""
+    @State private var isMFAWorking = false
+    @State private var mfaMessage: String?
+    @State private var mfaErrorMessage: String?
     
     var body: some View {
         NavigationStack {
@@ -190,6 +190,8 @@ struct SettingsView: View {
                             }
                         }
 
+                        mfaSection
+
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                                 Text("Сессия")
@@ -223,6 +225,115 @@ struct SettingsView: View {
         }
     }
 
+    private var mfaSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                Text("Безопасность")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+                    Image(systemName: "checkmark.shield")
+                        .font(.title3)
+                        .foregroundStyle(AppTheme.Colors.accent)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Двухфакторная аутентификация")
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                        Text(authManager.user?.mfaEnabled == true ? "2FA включена для этого аккаунта." : "Добавьте второй шаг входа через приложение-аутентификатор.")
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                }
+
+                if let mfaMessage {
+                    statusMessage(mfaMessage, color: AppTheme.Colors.success)
+                }
+
+                if let mfaErrorMessage {
+                    statusMessage(mfaErrorMessage, color: AppTheme.Colors.danger)
+                }
+
+                if authManager.user?.mfaEnabled == true {
+                    AppTextField(
+                        title: "Код или резервный код",
+                        text: $disableMFACode,
+                        placeholder: "000000 или backup",
+                        keyboardType: .default,
+                        autocapitalization: .never
+                    )
+
+                    PrimaryButton(
+                        title: "Отключить 2FA",
+                        action: { Task { await disableMFA() } },
+                        isLoading: isMFAWorking,
+                        isDisabled: disableMFACode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                        systemImage: "shield.slash"
+                    )
+                } else if let setup = mfaSetup {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                        Text("Добавьте аккаунт в приложении")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                        Text(setup.otpauthURL)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(AppTheme.Spacing.sm)
+                            .background(AppTheme.Colors.backgroundSecondary.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+                        Text("Резервные коды")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.warning)
+
+                        ForEach(setup.backupCodes, id: \.self) { code in
+                            Text(code)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(AppTheme.Spacing.md)
+                    .background(AppTheme.Colors.warning.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                    AppTextField(
+                        title: "Код подтверждения",
+                        text: $mfaCode,
+                        placeholder: "000000",
+                        keyboardType: .numberPad,
+                        autocapitalization: .never
+                    )
+
+                    PrimaryButton(
+                        title: "Включить 2FA",
+                        action: { Task { await verifyMFA() } },
+                        isLoading: isMFAWorking,
+                        isDisabled: mfaCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                        systemImage: "shield"
+                    )
+                } else {
+                    PrimaryButton(
+                        title: "Настроить аутентификатор",
+                        action: { Task { await setupMFA() } },
+                        isLoading: isMFAWorking,
+                        systemImage: "qrcode"
+                    )
+                }
+            }
+        }
+    }
+
     private func syncProfileFields() {
         guard let user = authManager.user else { return }
         profileName = user.name ?? ""
@@ -246,6 +357,51 @@ struct SettingsView: View {
             saveMessage = "Профиль обновлен."
         } catch {
             errorMessage = "Не удалось сохранить профиль. Проверьте часовой пояс и валюту, затем попробуйте снова."
+        }
+    }
+
+    private func setupMFA() async {
+        isMFAWorking = true
+        mfaMessage = nil
+        mfaErrorMessage = nil
+        defer { isMFAWorking = false }
+
+        do {
+            mfaSetup = try await authManager.setupMFA()
+        } catch {
+            mfaErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func verifyMFA() async {
+        isMFAWorking = true
+        mfaMessage = nil
+        mfaErrorMessage = nil
+        defer { isMFAWorking = false }
+
+        do {
+            try await authManager.verifyMFA(code: mfaCode)
+            mfaSetup = nil
+            mfaCode = ""
+            mfaMessage = "Двухфакторная аутентификация включена."
+        } catch {
+            mfaErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func disableMFA() async {
+        isMFAWorking = true
+        mfaMessage = nil
+        mfaErrorMessage = nil
+        defer { isMFAWorking = false }
+
+        do {
+            try await authManager.disableMFA(code: disableMFACode)
+            disableMFACode = ""
+            mfaSetup = nil
+            mfaMessage = "Двухфакторная аутентификация отключена."
+        } catch {
+            mfaErrorMessage = error.localizedDescription
         }
     }
 

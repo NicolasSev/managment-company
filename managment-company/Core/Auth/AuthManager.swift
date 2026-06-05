@@ -54,6 +54,11 @@ class AuthManager: ObservableObject {
             try container.encodeIfPresent(locale, forKey: .locale)
         }
     }
+
+    enum LoginOutcome: Equatable {
+        case authenticated
+        case mfaRequired(token: String)
+    }
     
     init() {
         restoreFromKeychain()
@@ -143,7 +148,7 @@ class AuthManager: ObservableObject {
         }
     }
     
-    func login(email: String, password: String) async throws {
+    func login(email: String, password: String) async throws -> LoginOutcome {
         let url = URL(string: "\(baseURL)/v1/auth/login")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -160,7 +165,49 @@ class AuthManager: ObservableObject {
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw AuthError.loginFailed
         }
-        
+
+        let decoded = try JSONDecoder().decode(LoginAttemptResponse.self, from: data)
+        if decoded.data.requiresMFA == true {
+            guard let token = decoded.data.mfaToken, !token.isEmpty else {
+                throw AuthError.loginFailed
+            }
+            return .mfaRequired(token: token)
+        }
+
+        guard let access = decoded.data.accessToken,
+              let refresh = decoded.data.refreshToken,
+              let nextUser = decoded.data.user else {
+            throw AuthError.loginFailed
+        }
+
+        sessionExpiredMessage = nil
+        persistTokens(access: access, refresh: refresh)
+        user = nextUser
+        isAuthenticated = true
+        return .authenticated
+    }
+
+    func authenticateMFA(token mfaToken: String, code: String) async throws {
+        let url = URL(string: "\(baseURL)/v1/auth/mfa/authenticate")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(MFAAuthenticateInput(
+            mfaToken: mfaToken,
+            code: code.trimmingCharacters(in: .whitespacesAndNewlines)
+        ))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AuthError.networkUnavailable(baseURL, networkErrorDetails(error))
+        }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AuthError.mfaFailed
+        }
+
         let decoded = try JSONDecoder().decode(LoginResponse.self, from: data)
         sessionExpiredMessage = nil
         persistTokens(access: decoded.data.accessToken, refresh: decoded.data.refreshToken)
@@ -216,6 +263,93 @@ class AuthManager: ObservableObject {
 
         user = updatedUser
     }
+
+    func forgotPassword(email: String) async throws {
+        let url = URL(string: "\(baseURL)/v1/auth/forgot-password")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(ForgotPasswordInput(
+            email: email.trimmingCharacters(in: .whitespacesAndNewlines)
+        ))
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw AuthError.passwordRecoveryFailed
+            }
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            throw AuthError.networkUnavailable(baseURL, networkErrorDetails(error))
+        }
+    }
+
+    func resetPassword(token: String, newPassword: String) async throws {
+        let url = URL(string: "\(baseURL)/v1/auth/reset-password")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(ResetPasswordInput(
+            token: token.trimmingCharacters(in: .whitespacesAndNewlines),
+            newPassword: newPassword
+        ))
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw AuthError.passwordResetFailed
+            }
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            throw AuthError.networkUnavailable(baseURL, networkErrorDetails(error))
+        }
+    }
+
+    func setupMFA() async throws -> MFASetupResult {
+        do {
+            return try await APIClient.shared.request(
+                "/v1/auth/mfa/setup",
+                method: "POST",
+                body: EmptyJSONBody(),
+                tokenProvider: { await MainActor.run { self.accessToken } },
+                refreshAndRetry: { await self.refreshToken() }
+            )
+        } catch {
+            throw AuthError.mfaSetupFailed
+        }
+    }
+
+    func verifyMFA(code: String) async throws {
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/auth/mfa/verify",
+                method: "POST",
+                body: MFACodeInput(code: code.trimmingCharacters(in: .whitespacesAndNewlines)),
+                tokenProvider: { await MainActor.run { self.accessToken } },
+                refreshAndRetry: { await self.refreshToken() }
+            )
+            await fetchUserWithRecovery()
+        } catch {
+            throw AuthError.mfaFailed
+        }
+    }
+
+    func disableMFA(code: String) async throws {
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/auth/mfa/disable",
+                method: "POST",
+                body: MFACodeInput(code: code.trimmingCharacters(in: .whitespacesAndNewlines)),
+                tokenProvider: { await MainActor.run { self.accessToken } },
+                refreshAndRetry: { await self.refreshToken() }
+            )
+            await fetchUserWithRecovery()
+        } catch {
+            throw AuthError.mfaFailed
+        }
+    }
     
     func authorizedRequest(_ path: String) -> URLRequest? {
         guard let token = accessToken,
@@ -247,6 +381,36 @@ struct LoginResponse: Codable {
     }
 }
 
+private struct LoginAttemptResponse: Codable {
+    let data: LoginAttemptData
+
+    struct LoginAttemptData: Codable {
+        let accessToken: String?
+        let refreshToken: String?
+        let user: AuthManager.User?
+        let requiresMFA: Bool?
+        let mfaToken: String?
+
+        enum CodingKeys: String, CodingKey {
+            case accessToken = "access_token"
+            case refreshToken = "refresh_token"
+            case user
+            case requiresMFA = "requires_mfa"
+            case mfaToken = "mfa_token"
+        }
+    }
+}
+
+struct MFASetupResult: Codable {
+    let otpauthURL: String
+    let backupCodes: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case otpauthURL = "otpauth_url"
+        case backupCodes = "backup_codes"
+    }
+}
+
 private struct ProfileUpdateInput: Encodable {
     let name: String
     let timezone: String
@@ -262,10 +426,42 @@ private struct APIUserResponse: Codable {
     let data: AuthManager.User
 }
 
+private struct MFAAuthenticateInput: Encodable {
+    let mfaToken: String
+    let code: String
+
+    enum CodingKeys: String, CodingKey {
+        case mfaToken = "mfa_token"
+        case code
+    }
+}
+
+private struct MFACodeInput: Encodable {
+    let code: String
+}
+
+private struct ForgotPasswordInput: Encodable {
+    let email: String
+}
+
+private struct ResetPasswordInput: Encodable {
+    let token: String
+    let newPassword: String
+
+    enum CodingKeys: String, CodingKey {
+        case token
+        case newPassword = "new_password"
+    }
+}
+
 enum AuthError: LocalizedError {
     case loginFailed
     case registrationFailed
     case networkUnavailable(String, String)
+    case mfaFailed
+    case mfaSetupFailed
+    case passwordRecoveryFailed
+    case passwordResetFailed
 
     var errorDescription: String? {
         switch self {
@@ -275,6 +471,14 @@ enum AuthError: LocalizedError {
             return "Не удалось зарегистрироваться. Проверьте введенные данные."
         case .networkUnavailable(let baseURL, let details):
             return "Не удалось подключиться к API по адресу \(baseURL). \(details)"
+        case .mfaFailed:
+            return "Не удалось подтвердить код. Проверьте код и попробуйте снова."
+        case .mfaSetupFailed:
+            return "Не удалось подготовить двухфакторную аутентификацию."
+        case .passwordRecoveryFailed:
+            return "Не удалось отправить письмо для восстановления пароля."
+        case .passwordResetFailed:
+            return "Не удалось сбросить пароль. Проверьте токен и новый пароль."
         }
     }
 }

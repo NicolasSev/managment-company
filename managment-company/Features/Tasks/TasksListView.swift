@@ -10,16 +10,23 @@ private enum TaskScope: String, CaseIterable, Identifiable {
 
 struct TasksListView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @State private var tasks: [AppTask] = []
+    @State private var propertiesById: [String: Property] = [:]
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showTaskForm = false
     @State private var searchText = ""
     @State private var selectedScope: TaskScope = .open
     @State private var actionMessage: String?
+    @State private var navigationPath = NavigationPath()
+
+    private var propertiesList: [Property] {
+        Array(propertiesById.values).sorted { $0.name < $1.name }
+    }
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 AppScreenBackground()
 
@@ -39,12 +46,15 @@ struct TasksListView: View {
             .task { await loadTasks() }
             .refreshable { await loadTasks() }
             .navigationDestination(for: AppTask.self) { task in
-                TaskFormView(task: task) { await loadTasks() }
+                TaskFormView(task: task, properties: propertiesList) { await loadTasks() }
                     .environmentObject(authManager)
             }
             .sheet(isPresented: $showTaskForm) {
-                TaskFormView(task: nil) { await loadTasks() }
+                TaskFormView(task: nil, properties: propertiesList) { await loadTasks() }
                     .environmentObject(authManager)
+            }
+            .onChange(of: notificationRouter.pendingRoute) { _, _ in
+                Task { await handlePendingNotificationRoute() }
             }
         }
     }
@@ -144,6 +154,7 @@ struct TasksListView: View {
                 task.description ?? "",
                 task.priority,
                 task.status,
+                task.propertyId.flatMap { propertiesById[$0]?.name } ?? "",
             ]
                 .joined(separator: " ")
                 .lowercased()
@@ -300,7 +311,10 @@ struct TasksListView: View {
             LazyVStack(spacing: AppTheme.Spacing.md) {
                 ForEach(items) { task in
                     NavigationLink(value: task) {
-                        TaskRow(task: task)
+                        TaskRow(
+                            task: task,
+                            propertyName: task.propertyId.flatMap { propertiesById[$0]?.name }
+                        )
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: isOpenTask(task)) {
@@ -341,6 +355,17 @@ struct TasksListView: View {
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
+            do {
+                let properties: [Property] = try await APIClient.shared.request(
+                    "/v1/properties",
+                    tokenProvider: { await MainActor.run { authManager.accessToken } },
+                    refreshAndRetry: { await authManager.refreshToken() }
+                )
+                propertiesById = Dictionary(uniqueKeysWithValues: properties.map { ($0.id, $0) })
+            } catch {
+                propertiesById = [:]
+            }
+            await handlePendingNotificationRoute()
         } catch {
             errorMessage = "Доска задач временно недоступна."
             tasks = []
@@ -412,10 +437,28 @@ struct TasksListView: View {
             errorMessage = "Не удалось обновить задачу."
         }
     }
+
+    private func handlePendingNotificationRoute() async {
+        guard let route = notificationRouter.pendingRoute,
+              case .task(let taskId) = route.kind else { return }
+
+        if isLoading && tasks.isEmpty { return }
+
+        searchText = ""
+        selectedScope = .all
+
+        if let task = tasks.first(where: { $0.id == taskId }) {
+            navigationPath.append(task)
+        } else {
+            errorMessage = "Задача из уведомления не найдена в текущем списке."
+        }
+        notificationRouter.clearRoute(route)
+    }
 }
 
 struct TaskRow: View {
     let task: AppTask
+    var propertyName: String?
     
     var body: some View {
         SurfaceCard(padding: AppTheme.Spacing.md) {
@@ -433,6 +476,12 @@ struct TaskRow: View {
                         } else {
                             Text("Без срока")
                                 .font(.subheadline)
+                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                        }
+
+                        if let propertyName {
+                            Label(propertyName, systemImage: "building.2")
+                                .font(.caption)
                                 .foregroundStyle(AppTheme.Colors.textSecondary)
                         }
                     }

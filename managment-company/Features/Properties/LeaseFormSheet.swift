@@ -16,9 +16,14 @@ struct LeaseFormSheet: View {
     @State private var endDate: Date
     @State private var rentAmount: String
     @State private var rentCurrency: String
+    @State private var depositAmount: String
+    @State private var depositCurrency: String
     @State private var paymentWindowStartDay: String
     @State private var paymentWindowEndDay: String
     @State private var paymentDueDay: String
+    @State private var renewalReminderDays: String
+    @State private var autoRenew: Bool
+    @State private var utilitiesPaidBy: String
     @State private var notes: String
     @State private var isHistorical: Bool
     @State private var isSaving = false
@@ -41,9 +46,14 @@ struct LeaseFormSheet: View {
         _endDate = State(initialValue: parsedEnd ?? start)
         _rentAmount = State(initialValue: lease.map { Self.amountLabel($0.rentAmount) } ?? "")
         _rentCurrency = State(initialValue: lease?.rentCurrency ?? "KZT")
+        _depositAmount = State(initialValue: lease?.depositAmount.map { Self.amountLabel($0) } ?? "")
+        _depositCurrency = State(initialValue: lease?.depositCurrency ?? lease?.rentCurrency ?? "KZT")
         _paymentWindowStartDay = State(initialValue: String(lease?.paymentWindowStartDay ?? lease?.paymentDay ?? 1))
         _paymentWindowEndDay = State(initialValue: String(lease?.paymentWindowEndDay ?? lease?.paymentDueDay ?? lease?.paymentDay ?? 5))
         _paymentDueDay = State(initialValue: String(lease?.paymentDueDay ?? lease?.paymentDay ?? 5))
+        _renewalReminderDays = State(initialValue: String(lease?.renewalReminderDays ?? 30))
+        _autoRenew = State(initialValue: lease?.autoRenew ?? false)
+        _utilitiesPaidBy = State(initialValue: lease?.utilitiesPaidBy ?? "owner")
         _notes = State(initialValue: lease?.notes ?? "")
         _isHistorical = State(initialValue: false)
     }
@@ -112,6 +122,19 @@ struct LeaseFormSheet: View {
                         placeholder: "KZT",
                         autocapitalization: .characters
                     )
+                    AppTextField(
+                        title: "Депозит",
+                        text: $depositAmount,
+                        placeholder: "0",
+                        keyboardType: .decimalPad,
+                        autocapitalization: .never
+                    )
+                    AppTextField(
+                        title: "Валюта депозита",
+                        text: $depositCurrency,
+                        placeholder: "KZT",
+                        autocapitalization: .characters
+                    )
 
                     HStack {
                         AppTextField(
@@ -137,6 +160,23 @@ struct LeaseFormSheet: View {
                         keyboardType: .numberPad,
                         autocapitalization: .never
                     )
+                }
+
+                Section("Условия договора") {
+                    AppTextField(
+                        title: "Напомнить о продлении за дней",
+                        text: $renewalReminderDays,
+                        placeholder: "30",
+                        keyboardType: .numberPad,
+                        autocapitalization: .never
+                    )
+                    Toggle("Автопродление", isOn: $autoRenew)
+                    Picker("Коммунальные оплачивает", selection: $utilitiesPaidBy) {
+                        Text("Собственник").tag("owner")
+                        Text("Арендатор").tag("tenant")
+                        Text("Раздельно").tag("split")
+                    }
+                    .pickerStyle(.navigationLink)
                 }
 
                 Section("Заметки") {
@@ -169,25 +209,49 @@ struct LeaseFormSheet: View {
     private var canSubmit: Bool {
         guard lease != nil || !tenantId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard let amount = parsedAmount, amount > 0 else { return false }
+        let depositTrimmed = depositAmount.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !depositTrimmed.isEmpty {
+            guard let deposit = parsedDepositAmount, deposit >= 0 else { return false }
+        }
         guard validDay(paymentWindowStartDay) != nil,
               validDay(paymentWindowEndDay) != nil,
               validDay(paymentDueDay) != nil else { return false }
+        guard validNonNegativeInt(renewalReminderDays) != nil else { return false }
         guard !hasEndDate || endDate >= startDate else { return false }
         guard !isHistorical || hasEndDate else { return false }
-        return !rentCurrency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard !rentCurrency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        if parsedDepositAmount != nil {
+            return !depositCurrency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return true
     }
 
     private var parsedAmount: Double? {
-        Double(
-            rentAmount
-                .replacingOccurrences(of: " ", with: "")
-                .replacingOccurrences(of: ",", with: ".")
-        )
+        Self.parseAmount(rentAmount)
+    }
+
+    private var parsedDepositAmount: Double? {
+        Self.parseAmount(depositAmount)
+    }
+
+    private static func parseAmount(_ raw: String) -> Double? {
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+        guard !normalized.isEmpty else { return nil }
+        return Double(normalized)
     }
 
     private func validDay(_ raw: String) -> Int? {
         guard let value = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)),
               (1...31).contains(value) else { return nil }
+        return value
+    }
+
+    private func validNonNegativeInt(_ raw: String) -> Int? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let value = Int(trimmed), value >= 0 else { return nil }
         return value
     }
 
@@ -205,10 +269,15 @@ struct LeaseFormSheet: View {
             moveInDate: Self.apiDayFormatter.string(from: moveInDate),
             rentAmount: amount,
             rentCurrency: rentCurrency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+            depositAmount: parsedDepositAmount,
+            depositCurrency: parsedDepositAmount == nil ? nil : depositCurrency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
             paymentDay: validDay(paymentDueDay),
             paymentWindowStartDay: validDay(paymentWindowStartDay),
             paymentWindowEndDay: validDay(paymentWindowEndDay),
             paymentDueDay: validDay(paymentDueDay),
+            renewalReminderDays: validNonNegativeInt(renewalReminderDays),
+            autoRenew: autoRenew,
+            utilitiesPaidBy: utilitiesPaidBy,
             notes: noteTrimmed.isEmpty ? nil : noteTrimmed,
             isHistorical: lease == nil ? isHistorical : nil
         )
@@ -283,10 +352,15 @@ private struct LeaseUpsertBody: Encodable {
     let moveInDate: String?
     let rentAmount: Double
     let rentCurrency: String
+    let depositAmount: Double?
+    let depositCurrency: String?
     let paymentDay: Int?
     let paymentWindowStartDay: Int?
     let paymentWindowEndDay: Int?
     let paymentDueDay: Int?
+    let renewalReminderDays: Int?
+    let autoRenew: Bool?
+    let utilitiesPaidBy: String?
     let notes: String?
     let isHistorical: Bool?
 
@@ -297,10 +371,15 @@ private struct LeaseUpsertBody: Encodable {
         case moveInDate = "move_in_date"
         case rentAmount = "rent_amount"
         case rentCurrency = "rent_currency"
+        case depositAmount = "deposit_amount"
+        case depositCurrency = "deposit_currency"
         case paymentDay = "payment_day"
         case paymentWindowStartDay = "payment_window_start_day"
         case paymentWindowEndDay = "payment_window_end_day"
         case paymentDueDay = "payment_due_day"
+        case renewalReminderDays = "renewal_reminder_days"
+        case autoRenew = "auto_renew"
+        case utilitiesPaidBy = "utilities_paid_by"
         case notes
         case isHistorical = "is_historical"
     }
@@ -317,10 +396,15 @@ private struct LeaseUpsertBody: Encodable {
         try c.encodeIfPresent(moveInDate, forKey: .moveInDate)
         try c.encode(rentAmount, forKey: .rentAmount)
         try c.encode(rentCurrency, forKey: .rentCurrency)
+        try c.encodeIfPresent(depositAmount, forKey: .depositAmount)
+        try c.encodeIfPresent(depositCurrency, forKey: .depositCurrency)
         try c.encodeIfPresent(paymentDay, forKey: .paymentDay)
         try c.encodeIfPresent(paymentWindowStartDay, forKey: .paymentWindowStartDay)
         try c.encodeIfPresent(paymentWindowEndDay, forKey: .paymentWindowEndDay)
         try c.encodeIfPresent(paymentDueDay, forKey: .paymentDueDay)
+        try c.encodeIfPresent(renewalReminderDays, forKey: .renewalReminderDays)
+        try c.encodeIfPresent(autoRenew, forKey: .autoRenew)
+        try c.encodeIfPresent(utilitiesPaidBy, forKey: .utilitiesPaidBy)
         if let notes {
             try c.encode(notes, forKey: .notes)
         } else {

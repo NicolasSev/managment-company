@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaskFormView: View {
     var task: AppTask?
+    var properties: [Property] = []
     var onSave: () async -> Void
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +15,7 @@ struct TaskFormView: View {
     @State private var hasReminder = false
     @State private var priority = "medium"
     @State private var status = "pending"
+    @State private var selectedPropertyId = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     
@@ -30,6 +32,14 @@ struct TaskFormView: View {
                         text: $details,
                         placeholder: "Что нужно сделать дальше?"
                     )
+                }
+                Section("Объект") {
+                    Picker("Объект", selection: $selectedPropertyId) {
+                        Text("Не назначено").tag("")
+                        ForEach(properties) { property in
+                            Text(property.name).tag(property.id)
+                        }
+                    }
                 }
                 Section("Статус") {
                     Picker("Статус", selection: $status) {
@@ -110,6 +120,7 @@ struct TaskFormView: View {
         details = t.description ?? ""
         priority = t.priority
         status = normalizeStatus(t.status)
+        selectedPropertyId = t.propertyId ?? ""
         if let due = t.dueDate {
             dueDate = AppFormatting.parsedDate(from: due) ?? Date()
             hasDueDate = true
@@ -135,6 +146,7 @@ struct TaskFormView: View {
         let reminderString = hasReminder ? ISO8601DateFormatter().string(from: reminderAt) : nil
         
         let body = TaskInput(
+            propertyId: selectedPropertyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : selectedPropertyId,
             title: title,
             description: details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : details,
             priority: priority,
@@ -172,6 +184,10 @@ struct TaskFormView: View {
 
     private var summaryText: String {
         var pieces = ["Статус: \(displayStatus(status))", "Приоритет: \(priorityLabel(priority))"]
+
+        if let property = properties.first(where: { $0.id == selectedPropertyId }) {
+            pieces.append("Объект: \(property.name)")
+        }
 
         if let due = hasDueDate ? AppFormatting.dateString(from: dueDateStringValue) : nil {
             pieces.append("Срок: \(due)")
@@ -235,6 +251,7 @@ struct TaskFormView: View {
 }
 
 private struct TaskInput: Encodable {
+    let propertyId: String?
     let title: String
     let description: String?
     let priority: String
@@ -244,6 +261,7 @@ private struct TaskInput: Encodable {
     
     enum CodingKeys: String, CodingKey {
         case title, description, priority, status
+        case propertyId = "property_id"
         case dueDate = "due_date"
         case reminderAt = "reminder_at"
     }

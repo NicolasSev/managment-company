@@ -17,6 +17,7 @@ struct PropertyUtility: Identifiable, Codable {
     let status: String
     let notes: String?
     let receiptFileId: String?
+    let sourceReceiptId: String?
     let ocrStatus: String?
     let ocrConfidence: Double?
     let ocrRawText: String?
@@ -33,6 +34,7 @@ struct PropertyUtility: Identifiable, Codable {
         case dueDate = "due_date"
         case paidAt = "paid_at"
         case receiptFileId = "receipt_file_id"
+        case sourceReceiptId = "source_receipt_id"
         case ocrStatus = "ocr_status"
         case ocrConfidence = "ocr_confidence"
         case ocrRawText = "ocr_raw_text"

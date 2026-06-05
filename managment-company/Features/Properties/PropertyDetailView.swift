@@ -9,6 +9,8 @@ struct PropertyDetailView: View {
     @State private var leases: [Lease] = []
     @State private var utilities: [PropertyUtility] = []
     @State private var utilitiesHistoryExtra: [PropertyUtility] = []
+    @State private var utilityReceipts: [UtilityReceiptPayload] = []
+    @State private var maintenanceRequests: [MaintenanceRequest] = []
     @State private var leaseSchedulesByLeaseId: [String: [LeasePaymentSchedule]] = [:]
     @State private var scheduleForMarkPaidSheet: LeasePaymentSchedule?
     @State private var isLoading = true
@@ -17,6 +19,12 @@ struct PropertyDetailView: View {
     @State private var showEditForm = false
     @State private var showUtilityForm = false
     @State private var editingUtility: PropertyUtility?
+    @State private var selectedUtility: PropertyUtility?
+    @State private var selectedUtilityReceipt: UtilityReceiptRoute?
+    @State private var showMaintenanceForm = false
+    @State private var editingMaintenance: MaintenanceRequest?
+    @State private var maintenanceToDelete: MaintenanceRequest?
+    @State private var updatingMaintenanceId: String?
     @State private var editingTransaction: Transaction?
     @State private var transactionToDelete: Transaction?
     @State private var showLeaseForm = false
@@ -39,6 +47,21 @@ struct PropertyDetailView: View {
             }
             return $0.periodYear > $1.periodYear
         }
+    }
+
+    private var utilityReceiptsForDisplay: [UtilityReceiptPayload] {
+        utilityReceipts.sorted { left, right in
+            let leftPeriod = UtilityReceiptDisplay.receiptPeriodSortKey(left)
+            let rightPeriod = UtilityReceiptDisplay.receiptPeriodSortKey(right)
+            if leftPeriod == rightPeriod {
+                return UtilityReceiptDisplay.receiptDateSortKey(left) > UtilityReceiptDisplay.receiptDateSortKey(right)
+            }
+            return leftPeriod > rightPeriod
+        }
+    }
+
+    private var utilityReceiptById: [String: UtilityReceiptPayload] {
+        Dictionary(uniqueKeysWithValues: utilityReceipts.map { ($0.id, $0) })
     }
 
     private var purchasePriceText: String {
@@ -119,6 +142,24 @@ struct PropertyDetailView: View {
             UtilityFormView(propertyId: property.id, utility: editingUtility) {
                 await loadUtilities()
                 await loadUtilitiesHistoryExtra()
+                await loadUtilityReceipts()
+            }
+            .environmentObject(authManager)
+        }
+        .sheet(item: $selectedUtility) { utility in
+            UtilityDetailSheet(utility: utility)
+                .environmentObject(authManager)
+        }
+        .sheet(item: $selectedUtilityReceipt) { route in
+            UtilityReceiptDetailSheet(
+                receiptId: route.id,
+                initialReceipt: utilityReceiptById[route.id]
+            )
+            .environmentObject(authManager)
+        }
+        .sheet(isPresented: $showMaintenanceForm) {
+            MaintenanceFormSheet(propertyId: property.id, request: editingMaintenance) {
+                await loadMaintenance()
             }
             .environmentObject(authManager)
         }
@@ -170,6 +211,25 @@ struct PropertyDetailView: View {
         } message: {
             Text("Операция будет удалена из журнала объекта и финансовой статистики.")
         }
+        .confirmationDialog(
+            "Удалить заявку на обслуживание?",
+            isPresented: Binding(
+                get: { maintenanceToDelete != nil },
+                set: { if !$0 { maintenanceToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Удалить", role: .destructive) {
+                if let request = maintenanceToDelete {
+                    Task { await deleteMaintenance(request) }
+                }
+            }
+            Button("Отмена", role: .cancel) {
+                maintenanceToDelete = nil
+            }
+        } message: {
+            Text("Заявка будет скрыта из списка обслуживания объекта.")
+        }
         .sheet(item: $scheduleForMarkPaidSheet) { schedule in
             MarkSchedulePaidSheet(schedule: schedule) {
                 await refreshSchedule(leaseID: schedule.leaseId)
@@ -185,7 +245,7 @@ struct PropertyDetailView: View {
         if isLoading {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let errorMessage, transactions.isEmpty, leases.isEmpty, utilitiesForDisplay.isEmpty {
+        } else if let errorMessage, transactions.isEmpty, leases.isEmpty, utilitiesForDisplay.isEmpty, maintenanceRequests.isEmpty {
             EmptyStateView(
                 title: "Не удалось загрузить активность объекта",
                 message: errorMessage,
@@ -213,6 +273,7 @@ struct PropertyDetailView: View {
                     transactionsSection
                     tenantsSection
                     utilitiesSection
+                    maintenanceSection
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.lg)
@@ -515,25 +576,312 @@ struct PropertyDetailView: View {
                     .accessibilityLabel("Добавить коммуналку")
                 }
 
-                if utilitiesForDisplay.isEmpty {
+                if utilitiesForDisplay.isEmpty && utilityReceiptsForDisplay.isEmpty {
                     sectionPlaceholder(
                         title: "Коммуналка пока не добавлена",
-                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.). Загрузка квитанций — в вебе.",
+                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.).",
                         icon: "receipt"
                     )
                 } else {
-                    ForEach(utilitiesForDisplay.prefix(36)) { utility in
-                        Button {
-                            editingUtility = utility
-                            showUtilityForm = true
-                        } label: {
-                            utilityRow(utility)
+                    if !utilitiesForDisplay.isEmpty {
+                        ForEach(utilitiesForDisplay.prefix(36)) { utility in
+                            utilityListRow(utility)
                         }
-                        .buttonStyle(.plain)
+                    }
+
+                    if !utilityReceiptsForDisplay.isEmpty {
+                        utilityReceiptsHistorySection(Array(utilityReceiptsForDisplay.prefix(8)))
                     }
                 }
             }
         }
+    }
+
+    private var maintenanceSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack(alignment: .top) {
+                    sectionHeader(
+                        title: "Обслуживание",
+                        subtitle: "Ремонты, подрядчики и заявки по объекту."
+                    )
+
+                    Spacer()
+
+                    Button {
+                        editingMaintenance = nil
+                        showMaintenanceForm = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.headline)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(AppTheme.Colors.accent)
+                    .accessibilityLabel("Добавить заявку на обслуживание")
+                }
+
+                if maintenanceRequests.isEmpty {
+                    sectionPlaceholder(
+                        title: "Заявок на обслуживание пока нет",
+                        message: "Создавайте здесь ремонты, плановые работы и обращения к подрядчикам по объекту.",
+                        icon: "wrench.and.screwdriver"
+                    )
+                } else {
+                    ForEach(maintenanceRequests) { request in
+                        maintenanceRow(request)
+                    }
+                }
+            }
+        }
+    }
+
+    private func maintenanceRow(_ request: MaintenanceRequest) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(MaintenanceDisplay.categoryLabel(request.category))
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                    Text(request.title)
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .lineLimit(2)
+
+                    if let description = request.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+                        Text(description)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    maintenanceStatusPill(request.status)
+                    maintenancePriorityPill(request.priority)
+
+                    if let scheduled = request.scheduledDate,
+                       let formatted = AppFormatting.dateString(from: scheduled) {
+                        Text(formatted)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                }
+            }
+
+            HStack(spacing: AppTheme.Spacing.sm) {
+                Menu {
+                    ForEach(MaintenanceDisplay.statuses, id: \.self) { status in
+                        Button(MaintenanceDisplay.statusLabel(status)) {
+                            Task { await updateMaintenance(request, status: status) }
+                        }
+                    }
+                } label: {
+                    Label("Статус", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 8)
+                        .background(AppTheme.Colors.info.opacity(0.12))
+                        .foregroundStyle(AppTheme.Colors.info)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .disabled(updatingMaintenanceId == request.id)
+
+                utilityActionButton(
+                    title: "Изменить",
+                    icon: "pencil",
+                    color: AppTheme.Colors.textSecondary
+                ) {
+                    editingMaintenance = request
+                    showMaintenanceForm = true
+                }
+
+                utilityActionButton(
+                    title: "Удалить",
+                    icon: "trash",
+                    color: AppTheme.Colors.danger
+                ) {
+                    maintenanceToDelete = request
+                }
+            }
+
+            if updatingMaintenanceId == request.id {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+        .padding(.vertical, AppTheme.Spacing.sm)
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func maintenanceStatusPill(_ status: String) -> some View {
+        Text(MaintenanceDisplay.statusLabel(status))
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(MaintenanceDisplay.statusColor(status).opacity(0.14))
+            .foregroundStyle(MaintenanceDisplay.statusColor(status))
+            .clipShape(Capsule())
+    }
+
+    private func maintenancePriorityPill(_ priority: String) -> some View {
+        Text(MaintenanceDisplay.priorityLabel(priority))
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(MaintenanceDisplay.priorityColor(priority).opacity(0.12))
+            .foregroundStyle(MaintenanceDisplay.priorityColor(priority))
+            .clipShape(Capsule())
+    }
+
+    private func utilityListRow(_ utility: PropertyUtility) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            Button {
+                selectedUtility = utility
+            } label: {
+                utilityRow(utility)
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: AppTheme.Spacing.sm) {
+                utilityActionButton(
+                    title: "Детали",
+                    icon: "info.circle",
+                    color: AppTheme.Colors.accent
+                ) {
+                    selectedUtility = utility
+                }
+
+                utilityActionButton(
+                    title: "Изменить",
+                    icon: "pencil",
+                    color: AppTheme.Colors.textSecondary
+                ) {
+                    editingUtility = utility
+                    showUtilityForm = true
+                }
+
+                if let receiptId = utility.sourceReceiptId?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !receiptId.isEmpty {
+                    utilityActionButton(
+                        title: "Квитанция",
+                        icon: "doc.text.magnifyingglass",
+                        color: AppTheme.Colors.info
+                    ) {
+                        selectedUtilityReceipt = UtilityReceiptRoute(id: receiptId)
+                    }
+                }
+            }
+        }
+    }
+
+    private func utilityActionButton(
+        title: String,
+        icon: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+                .background(color.opacity(0.12))
+                .foregroundStyle(color)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func utilityReceiptsHistorySection(_ receipts: [UtilityReceiptPayload]) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            Divider()
+                .padding(.vertical, AppTheme.Spacing.xs)
+
+            HStack(alignment: .firstTextBaseline) {
+                Text("Распознанные квитанции")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Spacer()
+
+                Text("\(utilityReceiptsForDisplay.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.accent)
+            }
+
+            ForEach(receipts, id: \.id) { receipt in
+                Button {
+                    selectedUtilityReceipt = UtilityReceiptRoute(id: receipt.id)
+                } label: {
+                    utilityReceiptRow(receipt)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if utilityReceiptsForDisplay.count > receipts.count {
+                Text("Еще квитанций: \(utilityReceiptsForDisplay.count - receipts.count).")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+        }
+        .padding(.top, AppTheme.Spacing.sm)
+    }
+
+    private func utilityReceiptRow(_ receipt: UtilityReceiptPayload) -> some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(UtilityReceiptDisplay.receiptPeriodLabel(receipt))
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Text(receipt.provider?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? receipt.provider! : "Поставщик не распознан")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(2)
+
+                if let account = receipt.accountNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !account.isEmpty {
+                    Text("Л/с \(account)")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(receipt.totalAmount.map { AppFormatting.compactAmount($0, currency: receipt.currency ?? "KZT") } ?? "Сумма не распознана")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                StatusBadge(status: UtilityReceiptDisplay.receiptStatusLabel(receipt.status))
+
+                if let paymentDate = receipt.paymentDate,
+                   let formatted = AppFormatting.dateString(from: paymentDate) {
+                    Text(formatted)
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+            }
+        }
+        .padding(.vertical, AppTheme.Spacing.sm)
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func leaseScheduleSection(rows: [LeasePaymentSchedule]) -> some View {
@@ -710,6 +1058,12 @@ struct PropertyDetailView: View {
                 Text(utility.provider?.isEmpty == false ? utility.provider! : "Поставщик не указан")
                     .font(.caption)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                if utility.sourceReceiptId?.isEmpty == false {
+                    Label("Из распознанной квитанции", systemImage: "doc.text.magnifyingglass")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.Colors.info)
+                }
             }
 
             Spacer()
@@ -754,6 +1108,8 @@ struct PropertyDetailView: View {
             group.addTask { await loadTransactions() }
             group.addTask { await loadLeases() }
             group.addTask { await loadUtilities() }
+            group.addTask { await loadUtilityReceipts() }
+            group.addTask { await loadMaintenance() }
         }
 
         await loadTenants()
@@ -865,6 +1221,79 @@ struct PropertyDetailView: View {
         }
     }
 
+    private func loadUtilityReceipts() async {
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/properties/\(property.id)/utility-receipts?per_page=100",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let env = try JSONDecoder().decode(APIListEnvelope<UtilityReceiptPayload>.self, from: data)
+            utilityReceipts = env.data
+        } catch {
+            utilityReceipts = []
+        }
+    }
+
+    private func loadMaintenance() async {
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/properties/\(property.id)/maintenance",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let env = try JSONDecoder().decode(APIListEnvelope<MaintenanceRequest>.self, from: data)
+            maintenanceRequests = env.data
+        } catch {
+            maintenanceRequests = []
+        }
+    }
+
+    private func updateMaintenance(_ request: MaintenanceRequest, status: String? = nil, priority: String? = nil) async {
+        guard updatingMaintenanceId == nil else { return }
+        updatingMaintenanceId = request.id
+        errorMessage = nil
+        defer { updatingMaintenanceId = nil }
+
+        let body = MaintenanceInput(
+            request: request,
+            status: status ?? request.status,
+            priority: priority ?? request.priority
+        )
+
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/maintenance/\(request.id)",
+                method: "PUT",
+                body: body,
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            AppHaptics.success()
+            await loadMaintenance()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = "Не удалось обновить заявку на обслуживание."
+        }
+    }
+
+    private func deleteMaintenance(_ request: MaintenanceRequest) async {
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/maintenance/\(request.id)",
+                method: "DELETE",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            maintenanceToDelete = nil
+            AppHaptics.success()
+            await loadMaintenance()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = "Не удалось удалить заявку на обслуживание."
+        }
+    }
+
     private func loadTransactions() async {
         do {
             let data = try await APIClient.shared.requestData(
@@ -968,28 +1397,11 @@ struct PropertyDetailView: View {
     }
 
     private func utilityPeriodLabel(_ utility: PropertyUtility) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "MMMM yyyy"
-        let components = DateComponents(year: utility.periodYear, month: utility.periodMonth, day: 1)
-        guard let date = Calendar.current.date(from: components) else {
-            return "\(utility.periodMonth)/\(utility.periodYear)"
-        }
-        return formatter.string(from: date)
+        UtilityReceiptDisplay.utilityPeriodLabel(year: utility.periodYear, month: utility.periodMonth)
     }
 
     private func utilityTypeLabel(_ value: String) -> String {
-        switch value {
-        case "utilities": return "Коммунальные услуги"
-        case "electricity": return "Электричество"
-        case "water": return "Вода"
-        case "gas": return "Газ"
-        case "heating": return "Отопление"
-        case "internet": return "Интернет"
-        case "maintenance": return "Обслуживание"
-        case "other": return "Другое"
-        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        UtilityReceiptDisplay.utilityTypeLabel(value)
     }
 
     private func propertyTypeLabel(_ value: String) -> String {
@@ -1008,6 +1420,856 @@ private struct GenerateScheduleBody: Encodable {}
 
 private struct LinkedTransactionRoute: Identifiable {
     let id: String
+}
+
+private struct UtilityReceiptRoute: Identifiable {
+    let id: String
+}
+
+private struct MaintenanceRequest: Identifiable, Codable {
+    let id: String
+    let propertyId: String
+    let tenantId: String?
+    let title: String
+    let description: String?
+    let category: String
+    let priority: String
+    let status: String
+    let contractorName: String?
+    let contractorPhone: String?
+    let estimatedCost: Double?
+    let actualCost: Double?
+    let currency: String
+    let scheduledDate: String?
+    let completedAt: String?
+    let createdAt: String
+    let updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, category, priority, status, currency
+        case propertyId = "property_id"
+        case tenantId = "tenant_id"
+        case contractorName = "contractor_name"
+        case contractorPhone = "contractor_phone"
+        case estimatedCost = "estimated_cost"
+        case actualCost = "actual_cost"
+        case scheduledDate = "scheduled_date"
+        case completedAt = "completed_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+private struct MaintenanceInput: Encodable {
+    let propertyId: String
+    let tenantId: String?
+    let title: String
+    let description: String?
+    let category: String
+    let priority: String
+    let status: String
+    let contractorName: String?
+    let contractorPhone: String?
+    let estimatedCost: Double?
+    let actualCost: Double?
+    let currency: String
+    let scheduledDate: String?
+    let completedAt: String?
+
+    init(
+        propertyId: String,
+        tenantId: String? = nil,
+        title: String,
+        description: String?,
+        category: String,
+        priority: String,
+        status: String,
+        contractorName: String?,
+        contractorPhone: String?,
+        estimatedCost: Double?,
+        actualCost: Double?,
+        currency: String,
+        scheduledDate: String?,
+        completedAt: String?
+    ) {
+        self.propertyId = propertyId
+        self.tenantId = tenantId
+        self.title = title
+        self.description = description
+        self.category = category
+        self.priority = priority
+        self.status = status
+        self.contractorName = contractorName
+        self.contractorPhone = contractorPhone
+        self.estimatedCost = estimatedCost
+        self.actualCost = actualCost
+        self.currency = currency
+        self.scheduledDate = scheduledDate
+        self.completedAt = completedAt
+    }
+
+    init(request: MaintenanceRequest, status: String, priority: String) {
+        self.init(
+            propertyId: request.propertyId,
+            tenantId: request.tenantId,
+            title: request.title,
+            description: request.description,
+            category: request.category,
+            priority: priority,
+            status: status,
+            contractorName: request.contractorName,
+            contractorPhone: request.contractorPhone,
+            estimatedCost: request.estimatedCost,
+            actualCost: request.actualCost,
+            currency: request.currency,
+            scheduledDate: request.scheduledDate,
+            completedAt: request.completedAt
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title, description, category, priority, status, currency
+        case propertyId = "property_id"
+        case tenantId = "tenant_id"
+        case contractorName = "contractor_name"
+        case contractorPhone = "contractor_phone"
+        case estimatedCost = "estimated_cost"
+        case actualCost = "actual_cost"
+        case scheduledDate = "scheduled_date"
+        case completedAt = "completed_at"
+    }
+}
+
+private enum MaintenanceDisplay {
+    static let categories = ["plumbing", "electrical", "hvac", "general", "appliance", "other"]
+    static let priorities = ["low", "medium", "high", "urgent"]
+    static let statuses = ["requested", "scheduled", "in_progress", "completed", "cancelled"]
+
+    static func categoryLabel(_ value: String) -> String {
+        switch value {
+        case "plumbing": return "Сантехника"
+        case "electrical": return "Электрика"
+        case "hvac": return "Климат"
+        case "general": return "Общее"
+        case "appliance": return "Техника"
+        case "other": return "Другое"
+        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    static func priorityLabel(_ value: String) -> String {
+        switch value {
+        case "low": return "Низкий"
+        case "medium": return "Средний"
+        case "high": return "Высокий"
+        case "urgent": return "Срочно"
+        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    static func statusLabel(_ value: String) -> String {
+        switch value {
+        case "requested": return "Запрошено"
+        case "scheduled": return "Запланировано"
+        case "in_progress": return "В работе"
+        case "completed": return "Завершено"
+        case "cancelled": return "Отменено"
+        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    static func statusColor(_ value: String) -> Color {
+        switch value {
+        case "completed":
+            return AppTheme.Colors.success
+        case "cancelled":
+            return AppTheme.Colors.danger
+        case "scheduled", "in_progress":
+            return AppTheme.Colors.info
+        default:
+            return AppTheme.Colors.warning
+        }
+    }
+
+    static func priorityColor(_ value: String) -> Color {
+        switch value {
+        case "urgent", "high":
+            return AppTheme.Colors.danger
+        case "medium":
+            return AppTheme.Colors.warning
+        default:
+            return AppTheme.Colors.textSecondary
+        }
+    }
+
+    static func decimalText(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+}
+
+private struct MaintenanceFormSheet: View {
+    let propertyId: String
+    var request: MaintenanceRequest?
+    var onSave: () async -> Void
+
+    @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var title = ""
+    @State private var descriptionText = ""
+    @State private var category = "plumbing"
+    @State private var priority = "medium"
+    @State private var status = "requested"
+    @State private var contractorName = ""
+    @State private var contractorPhone = ""
+    @State private var estimatedCost = ""
+    @State private var actualCost = ""
+    @State private var currency = "USD"
+    @State private var scheduledDate = Date()
+    @State private var hasScheduledDate = false
+    @State private var completedAt = Date()
+    @State private var hasCompletedAt = false
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Заявка") {
+                    AppTextField(title: "Название", text: $title, placeholder: "Что нужно сделать?")
+                    Picker("Категория", selection: $category) {
+                        ForEach(MaintenanceDisplay.categories, id: \.self) { value in
+                            Text(MaintenanceDisplay.categoryLabel(value)).tag(value)
+                        }
+                    }
+                    AppTextField(title: "Описание", text: $descriptionText, placeholder: "Детали работ")
+                }
+
+                Section("Статус") {
+                    Picker("Статус", selection: $status) {
+                        ForEach(MaintenanceDisplay.statuses, id: \.self) { value in
+                            Text(MaintenanceDisplay.statusLabel(value)).tag(value)
+                        }
+                    }
+                    Picker("Приоритет", selection: $priority) {
+                        ForEach(MaintenanceDisplay.priorities, id: \.self) { value in
+                            Text(MaintenanceDisplay.priorityLabel(value)).tag(value)
+                        }
+                    }
+                }
+
+                Section("Подрядчик") {
+                    AppTextField(title: "Имя", text: $contractorName, placeholder: "Компания или мастер")
+                    AppTextField(
+                        title: "Телефон",
+                        text: $contractorPhone,
+                        placeholder: "+7",
+                        keyboardType: .phonePad
+                    )
+                }
+
+                Section("Стоимость") {
+                    AppTextField(
+                        title: "План",
+                        text: $estimatedCost,
+                        placeholder: "0",
+                        keyboardType: .decimalPad,
+                        autocapitalization: .never
+                    )
+                    AppTextField(
+                        title: "Факт",
+                        text: $actualCost,
+                        placeholder: "0",
+                        keyboardType: .decimalPad,
+                        autocapitalization: .never
+                    )
+                    AppTextField(
+                        title: "Валюта",
+                        text: $currency,
+                        placeholder: "USD",
+                        autocapitalization: .characters
+                    )
+                }
+
+                Section("Даты") {
+                    Toggle("Запланировать дату", isOn: $hasScheduledDate)
+                    if hasScheduledDate {
+                        DatePicker("Дата работ", selection: $scheduledDate, displayedComponents: .date)
+                    }
+                    Toggle("Указать завершение", isOn: $hasCompletedAt)
+                    if hasCompletedAt {
+                        DatePicker("Завершено", selection: $completedAt, displayedComponents: .date)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(AppTheme.Colors.danger)
+                    }
+                }
+            }
+            .navigationTitle(request == nil ? "Новая заявка" : "Редактировать заявку")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Сохранить") { Task { await save() } }
+                        .disabled(!canSave || isLoading)
+                }
+            }
+            .onAppear { populateFromRequest() }
+        }
+    }
+
+    private var canSave: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            optionalAmountIsValid(estimatedCost) &&
+            optionalAmountIsValid(actualCost)
+    }
+
+    private func populateFromRequest() {
+        guard let request else { return }
+        title = request.title
+        descriptionText = request.description ?? ""
+        category = MaintenanceDisplay.categories.contains(request.category) ? request.category : "other"
+        priority = MaintenanceDisplay.priorities.contains(request.priority) ? request.priority : "medium"
+        status = MaintenanceDisplay.statuses.contains(request.status) ? request.status : "requested"
+        contractorName = request.contractorName ?? ""
+        contractorPhone = request.contractorPhone ?? ""
+        estimatedCost = request.estimatedCost.map { MaintenanceDisplay.decimalText($0) } ?? ""
+        actualCost = request.actualCost.map { MaintenanceDisplay.decimalText($0) } ?? ""
+        currency = request.currency
+        if let scheduled = request.scheduledDate, let parsed = AppFormatting.parsedDate(from: scheduled) {
+            scheduledDate = parsed
+            hasScheduledDate = true
+        }
+        if let completed = request.completedAt, let parsed = AppFormatting.parsedDate(from: completed) {
+            completedAt = parsed
+            hasCompletedAt = true
+        }
+    }
+
+    private func save() async {
+        guard canSave else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        let body = MaintenanceInput(
+            propertyId: propertyId,
+            tenantId: request?.tenantId,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            category: category,
+            priority: priority,
+            status: status,
+            contractorName: contractorName.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            contractorPhone: contractorPhone.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            estimatedCost: parsedOptionalAmount(estimatedCost),
+            actualCost: parsedOptionalAmount(actualCost),
+            currency: currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().nilIfBlank ?? "USD",
+            scheduledDate: hasScheduledDate ? dateString(scheduledDate) : nil,
+            completedAt: hasCompletedAt ? dateString(completedAt) : nil
+        )
+
+        do {
+            if let request {
+                _ = try await APIClient.shared.requestData(
+                    "/v1/maintenance/\(request.id)",
+                    method: "PUT",
+                    body: body,
+                    tokenProvider: { await MainActor.run { authManager.accessToken } },
+                    refreshAndRetry: { await authManager.refreshToken() }
+                )
+            } else {
+                _ = try await APIClient.shared.requestData(
+                    "/v1/maintenance",
+                    method: "POST",
+                    body: body,
+                    tokenProvider: { await MainActor.run { authManager.accessToken } },
+                    refreshAndRetry: { await authManager.refreshToken() }
+                )
+            }
+            AppHaptics.success()
+            await onSave()
+            dismiss()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = "Не удалось сохранить заявку на обслуживание."
+        }
+    }
+
+    private func optionalAmountIsValid(_ raw: String) -> Bool {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || parsedOptionalAmount(raw) != nil
+    }
+
+    private func parsedOptionalAmount(_ raw: String) -> Double? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return Double(trimmed.replacingOccurrences(of: ",", with: "."))
+    }
+
+    private func dateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+}
+
+private enum UtilityReceiptDisplay {
+    static func utilityTypeLabel(_ value: String) -> String {
+        switch value {
+        case "utilities": return "Коммунальные услуги"
+        case "electricity": return "Электричество"
+        case "cold_water": return "Холодная вода"
+        case "hot_water": return "Горячая вода"
+        case "water": return "Вода"
+        case "water_disposal": return "Водоотведение"
+        case "gas": return "Газ"
+        case "heating": return "Отопление"
+        case "common_area": return "МОП"
+        case "waste": return "Вывоз отходов"
+        case "elevator": return "Лифт"
+        case "intercom": return "Домофон"
+        case "internet": return "Интернет"
+        case "tv": return "ТВ"
+        case "capital_repair": return "Капремонт"
+        case "maintenance": return "Обслуживание"
+        case "other": return "Другое"
+        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    static func utilityPeriodLabel(year: Int, month: Int) -> String {
+        monthYearLabel(year: year, month: month) ?? "\(month)/\(year)"
+    }
+
+    static func receiptPeriodLabel(_ receipt: UtilityReceiptPayload) -> String {
+        if let year = receipt.periodYear, let month = receipt.periodMonth,
+           let label = monthYearLabel(year: year, month: month) {
+            return label
+        }
+        if let paymentDate = receipt.paymentDate,
+           let formatted = AppFormatting.dateString(from: paymentDate, dateStyle: .long) {
+            return formatted
+        }
+        return "Период не распознан"
+    }
+
+    static func receiptStatusLabel(_ status: String) -> String {
+        switch status {
+        case "queued": return "В очереди"
+        case "processing": return "Распознается"
+        case "parsed": return "Распознана"
+        case "confirmed": return "Сохранена"
+        case "failed": return "Ошибка"
+        default: return status
+        }
+    }
+
+    static func receiptPeriodSortKey(_ receipt: UtilityReceiptPayload) -> String {
+        let year = receipt.periodYear ?? 0
+        let month = receipt.periodMonth ?? 0
+        return "\(year)-\(String(format: "%02d", month))"
+    }
+
+    static func receiptDateSortKey(_ receipt: UtilityReceiptPayload) -> String {
+        receipt.paymentDate ?? receipt.confirmedAt ?? receipt.createdAt ?? receipt.updatedAt ?? ""
+    }
+
+    static func decimalText(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 3
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    private static func monthYearLabel(year: Int, month: Int) -> String? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "MMMM yyyy"
+        let components = DateComponents(year: year, month: month, day: 1)
+        guard let date = Calendar.current.date(from: components) else { return nil }
+        return formatter.string(from: date)
+    }
+}
+
+private struct UtilityDetailSheet: View {
+    let utility: PropertyUtility
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                    SurfaceCard {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(UtilityReceiptDisplay.utilityPeriodLabel(year: utility.periodYear, month: utility.periodMonth))
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                                    Text(UtilityReceiptDisplay.utilityTypeLabel(utility.utilityType))
+                                        .font(.title3.weight(.semibold))
+                                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                                }
+
+                                Spacer()
+
+                                StatusBadge(status: utility.status)
+                            }
+
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppTheme.Spacing.sm) {
+                                detailCell(
+                                    title: "Сумма",
+                                    value: AppFormatting.compactAmount(utility.amount, currency: utility.currency)
+                                )
+                                detailCell(
+                                    title: "Поставщик",
+                                    value: utility.provider?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? utility.provider! : "Не указан"
+                                )
+                                detailCell(
+                                    title: "Срок оплаты",
+                                    value: AppFormatting.dateString(from: utility.dueDate) ?? "Не указан"
+                                )
+                                detailCell(
+                                    title: "Оплачено",
+                                    value: AppFormatting.dateString(from: utility.paidAt) ?? "Не оплачено"
+                                )
+                            }
+
+                            if let notes = utility.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+                                detailRow("Заметки", value: notes)
+                            }
+
+                            if let receiptId = utility.sourceReceiptId?.trimmingCharacters(in: .whitespacesAndNewlines), !receiptId.isEmpty {
+                                detailRow("Квитанция", value: receiptId)
+                            }
+
+                            if let confidence = utility.ocrConfidence {
+                                detailRow("OCR", value: "\(Int((confidence * 100).rounded()))%")
+                            }
+
+                            if let processedAt = utility.ocrProcessedAt {
+                                detailRow("Обработано", value: AppFormatting.dateString(from: processedAt) ?? processedAt)
+                            }
+                        }
+                    }
+
+                    SurfaceCard {
+                        EntityFilesSection(
+                            entityType: "utility",
+                            entityId: utility.id,
+                            title: "Файлы начисления",
+                            isEmbedded: true,
+                            fileTypes: [
+                                EntityFileType(value: "receipt", label: "Квитанция"),
+                                EntityFileType(value: "document", label: "Документ"),
+                                EntityFileType(value: "photo", label: "Фото")
+                            ]
+                        )
+                    }
+                }
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.vertical, AppTheme.Spacing.lg)
+            }
+            .background(AppScreenBackground())
+            .navigationTitle("Коммуналка")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Готово") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func detailCell(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, AppTheme.Spacing.sm)
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func detailRow(_ title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+                .frame(width: 92, alignment: .leading)
+
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct UtilityReceiptDetailSheet: View {
+    let receiptId: String
+
+    @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var receipt: UtilityReceiptPayload?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    init(receiptId: String, initialReceipt: UtilityReceiptPayload? = nil) {
+        self.receiptId = receiptId
+        _receipt = State(initialValue: initialReceipt)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                    if isLoading && receipt == nil {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, minHeight: 160)
+                    } else if let receipt {
+                        receiptSummary(receipt)
+                        receiptItems(receipt.items ?? [], currency: receipt.currency ?? "KZT")
+
+                        if !receipt.fileId.isEmpty {
+                            SurfaceCard {
+                                Label("Файл квитанции сохранён в системе.", systemImage: "doc.text")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                            }
+                        }
+                    } else {
+                        sectionPlaceholder
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(AppTheme.Colors.warning)
+                    }
+                }
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.vertical, AppTheme.Spacing.lg)
+            }
+            .background(AppScreenBackground())
+            .navigationTitle("Квитанция")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Готово") { dismiss() }
+                }
+            }
+            .task(id: receiptId) { await loadReceipt() }
+        }
+    }
+
+    private func receiptSummary(_ receipt: UtilityReceiptPayload) -> some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(UtilityReceiptDisplay.receiptPeriodLabel(receipt))
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                        Text(receipt.totalAmount.map { AppFormatting.currency($0, currency: receipt.currency ?? "KZT") } ?? "Сумма не распознана")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                    }
+
+                    Spacer()
+
+                    StatusBadge(status: UtilityReceiptDisplay.receiptStatusLabel(receipt.status))
+                }
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppTheme.Spacing.sm) {
+                    detailCell("Поставщик", receipt.provider ?? "Не распознан")
+                    detailCell("Лицевой счёт", receipt.accountNumber ?? "Не распознан")
+                    detailCell("Дата квитанции", AppFormatting.dateString(from: receipt.paymentDate) ?? "Не распознана")
+                    detailCell("Уверенность", receipt.extractionConfidence.map { "\(Int(($0 * 100).rounded()))%" } ?? "Нет данных")
+                }
+
+                if let failure = receipt.failureReason?.trimmingCharacters(in: .whitespacesAndNewlines), !failure.isEmpty {
+                    detailRow("Ошибка", value: failure)
+                }
+            }
+        }
+    }
+
+    private func receiptItems(_ items: [UtilityReceiptItemPayload], currency: String) -> some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Text("Строки квитанции")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                if items.isEmpty {
+                    Text("Детали начислений не распознаны или ещё не загружены.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                } else {
+                    ForEach(items) { item in
+                        receiptItemRow(item, currency: currency)
+                    }
+                }
+            }
+        }
+    }
+
+    private func receiptItemRow(_ item: UtilityReceiptItemPayload, currency: String) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(UtilityReceiptDisplay.utilityTypeLabel(item.utilityType))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                    if let label = item.labelRaw?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                }
+
+                Spacer()
+
+                Text(AppFormatting.compactAmount(item.amount, currency: currency))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+            }
+
+            HStack(spacing: AppTheme.Spacing.sm) {
+                if let tariff = item.tariff {
+                    infoPill("Тариф \(UtilityReceiptDisplay.decimalText(tariff))")
+                }
+                if let consumption = item.consumption {
+                    infoPill("Расход \(UtilityReceiptDisplay.decimalText(consumption))\(item.unit.map { " \($0)" } ?? "")")
+                }
+                if item.materializedUtilityId != nil {
+                    infoPill("Сохранено")
+                }
+            }
+
+            if item.previousReading != nil || item.currentReading != nil {
+                Text("Показания: \(item.previousReading.map { UtilityReceiptDisplay.decimalText($0) } ?? "-") → \(item.currentReading.map { UtilityReceiptDisplay.decimalText($0) } ?? "-")")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+        }
+        .padding(.vertical, AppTheme.Spacing.sm)
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func infoPill(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(AppTheme.Colors.accent.opacity(0.1))
+            .foregroundStyle(AppTheme.Colors.accent)
+            .clipShape(Capsule())
+    }
+
+    private func detailCell(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, AppTheme.Spacing.sm)
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func detailRow(_ title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+                .frame(width: 92, alignment: .leading)
+
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var sectionPlaceholder: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.title2)
+                    .foregroundStyle(AppTheme.Colors.accent)
+
+                Text("Квитанция недоступна")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                Text("Не удалось загрузить детали квитанции. Потяните экран объекта для обновления и попробуйте снова.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+        }
+    }
+
+    private func loadReceipt() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let data = try await APIClient.shared.requestData(
+                "/v1/utility-receipts/\(receiptId)",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            let decoded = try JSONDecoder().decode(APIResponse<UtilityReceiptPayload>.self, from: data)
+            receipt = decoded.data
+        } catch {
+            errorMessage = "Не удалось загрузить детали квитанции."
+        }
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        isEmpty ? nil : self
+    }
 }
 
 private struct ExchangeRateConversionDTO: Decodable {
