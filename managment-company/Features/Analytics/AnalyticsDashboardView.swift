@@ -172,6 +172,9 @@ private extension Calendar {
 
 struct AnalyticsDashboardView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
+    @State private var showNotifications = false
+    @State private var notificationUnreadCount = 0
     @State private var dashboard: AnalyticsDashboard?
     @State private var overdue: OverduePaymentsPayload?
     @State private var cashflowTrend: CashflowTrendBody?
@@ -305,7 +308,7 @@ struct AnalyticsDashboardView: View {
                             VStack(spacing: AppTheme.Spacing.lg) {
                                 SurfaceCard {
                                     VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                                        Text("Аналитика")
+                                        Text("Дашборд")
                                             .font(.caption)
                                             .fontWeight(.semibold)
                                             .textCase(.uppercase)
@@ -504,8 +507,34 @@ struct AnalyticsDashboardView: View {
                     }
                 }
             }
-            .navigationTitle("Аналитика")
+            .navigationTitle("Дашборд")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showNotifications = true
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                            if notificationUnreadCount > 0 {
+                                Text(notificationUnreadCount > 99 ? "99+" : "\(notificationUnreadCount)")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(AppTheme.Colors.danger.clipShape(Capsule()))
+                                    .offset(x: 10, y: -10)
+                            }
+                        }
+                        .frame(minWidth: 36, minHeight: 36)
+                    }
+                    .accessibilityLabel(
+                        notificationUnreadCount > 0
+                            ? "Уведомления, непрочитано: \(notificationUnreadCount)"
+                            : "Уведомления"
+                    )
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -560,11 +589,36 @@ struct AnalyticsDashboardView: View {
                 }
                 .presentationDetents([.medium])
             }
-            .task { await loadDashboard() }
-            .refreshable { await loadDashboard() }
+            .sheet(isPresented: $showNotifications) {
+                NotificationsInboxView(onDataChanged: {
+                    await refreshNotificationUnread()
+                })
+                .environmentObject(authManager)
+            }
+            .onChange(of: showNotifications) { _, open in
+                if !open { Task { await refreshNotificationUnread() } }
+            }
+            .task { await loadDashboard(); await refreshNotificationUnread() }
+            .refreshable { await loadDashboard(); await refreshNotificationUnread() }
             .onChange(of: dashboardPeriod) { _, _ in Task { await loadDashboard() } }
             .onChange(of: analyticsRange) { _, _ in Task { await loadDashboard() } }
             .onChange(of: profitabilityGroupBy) { _, _ in Task { await loadDashboard() } }
+            .onChange(of: rentPreviewRouter.paidSignal) { _, _ in
+                Task { await loadDashboard(); await refreshNotificationUnread() }
+            }
+        }
+    }
+
+    private func refreshNotificationUnread() async {
+        do {
+            let u: UnreadCountData = try await APIClient.shared.request(
+                "/v1/notifications/unread-count",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            await MainActor.run { notificationUnreadCount = u.count }
+        } catch {
+            await MainActor.run { notificationUnreadCount = 0 }
         }
     }
 

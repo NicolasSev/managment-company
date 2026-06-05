@@ -6,7 +6,6 @@ enum AppTab: Hashable {
     case properties
     case tenants
     case tasks
-    case analytics
     case settings
 }
 
@@ -19,7 +18,7 @@ struct MainTabView: View {
     var body: some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedTab) {
-            HomeDashboardView(selectedTab: $selectedTab)
+            AnalyticsDashboardView()
                 .environmentObject(authManager)
                 .tag(AppTab.dashboard)
                 .tabItem {
@@ -46,11 +45,6 @@ struct MainTabView: View {
                 .tag(AppTab.tasks)
                 .tabItem {
                     Label("Задачи", systemImage: "checklist")
-                }
-            AnalyticsDashboardView()
-                .tag(AppTab.analytics)
-                .tabItem {
-                    Label("Аналитика", systemImage: "chart.bar")
                 }
             SettingsView()
                 .tag(AppTab.settings)
