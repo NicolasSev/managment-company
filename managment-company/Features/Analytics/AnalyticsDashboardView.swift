@@ -1003,15 +1003,18 @@ struct AnalyticsDashboardView: View {
 
     private func makeAnalyticsCSV() throws -> URL {
         let headers = ["period", "total_income", "owner_operating_cost", "tenant_utilities", "net_cashflow", "profit_margin_pct"]
-        let lines = [headers] + (profitability?.totals ?? []).map { row in
-            [
-                row.periodLabel.isEmpty ? row.periodKey : row.periodLabel,
+        var lines: [[String]] = [headers]
+        for row in profitability?.totals ?? [] {
+            let period = row.periodLabel.isEmpty ? row.periodKey : row.periodLabel
+            let cells: [String] = [
+                period,
                 String(row.totalIncome),
                 String(row.operatingCost),
                 String(row.utilityExpense),
                 String(row.netCashflow),
                 String(row.profitMarginPct)
             ]
+            lines.append(cells)
         }
         let csv = lines.map { $0.map(Self.csvEscape).joined(separator: ",") }.joined(separator: "\n")
         let url = temporaryExportURL(prefix: "analytics-profitability", fileExtension: "csv")
