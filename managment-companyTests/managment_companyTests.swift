@@ -18,7 +18,11 @@ struct ManagmentCompanyTests {
         // `Bundle(for:)` needs a class; this suite is a struct (Swift Testing),
         // so anchor on a token class compiled into the test bundle.
         let bundle = Bundle(for: BundleToken.self)
-        guard let url = bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures") else {
+        // Xcode 16 synchronized groups bundle these JSON fixtures flat (no
+        // "Fixtures" subdirectory), so fall back to a root-level lookup.
+        let url = bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures")
+            ?? bundle.url(forResource: name, withExtension: "json")
+        guard let url else {
             struct MissingFixture: Error {}
             throw MissingFixture()
         }
