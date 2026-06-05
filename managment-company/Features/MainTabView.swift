@@ -23,7 +23,7 @@ struct MainTabView: View {
                 .environmentObject(authManager)
                 .tag(AppTab.dashboard)
                 .tabItem {
-                    Label("Главная", systemImage: "rectangle.grid.2x2")
+                    Label("Дашборд", systemImage: "rectangle.grid.2x2")
                 }
             TransactionsListView()
                 .environmentObject(authManager)

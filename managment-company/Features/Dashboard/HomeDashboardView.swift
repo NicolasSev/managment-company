@@ -22,7 +22,7 @@ struct HomeDashboardView: View {
 
                 content
             }
-            .navigationTitle("Главная")
+            .navigationTitle("Дашборд")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
