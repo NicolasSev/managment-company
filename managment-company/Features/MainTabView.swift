@@ -18,7 +18,7 @@ struct MainTabView: View {
     var body: some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedTab) {
-            AnalyticsDashboardView()
+            DashboardView()
                 .environmentObject(authManager)
                 .tag(AppTab.dashboard)
                 .tabItem {
