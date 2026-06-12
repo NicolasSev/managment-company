@@ -44,6 +44,8 @@ struct DashboardView: View {
     @State private var tenants: [Tenant] = []
     @State private var leases: [Lease] = []
     @State private var paymentSchedules: [LeasePaymentSchedule] = []
+    @State private var portfolioTransactions: [Transaction] = []
+    @State private var incomeCategories: [Category] = []
     @State private var recentTransactions: [DashboardRecentTransactionRow] = []
     @State private var recentTransactionsExpanded = false
     @State private var recentTransactionsLoadFailed = false
@@ -81,7 +83,9 @@ struct DashboardView: View {
             year: calendarYear,
             month: calendarMonth,
             leases: leases,
-            schedules: paymentSchedules
+            schedules: paymentSchedules,
+            transactions: portfolioTransactions,
+            categories: incomeCategories
         )
     }
     private var coverageSummary: DashboardCoverageSummary {
@@ -708,7 +712,9 @@ struct DashboardView: View {
                 properties: properties,
                 leases: leases,
                 schedules: paymentSchedules,
-                tenants: tenants
+                tenants: tenants,
+                transactions: portfolioTransactions,
+                categories: incomeCategories
             )
         } label: {
             Text(String(day.day))
@@ -1133,6 +1139,13 @@ struct DashboardView: View {
         ) {
             tenants = loadedTenants
         }
+        if let loadedCategories: [Category] = try? await APIClient.shared.request(
+            "/v1/categories?type=income",
+            tokenProvider: tokenProvider,
+            refreshAndRetry: refreshProvider
+        ) {
+            incomeCategories = loadedCategories
+        }
 
         var loadedLeases: [Lease] = []
         for property in loadedProperties {
@@ -1204,6 +1217,7 @@ struct DashboardView: View {
             )
         )
         if !rows.isEmpty || !failed {
+            portfolioTransactions = merged
             recentTransactions = rows
         }
         recentTransactionsLoadFailed = failed

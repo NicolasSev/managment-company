@@ -213,6 +213,107 @@ struct DashboardAnalyticsTests {
         #expect(detail.coveragePct == 0)
     }
 
+    @Test func calendarUsesAttributedRentTransactionWhenScheduleIsMissing() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let lease = lease(
+            id: "lease-a",
+            propertyId: "property-a",
+            tenantId: "tenant-a",
+            start: "2025-11-01",
+            end: "2026-11-01",
+            rentAmount: 400_000,
+            paymentDay: 1
+        )
+        let transaction = transaction(
+            id: "transaction-a",
+            propertyId: lease.propertyId,
+            categoryId: "rent",
+            amount: 400_000,
+            date: "2026-05-01",
+            periodYear: 2026,
+            periodMonth: 5,
+            tenantId: lease.tenantId,
+            leaseId: lease.id
+        )
+
+        let days = DashboardAnalyticsLogic.calendarDays(
+            year: 2026,
+            month: 5,
+            leases: [lease],
+            schedules: [],
+            transactions: [transaction],
+            categories: [category(id: "rent", name: "Аренда")],
+            today: calendar.date(
+                from: DateComponents(year: 2026, month: 6, day: 12)
+            )!,
+            calendar: calendar
+        )
+        let detail = DashboardAnalyticsLogic.calendarDayDetail(
+            date: calendar.date(
+                from: DateComponents(year: 2026, month: 5, day: 15)
+            )!,
+            properties: [property(id: lease.propertyId, name: "Назарбаева 278")],
+            leases: [lease],
+            schedules: [],
+            tenants: [tenant(id: lease.tenantId, name: "Данил Назарбаев")],
+            transactions: [transaction],
+            categories: [category(id: "rent", name: "Аренда")],
+            calendar: calendar
+        )
+
+        #expect(days[14].state == .paid)
+        #expect(days[14].paidLeaseCount == 1)
+        #expect(detail.paidLeaseCount == 1)
+        #expect(detail.coveragePct == 100)
+        #expect(detail.entries[0].payment?.amount == 400_000)
+        #expect(detail.entries[0].payment?.periodStartDate == "2026-05-01")
+        #expect(detail.entries[0].payment?.periodEndDate == "2026-06-01")
+    }
+
+    @Test func calendarIgnoresNonRentIncomeTransaction() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let lease = lease(
+            id: "lease-a",
+            propertyId: "property-a",
+            tenantId: "tenant-a",
+            start: "2026-05-01",
+            end: nil,
+            rentAmount: 400_000
+        )
+        let transaction = transaction(
+            id: "transaction-a",
+            propertyId: lease.propertyId,
+            categoryId: "deposit",
+            amount: 400_000,
+            date: "2026-05-01",
+            periodYear: 2026,
+            periodMonth: 5,
+            tenantId: lease.tenantId,
+            leaseId: lease.id
+        )
+
+        let detail = DashboardAnalyticsLogic.calendarDayDetail(
+            date: calendar.date(
+                from: DateComponents(year: 2026, month: 5, day: 15)
+            )!,
+            properties: [property(id: lease.propertyId, name: "Назарбаева 278")],
+            leases: [lease],
+            schedules: [],
+            tenants: [],
+            transactions: [transaction],
+            categories: [
+                category(id: "rent", name: "Аренда"),
+                category(id: "deposit", name: "Депозит"),
+            ],
+            calendar: calendar
+        )
+
+        #expect(detail.paidLeaseCount == 0)
+        #expect(detail.entries[0].payment == nil)
+    }
+
     private func point(
         propertyId: String?,
         propertyName: String?,
@@ -257,7 +358,8 @@ struct DashboardAnalyticsTests {
         tenantId: String,
         start: String,
         end: String?,
-        rentAmount: Double
+        rentAmount: Double,
+        paymentDay: Int = 5
     ) -> Lease {
         Lease(
             id: id,
@@ -271,10 +373,10 @@ struct DashboardAnalyticsTests {
             rentCurrency: "KZT",
             depositAmount: nil,
             depositCurrency: nil,
-            paymentDay: 5,
+            paymentDay: paymentDay,
             paymentWindowStartDay: nil,
             paymentWindowEndDay: nil,
-            paymentDueDay: 5,
+            paymentDueDay: paymentDay,
             status: "active",
             terminatedAt: nil,
             terminationReason: nil,
@@ -321,6 +423,49 @@ struct DashboardAnalyticsTests {
             email: nil,
             cohabitants: nil,
             notes: nil
+        )
+    }
+
+    private func category(
+        id: String,
+        name: String
+    ) -> managment_company.Category {
+        managment_company.Category(
+            id: id,
+            name: name,
+            type: "income",
+            isSystem: true,
+            icon: nil,
+            sortOrder: 0
+        )
+    }
+
+    private func transaction(
+        id: String,
+        propertyId: String,
+        categoryId: String,
+        amount: Double,
+        date: String,
+        periodYear: Int,
+        periodMonth: Int,
+        tenantId: String?,
+        leaseId: String?
+    ) -> Transaction {
+        Transaction(
+            id: id,
+            propertyId: propertyId,
+            type: "income",
+            categoryId: categoryId,
+            amount: amount,
+            currency: "KZT",
+            amountBase: amount,
+            exchangeRate: nil,
+            transactionDate: date,
+            periodYear: periodYear,
+            periodMonth: periodMonth,
+            description: nil,
+            tenantId: tenantId,
+            leaseId: leaseId
         )
     }
 

@@ -169,6 +169,8 @@ enum DashboardAnalyticsLogic {
         month: Int,
         leases: [Lease],
         schedules: [LeasePaymentSchedule],
+        transactions: [Transaction] = [],
+        categories: [Category] = [],
         today: Date = Date(),
         calendar: Calendar = .current
     ) -> [DashboardCalendarDay] {
@@ -177,25 +179,29 @@ enum DashboardAnalyticsLogic {
             return []
         }
 
+        let rentCategoryIds = rentCategoryIDs(categories)
         var days: [DashboardCalendarDay] = []
         var date = start
         while date < nextMonth {
             let activeLeases = leases.filter { leaseIsActive($0, on: date, calendar: calendar) }
             let activeIds = Set(activeLeases.map(\.id))
-            let paidIds = Set(schedules.compactMap { schedule -> String? in
-                guard activeIds.contains(schedule.leaseId),
-                      scheduleCovers(schedule, date: date, calendar: calendar),
-                      scheduleIsPaid(schedule) else {
-                    return nil
-                }
-                return schedule.leaseId
+            let paidIds = Set(activeLeases.compactMap { lease -> String? in
+                rentPayment(
+                    lease: lease,
+                    date: date,
+                    schedules: schedules,
+                    transactions: transactions,
+                    rentCategoryIds: rentCategoryIds,
+                    calendar: calendar
+                ) == nil ? nil : lease.id
             })
-            let dueCount = schedules.filter { schedule in
-                guard activeIds.contains(schedule.leaseId),
-                      let dueDate = parseDate(schedule.dueDate, calendar: calendar) else {
-                    return false
-                }
-                return calendar.isDate(dueDate, inSameDayAs: date)
+            let dueCount = activeLeases.filter {
+                leasePaymentIsDue(
+                    lease: $0,
+                    date: date,
+                    schedules: schedules,
+                    calendar: calendar
+                )
             }.count
             let state: DashboardCoverageState
             if activeIds.isEmpty {
@@ -237,6 +243,8 @@ enum DashboardAnalyticsLogic {
         leases: [Lease],
         schedules: [LeasePaymentSchedule],
         tenants: [Tenant],
+        transactions: [Transaction] = [],
+        categories: [Category] = [],
         calendar: Calendar = .current
     ) -> DashboardCalendarDayDetail {
         let propertyNames = Dictionary(
@@ -245,40 +253,25 @@ enum DashboardAnalyticsLogic {
         let tenantNames = Dictionary(
             uniqueKeysWithValues: tenants.map { ($0.id, $0.displayName) }
         )
+        let rentCategoryIds = rentCategoryIDs(categories)
         let entries = leases
             .filter { leaseIsActive($0, on: date, calendar: calendar) }
             .map { lease in
                 let leaseSchedules = schedules.filter { $0.leaseId == lease.id }
-                let paymentSchedule = leaseSchedules
-                    .filter {
-                        scheduleCovers($0, date: date, calendar: calendar)
-                            && scheduleIsPaid($0)
-                    }
-                    .sorted {
-                        ($0.paidAt ?? $0.dueDate, $0.id)
-                            > ($1.paidAt ?? $1.dueDate, $1.id)
-                    }
-                    .first
-                let payment = paymentSchedule.map {
-                    DashboardCalendarPaymentDetail(
-                        amount: $0.actualAmount ?? $0.expectedAmount,
-                        currency: $0.currency,
-                        periodStartDate: $0.periodStartDate ?? $0.dueDate,
-                        periodEndDate: $0.periodEndDate
-                            ?? $0.periodStartDate
-                            ?? $0.dueDate,
-                        paidAt: $0.paidAt
-                    )
-                }
-                let isPaymentDue = leaseSchedules.contains { schedule in
-                    guard let dueDate = parseDate(
-                        schedule.dueDate,
-                        calendar: calendar
-                    ) else {
-                        return false
-                    }
-                    return calendar.isDate(dueDate, inSameDayAs: date)
-                }
+                let payment = rentPayment(
+                    lease: lease,
+                    date: date,
+                    schedules: leaseSchedules,
+                    transactions: transactions,
+                    rentCategoryIds: rentCategoryIds,
+                    calendar: calendar
+                )
+                let isPaymentDue = leasePaymentIsDue(
+                    lease: lease,
+                    date: date,
+                    schedules: leaseSchedules,
+                    calendar: calendar
+                )
 
                 return DashboardCalendarLeaseDetail(
                     leaseId: lease.id,
@@ -419,10 +412,157 @@ enum DashboardAnalyticsLogic {
     private static func scheduleIsPaid(_ schedule: LeasePaymentSchedule) -> Bool {
         let status = schedule.status.lowercased()
         return status == "paid"
-            || status == "matched"
             || schedule.actualPaymentId != nil
             || schedule.transactionId != nil
-            || schedule.paidAt != nil
+    }
+
+    private static func rentPayment(
+        lease: Lease,
+        date: Date,
+        schedules: [LeasePaymentSchedule],
+        transactions: [Transaction],
+        rentCategoryIds: Set<String>,
+        calendar: Calendar
+    ) -> DashboardCalendarPaymentDetail? {
+        let paidSchedule = schedules
+            .filter { schedule in
+                schedule.leaseId == lease.id
+                    && scheduleCovers(schedule, date: date, calendar: calendar)
+                    && scheduleIsPaid(schedule)
+            }
+            .sorted(by: {
+                ($0.paidAt ?? $0.dueDate, $0.id)
+                    > ($1.paidAt ?? $1.dueDate, $1.id)
+            })
+            .first
+        if let schedule = paidSchedule {
+            return DashboardCalendarPaymentDetail(
+                amount: schedule.actualAmount ?? schedule.expectedAmount,
+                currency: schedule.currency,
+                periodStartDate: schedule.periodStartDate ?? schedule.dueDate,
+                periodEndDate: schedule.periodEndDate
+                    ?? schedule.periodStartDate
+                    ?? schedule.dueDate,
+                paidAt: schedule.paidAt
+            )
+        }
+
+        let matches = transactions.compactMap {
+            transaction -> (Transaction, Date, Date)? in
+            guard transaction.propertyId == lease.propertyId,
+                  transaction.type.lowercased() == "income",
+                  rentCategoryIds.contains(transaction.categoryId),
+                  transaction.leaseId == nil || transaction.leaseId == lease.id,
+                  transaction.tenantId == nil || transaction.tenantId == lease.tenantId,
+                  let period = rentTransactionPeriod(
+                      transaction,
+                      lease: lease,
+                      calendar: calendar
+                  ) else {
+                return nil
+            }
+            let day = calendar.startOfDay(for: date)
+            guard day >= calendar.startOfDay(for: period.start),
+                  day <= calendar.startOfDay(for: period.end) else {
+                return nil
+            }
+            return (transaction, period.start, period.end)
+        }
+        .sorted {
+            ($0.0.transactionDate, $0.0.id) > ($1.0.transactionDate, $1.0.id)
+        }
+
+        guard let match = matches.first else { return nil }
+        return DashboardCalendarPaymentDetail(
+            amount: match.0.amount,
+            currency: match.0.currency,
+            periodStartDate: isoDate(match.1),
+            periodEndDate: isoDate(match.2),
+            paidAt: match.0.transactionDate
+        )
+    }
+
+    private static func rentTransactionPeriod(
+        _ transaction: Transaction,
+        lease: Lease,
+        calendar: Calendar
+    ) -> (start: Date, end: Date)? {
+        guard (1...12).contains(transaction.periodMonth) else { return nil }
+        let rawPaymentDay = lease.paymentDay ?? lease.paymentDueDay ?? 1
+        let paymentDay = min(max(rawPaymentDay, 1), 28)
+        guard let monthStart = calendar.date(
+            from: DateComponents(
+                year: transaction.periodYear,
+                month: transaction.periodMonth,
+                day: paymentDay
+            )
+        ), let nextMonthStart = calendar.date(
+            byAdding: .month,
+            value: 1,
+            to: monthStart
+        ), let leaseStart = parseDate(
+            lease.moveInDate ?? lease.startDate,
+            calendar: calendar
+        ) else {
+            return nil
+        }
+
+        let leaseEnd = (lease.terminatedAt ?? lease.endDate).flatMap {
+            parseDate($0, calendar: calendar)
+        }
+        let periodStart = max(monthStart, leaseStart)
+        let periodEnd = min(nextMonthStart, leaseEnd ?? nextMonthStart)
+        guard periodStart <= periodEnd else { return nil }
+        return (periodStart, periodEnd)
+    }
+
+    private static func leasePaymentIsDue(
+        lease: Lease,
+        date: Date,
+        schedules: [LeasePaymentSchedule],
+        calendar: Calendar
+    ) -> Bool {
+        let leaseSchedules = schedules.filter { $0.leaseId == lease.id }
+        if !leaseSchedules.isEmpty {
+            return leaseSchedules.contains { schedule in
+                guard let dueDate = parseDate(
+                    schedule.dueDate,
+                    calendar: calendar
+                ) else {
+                    return false
+                }
+                return calendar.isDate(dueDate, inSameDayAs: date)
+            }
+        }
+
+        let dueDay = min(max(lease.paymentDueDay ?? lease.paymentDay ?? 1, 1), 31)
+        let components = calendar.dateComponents([.year, .month], from: date)
+        guard let monthStart = calendar.date(from: components),
+              let range = calendar.range(of: .day, in: .month, for: monthStart),
+              let dueDate = calendar.date(
+                  from: DateComponents(
+                      year: components.year,
+                      month: components.month,
+                      day: min(dueDay, range.count)
+                  )
+              ) else {
+            return false
+        }
+        return calendar.isDate(dueDate, inSameDayAs: date)
+    }
+
+    private static func rentCategoryIDs(_ categories: [Category]) -> Set<String> {
+        Set(categories.compactMap { category in
+            let normalized = category.name
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if normalized == "аренда"
+                || normalized == "rent"
+                || normalized.contains("арендная") {
+                return category.id
+            }
+            return nil
+        })
     }
 
     nonisolated private static func csvEscape(_ raw: String) -> String {
