@@ -3,9 +3,10 @@ import SwiftUI
 struct PropertyFormView: View {
     var property: Property?
     var onSave: () async -> Void
+    var onDelete: (() async -> Void)? = nil
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var name = ""
     @State private var propertyType = "apartment"
     @State private var status = "vacant"
@@ -21,7 +22,10 @@ struct PropertyFormView: View {
     @State private var isLoadingPurchaseRate = false
     @State private var isLoading = false
     @State private var errorMessage: String?
-    
+    @State private var showDeleteConfirmation = false
+    @State private var deleteConfirmationName = ""
+    @State private var isDeleting = false
+
     private let propertyTypes = ["apartment", "house", "commercial", "land", "other"]
     private let statuses = ["vacant", "occupied", "renovation", "for_sale", "archived"]
     
@@ -94,6 +98,9 @@ struct PropertyFormView: View {
                             .foregroundStyle(AppTheme.Colors.danger)
                     }
                 }
+                if let property {
+                    deleteSection(for: property)
+                }
             }
             .navigationTitle(property == nil ? "Новый объект" : "Редактировать объект")
             .navigationBarTitleDisplayMode(.inline)
@@ -103,7 +110,7 @@ struct PropertyFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Сохранить") { Task { await save() } }
-                        .disabled(name.isEmpty || isLoading)
+                        .disabled(name.isEmpty || isLoading || isDeleting)
                 }
             }
             .onAppear { populateFromProperty() }
@@ -148,6 +155,69 @@ struct PropertyFormView: View {
         }
     }
     
+    @ViewBuilder
+    private func deleteSection(for property: Property) -> some View {
+        Section("Опасная зона") {
+            if showDeleteConfirmation {
+                Text("Введите название «\(property.name)», чтобы подтвердить. Объект и связанные с ним записи будут удалены без возможности восстановления.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                AppTextField(
+                    title: "Название для подтверждения",
+                    text: $deleteConfirmationName,
+                    placeholder: property.name,
+                    autocapitalization: .never
+                )
+                Button(role: .destructive) {
+                    Task { await deleteProperty(property) }
+                } label: {
+                    if isDeleting {
+                        ProgressView()
+                    } else {
+                        Text("Удалить объект")
+                    }
+                }
+                .disabled(!deleteConfirmationMatches(property) || isDeleting)
+            } else {
+                Button("Удалить объект из портфеля", role: .destructive) {
+                    showDeleteConfirmation = true
+                }
+                .disabled(isLoading)
+            }
+        }
+    }
+
+    private func deleteConfirmationMatches(_ property: Property) -> Bool {
+        deleteConfirmationName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            == property.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func deleteProperty(_ property: Property) async {
+        isDeleting = true
+        errorMessage = nil
+        defer { isDeleting = false }
+
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/properties/\(property.id)",
+                method: "DELETE",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            NotificationCenter.default.post(
+                name: .propertyDeleted,
+                object: nil,
+                userInfo: ["propertyId": property.id]
+            )
+            AppHaptics.success()
+            await onDelete?()
+            dismiss()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = "Не удалось удалить объект. Возможно, есть связанные записи (аренды, операции)."
+        }
+    }
+
     private func save() async {
         isLoading = true
         errorMessage = nil
@@ -267,6 +337,11 @@ private struct PropertyInput: Encodable {
         case wifiLogin = "wifi_login"
         case wifiPassword = "wifi_password"
     }
+}
+
+extension Notification.Name {
+    /// После успешного удаления объекта. `userInfo["propertyId"]` — `String`.
+    static let propertyDeleted = Notification.Name("app.propmanager.propertyDeleted")
 }
 
 private struct ExchangeRateConversionDTO: Decodable {

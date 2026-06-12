@@ -4,6 +4,7 @@ import UIKit
 struct PropertyDetailView: View {
     let property: Property
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.dismiss) private var dismiss
     @State private var transactions: [Transaction] = []
     @State private var tenants: [Tenant] = []
     @State private var leases: [Lease] = []
@@ -27,6 +28,8 @@ struct PropertyDetailView: View {
     @State private var updatingMaintenanceId: String?
     @State private var editingTransaction: Transaction?
     @State private var transactionToDelete: Transaction?
+    @State private var utilityToDelete: PropertyUtility?
+    @State private var receiptToDelete: UtilityReceiptPayload?
     @State private var showLeaseForm = false
     @State private var editingLease: Lease?
     @State private var leaseToTerminate: Lease?
@@ -135,8 +138,12 @@ struct PropertyDetailView: View {
             .environmentObject(authManager)
         }
         .sheet(isPresented: $showEditForm) {
-            PropertyFormView(property: property) { await loadData() }
-                .environmentObject(authManager)
+            PropertyFormView(
+                property: property,
+                onSave: { await loadData() },
+                onDelete: { dismiss() }
+            )
+            .environmentObject(authManager)
         }
         .sheet(isPresented: $showUtilityForm) {
             UtilityFormView(propertyId: property.id, utility: editingUtility) {
@@ -229,6 +236,44 @@ struct PropertyDetailView: View {
             }
         } message: {
             Text("Заявка будет скрыта из списка обслуживания объекта.")
+        }
+        .confirmationDialog(
+            "Удалить начисление коммуналки?",
+            isPresented: Binding(
+                get: { utilityToDelete != nil },
+                set: { if !$0 { utilityToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Удалить", role: .destructive) {
+                if let utility = utilityToDelete {
+                    Task { await deleteUtility(utility) }
+                }
+            }
+            Button("Отмена", role: .cancel) {
+                utilityToDelete = nil
+            }
+        } message: {
+            Text("Начисление будет удалено из истории коммунальных платежей объекта.")
+        }
+        .confirmationDialog(
+            "Удалить квитанцию?",
+            isPresented: Binding(
+                get: { receiptToDelete != nil },
+                set: { if !$0 { receiptToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Удалить", role: .destructive) {
+                if let receipt = receiptToDelete {
+                    Task { await deleteReceipt(receipt) }
+                }
+            }
+            Button("Отмена", role: .cancel) {
+                receiptToDelete = nil
+            }
+        } message: {
+            Text("Распознанная квитанция будет удалена. Подтверждённые квитанции удалить нельзя — удалите материализованные начисления.")
         }
         .sheet(item: $scheduleForMarkPaidSheet) { schedule in
             MarkSchedulePaidSheet(schedule: schedule) {
@@ -782,6 +827,14 @@ struct PropertyDetailView: View {
                         selectedUtilityReceipt = UtilityReceiptRoute(id: receiptId)
                     }
                 }
+
+                utilityActionButton(
+                    title: "Удалить",
+                    icon: "trash",
+                    color: AppTheme.Colors.danger
+                ) {
+                    utilityToDelete = utility
+                }
             }
         }
     }
@@ -825,12 +878,24 @@ struct PropertyDetailView: View {
             }
 
             ForEach(receipts, id: \.id) { receipt in
-                Button {
-                    selectedUtilityReceipt = UtilityReceiptRoute(id: receipt.id)
-                } label: {
-                    utilityReceiptRow(receipt)
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                    Button {
+                        selectedUtilityReceipt = UtilityReceiptRoute(id: receipt.id)
+                    } label: {
+                        utilityReceiptRow(receipt)
+                    }
+                    .buttonStyle(.plain)
+
+                    if receipt.status.lowercased() != "confirmed" {
+                        utilityActionButton(
+                            title: "Удалить квитанцию",
+                            icon: "trash",
+                            color: AppTheme.Colors.danger
+                        ) {
+                            receiptToDelete = receipt
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
             }
 
             if utilityReceiptsForDisplay.count > receipts.count {
@@ -1321,6 +1386,42 @@ struct PropertyDetailView: View {
             await loadData()
         } catch {
             errorMessage = "Не удалось удалить операцию. Потяните для обновления и попробуйте еще раз."
+        }
+    }
+
+    private func deleteUtility(_ utility: PropertyUtility) async {
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/utilities/\(utility.id)",
+                method: "DELETE",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            utilityToDelete = nil
+            AppHaptics.success()
+            await loadUtilities()
+            await loadUtilitiesHistoryExtra()
+            await loadUtilityReceipts()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = "Не удалось удалить начисление коммуналки."
+        }
+    }
+
+    private func deleteReceipt(_ receipt: UtilityReceiptPayload) async {
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/utility-receipts/\(receipt.id)",
+                method: "DELETE",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            receiptToDelete = nil
+            AppHaptics.success()
+            await loadUtilityReceipts()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = "Не удалось удалить квитанцию. Подтверждённые квитанции удалить нельзя."
         }
     }
 

@@ -86,6 +86,7 @@ struct managment_companyApp: App {
     var body: some Scene {
         WindowGroup {
             AppRootView()
+                .preferredColorScheme(.light)
                 .environmentObject(authManager)
                 .environmentObject(pushRegistration)
                 .environmentObject(notificationRouter)

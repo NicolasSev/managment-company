@@ -37,6 +37,9 @@ struct PropertiesListView: View {
             .onChange(of: notificationRouter.pendingRoute) { _, _ in
                 Task { await handlePendingNotificationRoute() }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .propertyDeleted)) { _ in
+                Task { await loadProperties() }
+            }
             .navigationDestination(for: Property.self) { prop in
                 PropertyDetailView(property: prop)
                     .environmentObject(authManager)

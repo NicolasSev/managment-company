@@ -51,6 +51,9 @@ struct StatusBadge: View {
         case "urgent": return "Срочно"
         case "income": return "Доход"
         case "expense": return "Расход"
+        case "paid": return "Оплачено"
+        case "skipped": return "Пропущено"
+        case "overdue": return "Просрочено"
         default:
             return normalizedStatus
                 .split(separator: "_")
@@ -61,9 +64,9 @@ struct StatusBadge: View {
     
     private var statusColor: Color {
         switch normalizedStatus {
-        case "occupied", "completed", "done", "income", "active":
+        case "occupied", "completed", "done", "income", "active", "paid":
             return AppTheme.Colors.success
-        case "vacant", "expense", "urgent", "cancelled", "terminated", "expired":
+        case "vacant", "expense", "urgent", "cancelled", "terminated", "expired", "overdue":
             return AppTheme.Colors.danger
         case "renovation", "in_progress", "pending", "todo", "high":
             return AppTheme.Colors.warning

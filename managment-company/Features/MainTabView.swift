@@ -3,6 +3,7 @@ import SwiftUI
 enum AppTab: Hashable {
     case dashboard
     case transactions
+    case payments
     case properties
     case tenants
     case tasks
@@ -29,6 +30,12 @@ struct MainTabView: View {
                 .tag(AppTab.transactions)
                 .tabItem {
                     Label("Операции", systemImage: "arrow.left.arrow.right")
+                }
+            PaymentsQueueView(authManager: authManager)
+                .environmentObject(authManager)
+                .tag(AppTab.payments)
+                .tabItem {
+                    Label("Оплата", systemImage: "calendar.badge.clock")
                 }
             PropertiesListView()
                 .tag(AppTab.properties)
