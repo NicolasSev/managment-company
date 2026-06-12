@@ -2,8 +2,8 @@
 //  PaymentQueueTests.swift
 //  managment-companyTests
 //
-//  Mirrored test for GAP-026 (cross-portfolio payment queue): wire decoding,
-//  PATCH intent encoding, queue/history presentation rules, and the
+//  Mirrored tests for GAP-026/027 (cross-portfolio payment queue): wire
+//  decoding, PATCH intent encoding, queue/history presentation rules, and the
 //  view-model action flow against a mock transport.
 //
 
@@ -173,6 +173,14 @@ struct PaymentQueueTests {
     }
 
     @MainActor
+    @Test func onlyPaidHistoryRestoreRequiresConfirmation() {
+        #expect(!PaymentsQueueViewModel.restoreRequiresConfirmation(for: makeItem(status: "skipped")))
+        #expect(PaymentsQueueViewModel.restoreRequiresConfirmation(
+            for: makeItem(actualAmount: 95000, paidAt: "2026-05-06", status: "paid")
+        ))
+    }
+
+    @MainActor
     @Test func overdueWinsOverPendingOnlyInUpcomingQueue() {
         let overdue = makeItem(status: "pending", isOverdue: true)
         #expect(PaymentsQueueViewModel.displayStatus(of: overdue, scope: .upcoming) == "overdue")
@@ -230,6 +238,26 @@ struct PaymentQueueTests {
         #expect(client.updates.count == 1)
         #expect(client.updates[0].scheduleId == item.id)
         #expect(client.updates[0].body == .skip)
+        #expect(vm.items.isEmpty)
+    }
+
+    @MainActor
+    @Test func restoreSendsRestoreIntentAndReloadsHistory() async {
+        let client = MockPaymentQueueClient()
+        let item = makeItem(status: "skipped")
+        client.queue = [item]
+        let vm = PaymentsQueueViewModel(client: client)
+        vm.scope = .past
+        await vm.load()
+        client.queue = []
+
+        let ok = await vm.restore(item)
+
+        #expect(ok)
+        #expect(client.updates.count == 1)
+        #expect(client.updates[0].scheduleId == item.id)
+        #expect(client.updates[0].body == .restore)
+        #expect(client.fetchedScopes == [.past, .past])
         #expect(vm.items.isEmpty)
     }
 

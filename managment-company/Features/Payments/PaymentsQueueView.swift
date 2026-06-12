@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// Cross-portfolio payment queue (GAP-026), iOS counterpart of web `/payments`:
+/// Cross-portfolio payment queue (GAP-026/027), iOS counterpart of web `/payments`:
 /// **Будущие платежи** — the upcoming APNs reminder queue across all active
 /// leases, editable inline (day/amount edits rewrite the lease contract,
 /// mark-paid records income, skip drops one installment); **Прошлые платежи** —
-/// recorded installments with record date + covered period (read-only;
-/// restore/un-pay is GAP-027).
+/// paid/skipped installments with restore/un-pay actions.
 struct PaymentsQueueView: View {
     @StateObject private var viewModel: PaymentsQueueViewModel
     @EnvironmentObject private var authManager: AuthManager
@@ -13,6 +12,7 @@ struct PaymentsQueueView: View {
     @State private var editingItem: PaymentQueueItem?
     @State private var markPaidItem: PaymentQueueItem?
     @State private var skipCandidate: PaymentQueueItem?
+    @State private var unpayCandidate: PaymentQueueItem?
 
     init(authManager: AuthManager) {
         _viewModel = StateObject(
@@ -66,6 +66,27 @@ struct PaymentsQueueView: View {
                 Button("Отмена", role: .cancel) {}
             } message: { item in
                 Text("\(item.propertyName) · \(AppFormatting.currency(item.expectedAmount, currency: item.currency)). Платёж будет помечен как пропущенный и не уйдёт в напоминания.")
+            }
+            .confirmationDialog(
+                "Отменить оплату?",
+                isPresented: Binding(
+                    get: { unpayCandidate != nil },
+                    set: { if !$0 { unpayCandidate = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: unpayCandidate
+            ) { item in
+                Button("Отменить оплату", role: .destructive) {
+                    Task {
+                        if await viewModel.restore(item) {
+                            unpayCandidate = nil
+                            AppHaptics.success()
+                        }
+                    }
+                }
+                Button("Оставить оплату", role: .cancel) {}
+            } message: { item in
+                Text("\(item.propertyName) · \(PaymentsQueueViewModel.periodLabel(of: item)) · \(AppFormatting.currency(item.actualAmount ?? item.expectedAmount, currency: item.currency)). Связанная операция дохода будет удалена, а платёж вернётся в очередь.")
             }
         }
     }
@@ -225,33 +246,55 @@ struct PaymentsQueueView: View {
     }
 
     private func pastRow(_ item: PaymentQueueItem) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let recorded = PaymentsQueueViewModel.recordedDate(of: item) {
-                    Text(AppFormatting.dateString(from: recorded) ?? recorded)
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                } else {
-                    Text("—")
-                        .font(.headline)
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let recorded = PaymentsQueueViewModel.recordedDate(of: item) {
+                        Text(AppFormatting.dateString(from: recorded) ?? recorded)
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                    } else {
+                        Text("—")
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+
+                    Text("Период: \(PaymentsQueueViewModel.periodLabel(of: item))")
+                        .font(.caption)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                    propertyTenantBlock(item)
                 }
 
-                Text("Период: \(PaymentsQueueViewModel.periodLabel(of: item))")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                Spacer()
 
-                propertyTenantBlock(item)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(AppFormatting.currency(item.actualAmount ?? item.expectedAmount, currency: item.currency))
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                    StatusBadge(status: PaymentsQueueViewModel.displayStatus(of: item, scope: .past))
+                }
             }
 
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(AppFormatting.currency(item.actualAmount ?? item.expectedAmount, currency: item.currency))
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                StatusBadge(status: PaymentsQueueViewModel.displayStatus(of: item, scope: .past))
+            if PaymentsQueueViewModel.restoreRequiresConfirmation(for: item) {
+                rowActionButton(
+                    title: "Отменить оплату",
+                    systemImage: "arrow.uturn.backward.circle",
+                    tint: AppTheme.Colors.danger
+                ) {
+                    unpayCandidate = item
+                }
+                .disabled(viewModel.isMutating)
+            } else {
+                rowActionButton(title: "Вернуть в очередь", systemImage: "arrow.counterclockwise.circle") {
+                    Task {
+                        if await viewModel.restore(item) {
+                            AppHaptics.success()
+                        }
+                    }
+                }
+                .disabled(viewModel.isMutating)
             }
         }
     }
@@ -277,15 +320,20 @@ struct PaymentsQueueView: View {
         }
     }
 
-    private func rowActionButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func rowActionButton(
+        title: String,
+        systemImage: String,
+        tint: Color = AppTheme.Colors.accent,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.caption.weight(.semibold))
                 .padding(.horizontal, AppTheme.Spacing.sm)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
-                .background(AppTheme.Colors.accent.opacity(0.1))
-                .foregroundStyle(AppTheme.Colors.accent)
+                .background(tint.opacity(0.1))
+                .foregroundStyle(tint)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

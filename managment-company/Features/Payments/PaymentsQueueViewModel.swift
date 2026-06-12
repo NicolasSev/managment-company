@@ -48,7 +48,7 @@ struct LivePaymentQueueClient: PaymentQueueClient {
     }
 }
 
-/// State + actions of the cross-portfolio payment queue screen (GAP-026).
+/// State + actions of the cross-portfolio payment queue screen (GAP-026/027).
 /// Day/amount edits are contract-level by product decision: the backend rewrites
 /// the tenant's lease and regenerates all future installments.
 @MainActor
@@ -86,6 +86,12 @@ final class PaymentsQueueViewModel: ObservableObject {
     /// Drops one installment from the queue (`action: "skip"`). Returns success.
     func skip(_ item: PaymentQueueItem) async -> Bool {
         await mutate(scheduleId: item.id, body: .skip, failureMessage: "Не удалось пропустить платёж.")
+    }
+
+    /// Returns a skipped or paid installment to the upcoming queue. For paid
+    /// rows the backend also reverses the linked income and tenant payment.
+    func restore(_ item: PaymentQueueItem) async -> Bool {
+        await mutate(scheduleId: item.id, body: .restore, failureMessage: "Не удалось вернуть платёж в очередь.")
     }
 
     /// Applies the edit-sheet result: day first, then amount — one intent per
@@ -152,6 +158,12 @@ final class PaymentsQueueViewModel: ObservableObject {
     static func recordedDate(of item: PaymentQueueItem) -> String? {
         guard item.status != "skipped" else { return nil }
         return item.paidAt ?? item.dueDate
+    }
+
+    /// Restoring a paid row deletes the linked income transaction, so it needs
+    /// explicit confirmation. A skipped row can return immediately.
+    static func restoreRequiresConfirmation(for item: PaymentQueueItem) -> Bool {
+        item.status != "skipped"
     }
 
     /// Status string fed to `StatusBadge`: overdue wins over `pending` in the
