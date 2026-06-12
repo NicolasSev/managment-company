@@ -17,6 +17,7 @@ private struct DashboardExportDocument: Identifiable {
 struct DashboardView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
+    @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
 
     enum Period: String, CaseIterable, Identifiable {
         case all, month, season, quarter, year
@@ -42,6 +43,9 @@ struct DashboardView: View {
     @State private var properties: [Property] = []
     @State private var leases: [Lease] = []
     @State private var paymentSchedules: [LeasePaymentSchedule] = []
+    @State private var recentTransactions: [DashboardRecentTransactionRow] = []
+    @State private var recentTransactionsExpanded = false
+    @State private var recentTransactionsLoadFailed = false
     @State private var analyticsRange: DashboardAnalyticsRange = .twelveMonths
     @State private var analyticsGroup: DashboardAnalyticsGroup = .month
     @State private var selectedPropertyIds: Set<String> = []
@@ -83,6 +87,18 @@ struct DashboardView: View {
     }
     private var availableYears: [Int] {
         DashboardAnalyticsLogic.availableYears(leases: leases)
+    }
+    private var visibleRecentTransactions: [DashboardRecentTransactionRow] {
+        DashboardRecentTransactionsLogic.visibleRows(
+            recentTransactions,
+            expanded: recentTransactionsExpanded
+        )
+    }
+    private var recentTransactionsAction: DashboardRecentTransactionsAction? {
+        DashboardRecentTransactionsLogic.action(
+            rowCount: recentTransactions.count,
+            expanded: recentTransactionsExpanded
+        )
     }
 
     var body: some View {
@@ -194,6 +210,7 @@ struct DashboardView: View {
                     if !comparisonRows.isEmpty {
                         comparisonSection
                     }
+                    recentTransactionsSection
                     if !leases.isEmpty {
                         calendarSection
                     }
@@ -488,6 +505,135 @@ struct DashboardView: View {
                     .padding(.vertical, AppTheme.Spacing.xs)
                 }
             }
+        }
+    }
+
+    private var recentTransactionsSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                sectionHeading(
+                    "Последние операции",
+                    subtitle: "Движение денег по всему портфелю."
+                )
+
+                if recentTransactionsLoadFailed {
+                    HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(AppTheme.Colors.warning)
+                        Text(
+                            recentTransactions.isEmpty
+                                ? "Не удалось загрузить операции. Потяните экран, чтобы повторить."
+                                : "Часть операций не обновилась; показаны доступные данные."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                    .padding(AppTheme.Spacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppTheme.Colors.warning.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+
+                if recentTransactions.isEmpty, !recentTransactionsLoadFailed {
+                    Text("Операций пока нет.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, AppTheme.Spacing.lg)
+                } else {
+                    ForEach(visibleRecentTransactions) { row in
+                        Button {
+                            notificationRouter.open(
+                                NotificationRoute(kind: .transaction(row.id))
+                            )
+                        } label: {
+                            recentTransactionRow(row)
+                        }
+                        .buttonStyle(.plain)
+
+                        if row.id != visibleRecentTransactions.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+
+                if let recentTransactionsAction {
+                    Button {
+                        handleRecentTransactionsAction(recentTransactionsAction)
+                    } label: {
+                        Label(
+                            recentTransactionsAction == .expand
+                                ? "Смотреть больше"
+                                : "Перейти на страницу Операций",
+                            systemImage: recentTransactionsAction == .expand
+                                ? "chevron.down"
+                                : "arrow.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppTheme.Colors.accent)
+                }
+            }
+        }
+    }
+
+    private func recentTransactionRow(
+        _ row: DashboardRecentTransactionRow
+    ) -> some View {
+        HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.propertyName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                HStack(spacing: 4) {
+                    Text(
+                        AppFormatting.dateString(
+                            from: row.transactionDate,
+                            dateStyle: .medium,
+                            timeStyle: DateFormatter.Style.none
+                        ) ?? row.transactionDate
+                    )
+                    if let description = row.description?
+                        .trimmingCharacters(in: .whitespacesAndNewlines),
+                       !description.isEmpty {
+                        Text("· \(description)")
+                            .lineLimit(1)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+
+            Spacer(minLength: AppTheme.Spacing.sm)
+
+            VStack(alignment: .trailing, spacing: 6) {
+                StatusBadge(status: row.type)
+                Text(
+                    "\(row.amountSign)"
+                    + AppFormatting.currency(abs(row.amount), currency: row.currency)
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(
+                    row.isIncome ? AppTheme.Colors.success : AppTheme.Colors.danger
+                )
+            }
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, AppTheme.Spacing.xs)
+    }
+
+    private func handleRecentTransactionsAction(
+        _ action: DashboardRecentTransactionsAction
+    ) {
+        switch action {
+        case .expand:
+            recentTransactionsExpanded = true
+        case .openTransactions:
+            notificationRouter.open(NotificationRoute(kind: .transactions))
         }
     }
 
@@ -884,6 +1030,7 @@ struct DashboardView: View {
         await loadSecondaryAnalytics()
         await loadProfitability()
         await loadPortfolioCalendar()
+        await loadRecentTransactions()
         await loadUtilities()
     }
 
@@ -988,6 +1135,52 @@ struct DashboardView: View {
             loadedSchedules.append(contentsOf: envelope.data)
         }
         paymentSchedules = loadedSchedules
+    }
+
+    private func loadRecentTransactions() async {
+        var sourceProperties = properties
+        if sourceProperties.isEmpty {
+            do {
+                sourceProperties = try await APIClient.shared.request(
+                    "/v1/properties",
+                    tokenProvider: tokenProvider,
+                    refreshAndRetry: refreshProvider
+                )
+            } catch {
+                recentTransactionsLoadFailed = true
+                return
+            }
+        }
+
+        var merged: [Transaction] = []
+        var failed = false
+        for property in sourceProperties {
+            do {
+                let data = try await APIClient.shared.requestData(
+                    "/v1/properties/\(property.id)/transactions?per_page=100",
+                    tokenProvider: tokenProvider,
+                    refreshAndRetry: refreshProvider
+                )
+                let decoded = try JSONDecoder().decode(
+                    APIResponse<[Transaction]>.self,
+                    from: data
+                )
+                merged.append(contentsOf: decoded.data)
+            } catch {
+                failed = true
+            }
+        }
+
+        let rows = DashboardRecentTransactionsLogic.rows(
+            transactions: merged,
+            propertyNames: Dictionary(
+                uniqueKeysWithValues: sourceProperties.map { ($0.id, $0.name) }
+            )
+        )
+        if !rows.isEmpty || !failed {
+            recentTransactions = rows
+        }
+        recentTransactionsLoadFailed = failed
     }
 
     private func tokenProvider() async -> String? {
