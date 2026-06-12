@@ -2128,7 +2128,7 @@ private struct UtilityDetailSheet: View {
     }
 }
 
-private struct UtilityReceiptDetailSheet: View {
+struct UtilityReceiptDetailSheet: View {
     let receiptId: String
 
     @EnvironmentObject private var authManager: AuthManager
