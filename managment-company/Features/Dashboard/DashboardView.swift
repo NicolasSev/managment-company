@@ -41,6 +41,7 @@ struct DashboardView: View {
     @State private var cashflowTrend: CashflowTrendBody?
     @State private var utilities: [PropertyUtility] = []
     @State private var properties: [Property] = []
+    @State private var tenants: [Tenant] = []
     @State private var leases: [Lease] = []
     @State private var paymentSchedules: [LeasePaymentSchedule] = []
     @State private var recentTransactions: [DashboardRecentTransactionRow] = []
@@ -58,6 +59,7 @@ struct DashboardView: View {
     @State private var notificationUnreadCount = 0
     @State private var exportDocument: DashboardExportDocument?
     @State private var exportErrorMessage: String?
+    @State private var selectedCalendarDay: DashboardCalendarDayDetail?
 
     private let calendarColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
     private let weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -144,6 +146,11 @@ struct DashboardView: View {
                     }
                 }
                 .presentationDetents([.medium])
+            }
+            .sheet(item: $selectedCalendarDay) { detail in
+                DashboardCalendarDayDetailSheet(detail: detail)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
             .alert(
                 "Экспорт недоступен",
@@ -695,24 +702,36 @@ struct DashboardView: View {
     }
 
     private func calendarCell(_ day: DashboardCalendarDay) -> some View {
-        Text(String(day.day))
-            .font(.caption.weight(day.isToday || day.dueScheduleCount > 0 ? .bold : .medium))
-            .foregroundStyle(day.state == .noLease
-                             ? AppTheme.Colors.textSecondary
-                             : Color.white)
-            .frame(maxWidth: .infinity, minHeight: 38)
-            .background(coverageColor(day.state))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(
-                        day.isToday
-                            ? AppTheme.Colors.accent
-                            : (day.dueScheduleCount > 0 ? AppTheme.Colors.warning : Color.clear),
-                        lineWidth: day.isToday ? 2.5 : 1.5
-                    )
-            }
-            .accessibilityLabel(calendarAccessibility(day))
+        Button {
+            selectedCalendarDay = DashboardAnalyticsLogic.calendarDayDetail(
+                date: day.date,
+                properties: properties,
+                leases: leases,
+                schedules: paymentSchedules,
+                tenants: tenants
+            )
+        } label: {
+            Text(String(day.day))
+                .font(.caption.weight(day.isToday || day.dueScheduleCount > 0 ? .bold : .medium))
+                .foregroundStyle(day.state == .noLease
+                                 ? AppTheme.Colors.textSecondary
+                                 : Color.white)
+                .frame(maxWidth: .infinity, minHeight: 38)
+                .background(coverageColor(day.state))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(
+                            day.isToday
+                                ? AppTheme.Colors.accent
+                                : (day.dueScheduleCount > 0 ? AppTheme.Colors.warning : Color.clear),
+                            lineWidth: day.isToday ? 2.5 : 1.5
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(calendarAccessibility(day))
+        .accessibilityHint("Открывает детали аренды за этот день")
     }
 
     private func legendDot(_ title: String, color: Color) -> some View {
@@ -1107,6 +1126,13 @@ struct DashboardView: View {
         if selectedPropertyIds.isEmpty {
             selectedPropertyIds = Set(loadedProperties.map(\.id))
         }
+        if let loadedTenants: [Tenant] = try? await APIClient.shared.request(
+            "/v1/tenants?per_page=100",
+            tokenProvider: tokenProvider,
+            refreshAndRetry: refreshProvider
+        ) {
+            tenants = loadedTenants
+        }
 
         var loadedLeases: [Lease] = []
         for property in loadedProperties {
@@ -1189,5 +1215,191 @@ struct DashboardView: View {
 
     private func refreshProvider() async -> Bool {
         await authManager.refreshToken()
+    }
+}
+
+private struct DashboardCalendarDayDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let detail: DashboardCalendarDayDetail
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                    summary
+
+                    if detail.entries.isEmpty {
+                        SurfaceCard {
+                            VStack(spacing: AppTheme.Spacing.sm) {
+                                Image(systemName: "house")
+                                    .font(.title2)
+                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                                Text("На эту дату активной аренды нет.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, AppTheme.Spacing.lg)
+                        }
+                    } else {
+                        ForEach(detail.entries) { entry in
+                            leaseCard(entry)
+                        }
+                    }
+                }
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.vertical, AppTheme.Spacing.lg)
+            }
+            .background(AppScreenBackground())
+            .navigationTitle("Детали дня")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var summary: some View {
+        SurfaceCard {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(formattedDay)
+                        .font(.caption.weight(.semibold))
+                        .textCase(.uppercase)
+                        .tracking(1.2)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                    Text(
+                        detail.activeLeaseCount == 0
+                            ? "Активной аренды нет"
+                            : "Оплачено \(detail.paidLeaseCount) из \(detail.activeLeaseCount)"
+                    )
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                }
+                Spacer()
+                Text("\(detail.coveragePct)%")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(AppTheme.Colors.textPrimary)
+                    .clipShape(Capsule())
+            }
+        }
+    }
+
+    private func leaseCard(
+        _ entry: DashboardCalendarLeaseDetail
+    ) -> some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.propertyName)
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                        Text(entry.tenantName)
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                    Spacer()
+                    paymentBadge(entry.isPaid)
+                }
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    alignment: .leading,
+                    spacing: AppTheme.Spacing.md
+                ) {
+                    detailField(
+                        title: "Аренда",
+                        value: AppFormatting.currency(
+                            entry.rentAmount,
+                            currency: entry.rentCurrency
+                        )
+                    )
+                    detailField(
+                        title: "Въезд",
+                        value: formattedDate(entry.moveInDate)
+                    )
+                    detailField(
+                        title: "Выезд",
+                        value: entry.moveOutDate.map(formattedDate)
+                            ?? "Сейчас проживает"
+                    )
+                    if entry.isPaymentDue {
+                        detailField(title: "Срок оплаты", value: "Сегодня")
+                    }
+                }
+
+                Divider()
+
+                detailField(
+                    title: "Оплата",
+                    value: paymentDescription(entry.payment)
+                )
+            }
+        }
+    }
+
+    private func paymentBadge(_ isPaid: Bool) -> some View {
+        Text(isPaid ? "Оплачено" : "Без оплаты")
+            .font(.caption2.weight(.semibold))
+            .textCase(.uppercase)
+            .tracking(0.7)
+            .foregroundStyle(
+                isPaid ? AppTheme.Colors.success : AppTheme.Colors.danger
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                (isPaid ? AppTheme.Colors.success : AppTheme.Colors.danger)
+                    .opacity(0.12)
+            )
+            .clipShape(Capsule())
+    }
+
+    private func detailField(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .textCase(.uppercase)
+                .tracking(0.9)
+                .foregroundStyle(AppTheme.Colors.textSecondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func paymentDescription(
+        _ payment: DashboardCalendarPaymentDetail?
+    ) -> String {
+        guard let payment else {
+            return "Нет оплаты за этот период"
+        }
+        return AppFormatting.currency(payment.amount, currency: payment.currency)
+            + " за \(formattedDate(payment.periodStartDate))"
+            + " – \(formattedDate(payment.periodEndDate))"
+    }
+
+    private var formattedDay: String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM yyyy 'г.'"
+        return formatter.string(from: detail.date)
+    }
+
+    private func formattedDate(_ raw: String) -> String {
+        AppFormatting.dateString(
+            from: raw,
+            dateStyle: .medium,
+            timeStyle: DateFormatter.Style.none
+        ) ?? raw
     }
 }

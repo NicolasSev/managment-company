@@ -95,6 +95,45 @@ struct DashboardCoverageSummary: Equatable {
     }
 }
 
+struct DashboardCalendarPaymentDetail: Equatable {
+    let amount: Double
+    let currency: String
+    let periodStartDate: String
+    let periodEndDate: String
+    let paidAt: String?
+}
+
+struct DashboardCalendarLeaseDetail: Identifiable, Equatable {
+    let leaseId: String
+    let propertyId: String
+    let propertyName: String
+    let tenantName: String
+    let rentAmount: Double
+    let rentCurrency: String
+    let moveInDate: String
+    let moveOutDate: String?
+    let payment: DashboardCalendarPaymentDetail?
+    let isPaymentDue: Bool
+
+    var id: String { leaseId }
+    var isPaid: Bool { payment != nil }
+}
+
+struct DashboardCalendarDayDetail: Identifiable, Equatable {
+    let date: Date
+    let entries: [DashboardCalendarLeaseDetail]
+
+    var id: String { DashboardAnalyticsLogic.isoDate(date) }
+    var activeLeaseCount: Int { entries.count }
+    var paidLeaseCount: Int { entries.filter(\.isPaid).count }
+    var coveragePct: Int {
+        guard activeLeaseCount > 0 else { return 0 }
+        return Int(
+            (Double(paidLeaseCount) / Double(activeLeaseCount) * 100).rounded()
+        )
+    }
+}
+
 enum DashboardAnalyticsLogic {
     static func comparisonRows(
         points: [ProfitabilityPoint],
@@ -190,6 +229,83 @@ enum DashboardAnalyticsLogic {
             rentDays: days.reduce(0) { $0 + $1.activeLeaseCount },
             paidDays: days.reduce(0) { $0 + min($1.paidLeaseCount, $1.activeLeaseCount) }
         )
+    }
+
+    static func calendarDayDetail(
+        date: Date,
+        properties: [Property],
+        leases: [Lease],
+        schedules: [LeasePaymentSchedule],
+        tenants: [Tenant],
+        calendar: Calendar = .current
+    ) -> DashboardCalendarDayDetail {
+        let propertyNames = Dictionary(
+            uniqueKeysWithValues: properties.map { ($0.id, $0.name) }
+        )
+        let tenantNames = Dictionary(
+            uniqueKeysWithValues: tenants.map { ($0.id, $0.displayName) }
+        )
+        let entries = leases
+            .filter { leaseIsActive($0, on: date, calendar: calendar) }
+            .map { lease in
+                let leaseSchedules = schedules.filter { $0.leaseId == lease.id }
+                let paymentSchedule = leaseSchedules
+                    .filter {
+                        scheduleCovers($0, date: date, calendar: calendar)
+                            && scheduleIsPaid($0)
+                    }
+                    .sorted {
+                        ($0.paidAt ?? $0.dueDate, $0.id)
+                            > ($1.paidAt ?? $1.dueDate, $1.id)
+                    }
+                    .first
+                let payment = paymentSchedule.map {
+                    DashboardCalendarPaymentDetail(
+                        amount: $0.actualAmount ?? $0.expectedAmount,
+                        currency: $0.currency,
+                        periodStartDate: $0.periodStartDate ?? $0.dueDate,
+                        periodEndDate: $0.periodEndDate
+                            ?? $0.periodStartDate
+                            ?? $0.dueDate,
+                        paidAt: $0.paidAt
+                    )
+                }
+                let isPaymentDue = leaseSchedules.contains { schedule in
+                    guard let dueDate = parseDate(
+                        schedule.dueDate,
+                        calendar: calendar
+                    ) else {
+                        return false
+                    }
+                    return calendar.isDate(dueDate, inSameDayAs: date)
+                }
+
+                return DashboardCalendarLeaseDetail(
+                    leaseId: lease.id,
+                    propertyId: lease.propertyId,
+                    propertyName: propertyNames[lease.propertyId]
+                        ?? lease.propertyName
+                        ?? "Объект",
+                    tenantName: tenantNames[lease.tenantId]
+                        ?? "Арендатор не найден",
+                    rentAmount: lease.rentAmount,
+                    rentCurrency: lease.rentCurrency,
+                    moveInDate: lease.moveInDate ?? lease.startDate,
+                    moveOutDate: lease.terminatedAt ?? lease.endDate,
+                    payment: payment,
+                    isPaymentDue: isPaymentDue
+                )
+            }
+            .sorted {
+                if $0.propertyName == $1.propertyName {
+                    return $0.leaseId < $1.leaseId
+                }
+                return $0.propertyName.localizedCaseInsensitiveCompare(
+                    $1.propertyName
+                ) == .orderedAscending
+            }
+
+        return DashboardCalendarDayDetail(date: date, entries: entries)
     }
 
     static func leadingWeekdaySlots(
