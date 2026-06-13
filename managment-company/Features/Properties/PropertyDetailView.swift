@@ -37,6 +37,8 @@ struct PropertyDetailView: View {
     @State private var linkedTransaction: LinkedTransactionRoute?
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
     @State private var welcomeCopyMessage: String?
+    @State private var showArchiveConfirmation = false
+    @State private var isUpdatingArchive = false
 
     /// Merges paginated property utilities with portfolio history (longer horizon) for this object.
     private var utilitiesForDisplay: [PropertyUtility] {
@@ -112,8 +114,10 @@ struct PropertyDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Редактировать") { showEditForm = true }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Добавить операцию") { showTransactionSheet = true }
+            if !property.isArchived {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Добавить операцию") { showTransactionSheet = true }
+                }
             }
         }
         .task { await loadData() }
@@ -198,6 +202,20 @@ struct PropertyDetailView: View {
                 baseCurrency: authManager.user?.baseCurrency ?? "KZT"
             )
             .environmentObject(authManager)
+        }
+        .confirmationDialog(
+            property.isArchived ? "Восстановить объект?" : "Архивировать объект?",
+            isPresented: $showArchiveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(property.isArchived ? "Восстановить" : "Архивировать") {
+                Task { await updateArchiveState() }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text(property.isArchived
+                ? "Объект снова появится в активном портфеле, календарях, расчётах и напоминаниях."
+                : "Объект исчезнет из активного портфеля, календарей, расчётов и напоминаний. Все данные сохранятся.")
         }
         .confirmationDialog(
             "Удалить операцию?",
@@ -309,8 +327,15 @@ struct PropertyDetailView: View {
                     if let welcomeCopyMessage {
                         statusBanner(welcomeCopyMessage, color: AppTheme.Colors.success)
                     }
+                    if property.isArchived {
+                        statusBanner(
+                            "Объект находится в архиве и не участвует в портфельных расчётах, календарях и напоминаниях.",
+                            color: AppTheme.Colors.warning
+                        )
+                    }
 
                     factsSection
+                    archiveLifecycleSection
 
                     PropertyFilesSection(propertyId: property.id)
                         .environmentObject(authManager)
@@ -322,6 +347,38 @@ struct PropertyDetailView: View {
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.lg)
+            }
+        }
+    }
+
+    private var archiveLifecycleSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                Text(property.isArchived ? "Архив" : "Управление портфелем")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Text(property.isArchived
+                    ? "Данные объекта сохранены. Восстановите его, чтобы вернуть в активные расчёты."
+                    : "Архивирование скроет объект из общих расчётов без удаления истории.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Button {
+                    showArchiveConfirmation = true
+                } label: {
+                    Label(
+                        property.isArchived ? "Восстановить объект" : "Архивировать объект",
+                        systemImage: property.isArchived ? "arrow.uturn.backward.circle" : "archivebox"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(property.isArchived ? AppTheme.Colors.accent : AppTheme.Colors.warning)
+                .disabled(isUpdatingArchive)
             }
         }
     }
@@ -1181,6 +1238,34 @@ struct PropertyDetailView: View {
         await loadLeaseSchedules()
         await loadUtilitiesHistoryExtra()
         await loadPurchaseUSDEquivalent()
+    }
+
+    private func updateArchiveState() async {
+        isUpdatingArchive = true
+        errorMessage = nil
+        defer { isUpdatingArchive = false }
+
+        let action = property.isArchived ? "restore" : "archive"
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/properties/\(property.id)/\(action)",
+                method: "POST",
+                tokenProvider: { await MainActor.run { authManager.accessToken } },
+                refreshAndRetry: { await authManager.refreshToken() }
+            )
+            NotificationCenter.default.post(
+                name: .propertyArchiveChanged,
+                object: nil,
+                userInfo: ["propertyId": property.id]
+            )
+            AppHaptics.success()
+            dismiss()
+        } catch {
+            AppHaptics.warning()
+            errorMessage = property.isArchived
+                ? "Не удалось восстановить объект."
+                : "Не удалось архивировать объект."
+        }
     }
 
     private func loadPurchaseUSDEquivalent() async {

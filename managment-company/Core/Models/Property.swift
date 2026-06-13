@@ -24,6 +24,7 @@ struct Property: Identifiable, Codable, Hashable {
     /// Wi-Fi login / network name shown in tenant welcome text.
     let wifiLogin: String?
     let wifiPassword: String?
+    var archivedAt: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name, status, notes, tags
@@ -39,9 +40,14 @@ struct Property: Identifiable, Codable, Hashable {
         case utilityAccountNumber = "utility_account_number"
         case wifiLogin = "wifi_login"
         case wifiPassword = "wifi_password"
+        case archivedAt = "archived_at"
     }
     
     var displayAddress: String? {
         [address, city].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    var isArchived: Bool {
+        archivedAt != nil || status.lowercased() == "archived"
     }
 }

@@ -27,7 +27,7 @@ struct PropertyFormView: View {
     @State private var isDeleting = false
 
     private let propertyTypes = ["apartment", "house", "commercial", "land", "other"]
-    private let statuses = ["vacant", "occupied", "renovation", "for_sale", "archived"]
+    private let statuses = ["vacant", "occupied", "renovation", "for_sale"]
     
     var body: some View {
         NavigationStack {
@@ -342,6 +342,8 @@ private struct PropertyInput: Encodable {
 extension Notification.Name {
     /// После успешного удаления объекта. `userInfo["propertyId"]` — `String`.
     static let propertyDeleted = Notification.Name("app.propmanager.propertyDeleted")
+    /// После архивирования или восстановления объекта.
+    static let propertyArchiveChanged = Notification.Name("app.propmanager.propertyArchiveChanged")
 }
 
 private struct ExchangeRateConversionDTO: Decodable {

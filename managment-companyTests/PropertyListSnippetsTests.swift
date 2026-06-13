@@ -5,6 +5,26 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PropertyListSnippetsTests {
+    @Test func propertyArchiveLifecycleDecodesWithoutChangingOperationalStatus() throws {
+        let active = try JSONDecoder().decode(
+            Property.self,
+            from: Data(#"{"id":"active","name":"Active","property_type":"apartment","status":"occupied","archived_at":null}"#.utf8)
+        )
+        let archived = try JSONDecoder().decode(
+            Property.self,
+            from: Data(#"{"id":"archived","name":"Archived","property_type":"apartment","status":"occupied","archived_at":"2026-06-13T10:00:00Z"}"#.utf8)
+        )
+        let legacy = try JSONDecoder().decode(
+            Property.self,
+            from: Data(#"{"id":"legacy","name":"Legacy","property_type":"apartment","status":"archived"}"#.utf8)
+        )
+
+        #expect(active.isArchived == false)
+        #expect(archived.isArchived)
+        #expect(archived.status == "occupied")
+        #expect(legacy.isArchived)
+    }
+
     @Test func occupiedPropertyUsesActiveLeaseAsCurrentTenant() {
         let tenant = makeTenant(id: "tenant-a", firstName: "Анна")
         let snippet = PropertyListSnippetLogic.tenantSnippet(

@@ -14,6 +14,14 @@ private struct PropertyReceiptDetailRoute: Identifiable {
 }
 
 struct PropertiesListView: View {
+    private enum PropertyScope: String, CaseIterable, Identifiable {
+        case active
+        case archived
+
+        var id: String { rawValue }
+        var title: String { self == .active ? "Активные" : "Архив" }
+    }
+
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @State private var properties: [Property] = []
@@ -28,6 +36,7 @@ struct PropertiesListView: View {
     @State private var selectedTenant: PropertyTenantDetailRoute?
     @State private var selectedTransaction: PropertyTransactionDetailRoute?
     @State private var selectedReceipt: PropertyReceiptDetailRoute?
+    @State private var propertyScope: PropertyScope = .active
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -38,12 +47,17 @@ struct PropertiesListView: View {
             }
             .navigationTitle("Объекты")
             .searchable(text: $searchText, prompt: "Поиск объектов")
+            .onChange(of: propertyScope) { _, _ in
+                Task { await loadProperties() }
+            }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showPropertyForm = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
+                if propertyScope == .active {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showPropertyForm = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                        }
                     }
                 }
             }
@@ -57,6 +71,9 @@ struct PropertiesListView: View {
                 Task { await handlePendingNotificationRoute() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .propertyDeleted)) { _ in
+                Task { await loadProperties() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .propertyArchiveChanged)) { _ in
                 Task { await loadProperties() }
             }
             .navigationDestination(for: Property.self) { prop in
@@ -98,35 +115,56 @@ struct PropertiesListView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: AppTheme.Spacing.md) {
+                scopePicker
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .padding(.horizontal, AppTheme.Spacing.md)
         } else if let errorMessage, properties.isEmpty {
-            EmptyStateView(
-                title: "Не удалось загрузить объекты",
-                message: errorMessage,
-                actionName: "Повторить",
-                action: { Task { await loadProperties() } },
-                icon: "wifi.exclamationmark"
-            )
+            VStack(spacing: AppTheme.Spacing.md) {
+                scopePicker
+                EmptyStateView(
+                    title: "Не удалось загрузить объекты",
+                    message: errorMessage,
+                    actionName: "Повторить",
+                    action: { Task { await loadProperties() } },
+                    icon: "wifi.exclamationmark"
+                )
+            }
+            .padding(.horizontal, AppTheme.Spacing.md)
         } else if filteredProperties.isEmpty {
-            EmptyStateView(
-                title: searchText.isEmpty ? "Объектов пока нет" : "Нет подходящих объектов",
-                message: searchText.isEmpty
-                    ? "Добавьте первый объект, чтобы начать вести портфель."
-                    : "Попробуйте другое название, адрес или город.",
-                actionName: searchText.isEmpty ? "Добавить объект" : "Сбросить поиск",
-                action: {
-                    if searchText.isEmpty {
-                        showPropertyForm = true
-                    } else {
-                        searchText = ""
-                    }
-                },
-                icon: searchText.isEmpty ? "building.2" : "magnifyingglass"
-            )
+            VStack(spacing: AppTheme.Spacing.md) {
+                scopePicker
+                EmptyStateView(
+                    title: searchText.isEmpty ? "Объектов пока нет" : "Нет подходящих объектов",
+                    message: searchText.isEmpty
+                        ? propertyScope == .archived
+                            ? "Архивированные объекты появятся здесь и будут доступны для восстановления."
+                            : "Добавьте первый объект, чтобы начать вести портфель."
+                        : "Попробуйте другое название, адрес или город.",
+                    actionName: searchText.isEmpty
+                        ? propertyScope == .active ? "Добавить объект" : "К активным"
+                        : "Сбросить поиск",
+                    action: {
+                        if searchText.isEmpty {
+                            if propertyScope == .active {
+                                showPropertyForm = true
+                            } else {
+                                propertyScope = .active
+                            }
+                        } else {
+                            searchText = ""
+                        }
+                    },
+                    icon: searchText.isEmpty ? "building.2" : "magnifyingglass"
+                )
+            }
+            .padding(.horizontal, AppTheme.Spacing.md)
         } else {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: AppTheme.Spacing.lg) {
+                    scopePicker
                     portfolioSummary
                     filterSummary
                     if let errorMessage, !properties.isEmpty {
@@ -166,6 +204,15 @@ struct PropertiesListView: View {
         }
     }
 
+    private var scopePicker: some View {
+        Picker("Состав портфеля", selection: $propertyScope) {
+            ForEach(PropertyScope.allCases) { scope in
+                Text(scope.title).tag(scope)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
     private var filteredProperties: [Property] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return properties }
@@ -197,7 +244,9 @@ struct PropertiesListView: View {
                     .tracking(1.2)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
 
-                Text("Чистый обзор всех объектов.")
+                Text(propertyScope == .active
+                    ? "Чистый обзор активных объектов."
+                    : "Объекты вне расчётов и напоминаний.")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
 
@@ -261,10 +310,12 @@ struct PropertiesListView: View {
         let count = filteredProperties.count
 
         if query.isEmpty {
-            return "Showing \(count) tracked propert\(count == 1 ? "y" : "ies") in the mobile portfolio."
+            return propertyScope == .active
+                ? "Показано активных объектов: \(count)."
+                : "Показано объектов в архиве: \(count)."
         }
 
-        return "Showing \(count) propert\(count == 1 ? "y" : "ies") matching “\(query)”."
+        return "По запросу «\(query)» найдено объектов: \(count)."
     }
 
     private func statusBanner(_ message: String, color: Color) -> some View {
@@ -284,8 +335,11 @@ struct PropertiesListView: View {
         snippetWarning = nil
         
         do {
+            let path = propertyScope == .active
+                ? "/v1/properties"
+                : "/v1/properties?scope=archived"
             let loaded: [Property] = try await APIClient.shared.request(
-                "/v1/properties",
+                path,
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
@@ -464,6 +518,15 @@ struct PropertyRowView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 8) {
+                    if property.isArchived {
+                        Text("Архив")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.warning)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppTheme.Colors.warning.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
                     StatusBadge(status: property.status)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
