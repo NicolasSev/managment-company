@@ -885,6 +885,12 @@ private struct ListedTransactionCard: View {
                 HStack(spacing: 8) {
                     StatusBadge(status: row.transaction.type)
 
+                    if let category = row.transaction.categoryName, !category.isEmpty {
+                        Text(category)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+
                     if let description = row.transaction.description, !description.isEmpty {
                         Text(description)
                             .font(.subheadline)

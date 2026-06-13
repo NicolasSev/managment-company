@@ -608,6 +608,13 @@ struct DashboardView: View {
                             timeStyle: DateFormatter.Style.none
                         ) ?? row.transactionDate
                     )
+                    if let category = row.categoryName?
+                        .trimmingCharacters(in: .whitespacesAndNewlines),
+                       !category.isEmpty {
+                        Text("· \(category)")
+                            .lineLimit(1)
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                    }
                     if let description = row.description?
                         .trimmingCharacters(in: .whitespacesAndNewlines),
                        !description.isEmpty {

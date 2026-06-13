@@ -5,6 +5,7 @@ struct Transaction: Identifiable, Codable {
     let propertyId: String
     let type: String
     let categoryId: String
+    var categoryName: String? = nil
     let amount: Double
     let currency: String
     let amountBase: Double
@@ -20,6 +21,7 @@ struct Transaction: Identifiable, Codable {
         case id, type, amount, currency, description
         case propertyId = "property_id"
         case categoryId = "category_id"
+        case categoryName = "category_name"
         case amountBase = "amount_base"
         case exchangeRate = "exchange_rate"
         case transactionDate = "transaction_date"

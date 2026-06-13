@@ -73,6 +73,10 @@ struct TransactionDetailSheet: View {
                                 detailRow("Объект", value: propertyName)
                             }
 
+                            if let category = transaction.categoryName?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty {
+                                detailRow("Категория", value: category)
+                            }
+
                             detailRow("Период", value: "\(transaction.periodMonth)/\(transaction.periodYear)")
 
                             if let description = transaction.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

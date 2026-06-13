@@ -2484,6 +2484,12 @@ struct TransactionRow: View {
                 HStack(spacing: 8) {
                     StatusBadge(status: transaction.type)
 
+                    if let category = transaction.categoryName, !category.isEmpty {
+                        Text(category)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+
                     if let description = transaction.description, !description.isEmpty {
                         Text(description)
                             .font(.subheadline)

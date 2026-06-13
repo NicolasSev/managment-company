@@ -12,6 +12,7 @@ struct DashboardRecentTransactionRow: Identifiable {
     let amount: Double
     let currency: String
     let transactionDate: String
+    let categoryName: String?
     let description: String?
 
     var isIncome: Bool {
@@ -44,6 +45,7 @@ enum DashboardRecentTransactionsLogic {
                     amount: $0.amount,
                     currency: $0.currency,
                     transactionDate: $0.transactionDate,
+                    categoryName: $0.categoryName,
                     description: $0.description
                 )
             }
