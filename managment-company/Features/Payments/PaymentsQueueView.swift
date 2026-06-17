@@ -16,14 +16,27 @@ struct PaymentsQueueView: View {
     @State private var skipCandidate: PaymentQueueItem?
     @State private var unpayCandidate: PaymentQueueItem?
 
-    init(authManager: AuthManager) {
+    /// When embedded inside another navigation container (the GAP-037 «Деньги»
+    /// hub), the view skips its own `NavigationStack`.
+    var embedded = false
+
+    init(authManager: AuthManager, embedded: Bool = false) {
+        self.embedded = embedded
         _viewModel = StateObject(
             wrappedValue: PaymentsQueueViewModel(client: LivePaymentQueueClient(authManager: authManager))
         )
     }
 
     var body: some View {
-        NavigationStack {
+        if embedded {
+            core
+        } else {
+            NavigationStack { core }
+        }
+    }
+
+    @ViewBuilder
+    private var core: some View {
             ZStack {
                 AppScreenBackground()
                 content
@@ -90,7 +103,6 @@ struct PaymentsQueueView: View {
             } message: { item in
                 Text("\(item.propertyName) · \(PaymentsQueueViewModel.periodLabel(of: item)) · \(AppFormatting.currency(item.actualAmount ?? item.expectedAmount, currency: item.currency)). Связанная операция дохода будет удалена, а платёж вернётся в очередь.")
             }
-        }
     }
 
     private var horizonMenu: some View {

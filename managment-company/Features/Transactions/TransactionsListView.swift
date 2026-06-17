@@ -169,8 +169,20 @@ struct TransactionsListView: View {
             .map { $0 }
     }
 
+    /// When embedded inside another navigation container (the GAP-037 «Деньги»
+    /// hub), the view skips its own `NavigationStack`.
+    var embedded = false
+
     var body: some View {
-        NavigationStack {
+        if embedded {
+            core
+        } else {
+            NavigationStack { core }
+        }
+    }
+
+    @ViewBuilder
+    private var core: some View {
             ZStack {
                 AppScreenBackground()
 
@@ -279,7 +291,6 @@ struct TransactionsListView: View {
             .onChange(of: notificationRouter.pendingRoute) { _, _ in
                 Task { await handlePendingNotificationRoute() }
             }
-        }
     }
 
     @ViewBuilder

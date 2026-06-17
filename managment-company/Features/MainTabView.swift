@@ -2,6 +2,7 @@ import SwiftUI
 
 enum AppTab: Hashable {
     case today
+    case money
     case dashboard
     case transactions
     case payments
@@ -17,7 +18,10 @@ struct MainTabView: View {
     @ObservedObject private var pendingMutations = PendingMutationQueue.shared
     @ObservedObject private var overdueBadge = PaymentsOverdueBadge.shared
     @StateObject private var quickActions = QuickActionsController()
-    @State private var selectedTab: AppTab = .dashboard
+    @State private var selectedTab: AppTab = .today
+    @State private var showDashboard = false
+    @State private var showTenants = false
+    @State private var showSettings = false
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -28,23 +32,11 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Сегодня", systemImage: "sun.max")
                 }
-            DashboardView()
+            MoneyHubView(authManager: authManager)
                 .environmentObject(authManager)
-                .tag(AppTab.dashboard)
+                .tag(AppTab.money)
                 .tabItem {
-                    Label("Дашборд", systemImage: "rectangle.grid.2x2")
-                }
-            TransactionsListView()
-                .environmentObject(authManager)
-                .tag(AppTab.transactions)
-                .tabItem {
-                    Label("Операции", systemImage: "arrow.left.arrow.right")
-                }
-            PaymentsQueueView(authManager: authManager)
-                .environmentObject(authManager)
-                .tag(AppTab.payments)
-                .tabItem {
-                    Label("Оплата", systemImage: "calendar.badge.clock")
+                    Label("Деньги", systemImage: "creditcard")
                 }
                 .badge(overdueBadge.count)
             PropertiesListView()
@@ -52,25 +44,25 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Объекты", systemImage: "building.2")
                 }
-            TenantsListView()
-                .environmentObject(authManager)
-                .tag(AppTab.tenants)
-                .tabItem {
-                    Label("Арендаторы", systemImage: "person.2")
-                }
             TasksListView()
                 .tag(AppTab.tasks)
                 .tabItem {
                     Label("Задачи", systemImage: "checklist")
                 }
-            SettingsView()
-                .tag(AppTab.settings)
-                .tabItem {
-                    Label("Настройки", systemImage: "gearshape")
-                }
         }
         .tint(AppTheme.Colors.accent)
         .environmentObject(quickActions)
+        // Secondary routes moved out of the primary bar (GAP-037): Dashboard,
+        // Tenants, and Settings remain reachable without being primary tabs.
+        .sheet(isPresented: $showDashboard) {
+            DashboardView().environmentObject(authManager)
+        }
+        .sheet(isPresented: $showTenants) {
+            TenantsListView().environmentObject(authManager)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView().environmentObject(authManager)
+        }
 
             QuickActionLauncher()
                 .environmentObject(authManager)
@@ -94,12 +86,37 @@ struct MainTabView: View {
             }
         }
         .onChange(of: notificationRouter.selectTab) { _, tab in
-            if let tab {
-                selectedTab = tab
-                notificationRouter.clearTabSelection()
+            guard let tab else { return }
+            switch MainTabView.target(for: tab) {
+            case .tab(let resolved): selectedTab = resolved
+            case .dashboardSheet: showDashboard = true
+            case .tenantsSheet: showTenants = true
+            case .settingsSheet: showSettings = true
             }
+            notificationRouter.clearTabSelection()
         }
     }
+
+    /// Resolves a requested `AppTab` to a destination after the GAP-037 nav
+    /// simplification: routes whose tab left the primary bar open as a secondary
+    /// sheet, and the two money routes land on the «Деньги» hub.
+    static func target(for tab: AppTab) -> AppNavigationTarget {
+        switch tab {
+        case .dashboard: return .dashboardSheet
+        case .tenants: return .tenantsSheet
+        case .settings: return .settingsSheet
+        case .transactions, .payments: return .tab(.money)
+        case .today, .money, .properties, .tasks: return .tab(tab)
+        }
+    }
+}
+
+/// Where a requested route lands under the GAP-037 five-position navigation.
+enum AppNavigationTarget: Equatable {
+    case tab(AppTab)
+    case dashboardSheet
+    case tenantsSheet
+    case settingsSheet
 }
 
 struct SettingsView: View {

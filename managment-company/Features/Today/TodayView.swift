@@ -26,6 +26,24 @@ struct TodayView: View {
                 content
             }
             .navigationTitle("Сегодня")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button { notificationRouter.selectTab = .dashboard } label: {
+                            Label("Дашборд", systemImage: "rectangle.grid.2x2")
+                        }
+                        Button { notificationRouter.selectTab = .tenants } label: {
+                            Label("Арендаторы", systemImage: "person.2")
+                        }
+                        Button { notificationRouter.selectTab = .settings } label: {
+                            Label("Настройки", systemImage: "gearshape")
+                        }
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                    }
+                    .accessibilityLabel("Ещё")
+                }
+            }
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
             .sheet(item: $markPaidItem) { item in
