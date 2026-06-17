@@ -15,6 +15,7 @@ struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @ObservedObject private var pendingMutations = PendingMutationQueue.shared
+    @StateObject private var quickActions = QuickActionsController()
     @State private var selectedTab: AppTab = .dashboard
     
     var body: some View {
@@ -67,6 +68,15 @@ struct MainTabView: View {
                 }
         }
         .tint(AppTheme.Colors.accent)
+        .environmentObject(quickActions)
+
+            QuickActionLauncher()
+                .environmentObject(authManager)
+                .environmentObject(quickActions)
+                .environmentObject(notificationRouter)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, AppTheme.Spacing.lg)
+                .padding(.bottom, 64)
 
             if pendingMutations.pendingCount > 0 {
                 HStack(spacing: AppTheme.Spacing.sm) {

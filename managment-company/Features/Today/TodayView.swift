@@ -7,11 +7,9 @@ struct TodayView: View {
     @StateObject private var viewModel: TodayViewModel
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @EnvironmentObject private var quickActions: QuickActionsController
 
     @State private var markPaidItem: PaymentQueueItem?
-    @State private var showExpenseSheet = false
-    @State private var showReceiptSheet = false
-    @State private var showTaskSheet = false
 
     init(authManager: AuthManager) {
         _viewModel = StateObject(wrappedValue: TodayViewModel(
@@ -36,21 +34,8 @@ struct TodayView: View {
                 }
                 .environmentObject(authManager)
             }
-            .sheet(isPresented: $showExpenseSheet) {
-                QuickTransactionSheet(propertyId: nil, properties: viewModel.properties) {
-                    await viewModel.load()
-                }
-                .environmentObject(authManager)
-            }
-            .sheet(isPresented: $showReceiptSheet) {
-                UtilityReceiptUploadSheet { Task { await viewModel.load() } }
-                    .environmentObject(authManager)
-            }
-            .sheet(isPresented: $showTaskSheet) {
-                TaskFormView(properties: viewModel.properties) {
-                    await viewModel.load()
-                }
-                .environmentObject(authManager)
+            .onReceive(NotificationCenter.default.publisher(for: .quickActionCompleted)) { _ in
+                Task { await viewModel.load() }
             }
         }
     }
@@ -64,7 +49,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
                     hero
                     if viewModel.hasPartialError { partialErrorBanner }
-                    quickActions
+                    quickActionsSection
                     attentionSection
                     if let money = viewModel.moneySummary { moneySection(money) }
                     if !viewModel.recentRows.isEmpty { recentSection }
@@ -119,16 +104,16 @@ struct TodayView: View {
 
     // MARK: - Quick actions
 
-    private var quickActions: some View {
+    private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
             Text("Быстрые действия")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.Colors.textSecondary)
             HStack(spacing: AppTheme.Spacing.sm) {
-                quickAction("Оплата", "wallet.bullet") { notificationRouter.selectTab = .payments }
-                quickAction("Расход", "banknote") { showExpenseSheet = true }
-                quickAction("Квитанция", "doc.text.viewfinder") { showReceiptSheet = true }
-                quickAction("Задача", "checklist") { showTaskSheet = true }
+                quickAction("Оплата", "wallet.bullet") { quickActions.open(.payment) }
+                quickAction("Расход", "banknote") { quickActions.open(.expense) }
+                quickAction("Квитанция", "doc.text.viewfinder") { quickActions.open(.receipt) }
+                quickAction("Задача", "checklist") { quickActions.open(.task) }
             }
         }
     }
