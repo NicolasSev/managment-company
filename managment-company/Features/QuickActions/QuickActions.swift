@@ -95,7 +95,6 @@ struct QuickActionLauncher: View {
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
 
     @State private var properties: [Property] = []
-    @State private var documentInfo = false
 
     var body: some View {
         Button {
@@ -117,12 +116,6 @@ struct QuickActionLauncher: View {
         }
         .sheet(item: $controller.activeAction) { action in
             actionSheet(for: action)
-        }
-        .alert("Загрузка документов", isPresented: $documentInfo) {
-            Button("К объектам") { notificationRouter.selectTab = .properties }
-            Button("Закрыть", role: .cancel) {}
-        } message: {
-            Text("Загрузка документа с поиском объекта/арендатора появится с GAP-036. Пока прикрепите файл из карточки объекта.")
         }
     }
 
@@ -189,10 +182,11 @@ struct QuickActionLauncher: View {
             }
             .environmentObject(authManager)
         case .document:
-            Color.clear.onAppear {
-                controller.close()
-                documentInfo = true
-            }
+            QuickDocumentSheet(
+                authManager: authManager,
+                contextPropertyId: controller.contextPropertyId
+            )
+            .environmentObject(authManager)
         case .tenant:
             TenantFormSheet {
                 await reload()
