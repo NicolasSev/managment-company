@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum AppTab: Hashable {
+    case today
     case dashboard
     case transactions
     case payments
@@ -19,6 +20,12 @@ struct MainTabView: View {
     var body: some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedTab) {
+            TodayView(authManager: authManager)
+                .environmentObject(authManager)
+                .tag(AppTab.today)
+                .tabItem {
+                    Label("Сегодня", systemImage: "sun.max")
+                }
             DashboardView()
                 .environmentObject(authManager)
                 .tag(AppTab.dashboard)

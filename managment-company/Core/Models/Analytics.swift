@@ -47,6 +47,22 @@ struct AnalyticsDashboard: Codable {
     }
 }
 
+/// One lease nearing its end date — `GET /v1/analytics/upcoming-renewals?days=N`.
+struct UpcomingRenewal: Codable, Identifiable {
+    var id: String { leaseId }
+    let leaseId: String
+    let propertyId: String
+    let tenantId: String
+    let endDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case leaseId = "lease_id"
+        case propertyId = "property_id"
+        case tenantId = "tenant_id"
+        case endDate = "end_date"
+    }
+}
+
 /// `OccupancyResponse` envelope body for GET `/v1/analytics/occupancy`.
 struct OccupancyPayload: Codable {
     let occupied: Int
