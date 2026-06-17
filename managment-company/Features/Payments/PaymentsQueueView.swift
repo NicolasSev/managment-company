@@ -8,6 +8,8 @@ import SwiftUI
 struct PaymentsQueueView: View {
     @StateObject private var viewModel: PaymentsQueueViewModel
     @EnvironmentObject private var authManager: AuthManager
+    @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @Environment(\.openURL) private var openURL
 
     @State private var editingItem: PaymentQueueItem?
     @State private var markPaidItem: PaymentQueueItem?
@@ -123,17 +125,22 @@ struct PaymentsQueueView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
                     headerSection
-                    scopePicker
+                    segmentPicker
 
                     if let errorMessage = viewModel.errorMessage {
                         statusBanner(errorMessage)
                     }
 
-                    if viewModel.items.isEmpty {
+                    if viewModel.segment == .overdue, viewModel.overdueSummary.count > 0 {
+                        overdueSummaryCard
+                    }
+
+                    let rows = viewModel.displayedItems(today: today)
+                    if rows.isEmpty {
                         emptyState
                     } else {
-                        summaryLine
-                        rowsSection
+                        summaryLine(rows)
+                        rowsSection(rows)
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
@@ -157,48 +164,61 @@ struct PaymentsQueueView: View {
         }
     }
 
-    private var scopePicker: some View {
-        Picker("Раздел", selection: $viewModel.scope) {
-            ForEach(PaymentQueueScope.allCases) { scope in
-                Text(scope.title).tag(scope)
+    private var today: String {
+        AppFormatting.dayKey(timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty")
+    }
+
+    private var segmentPicker: some View {
+        Picker("Раздел", selection: $viewModel.segment) {
+            ForEach(PaymentCollectionSegment.allCases) { segment in
+                Text(segment.title).tag(segment)
             }
         }
         .pickerStyle(.segmented)
     }
 
-    private var summaryLine: some View {
+    private var overdueSummaryCard: some View {
+        let summary = viewModel.overdueSummary
+        return SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                HStack {
+                    Text("\(summary.count) просрочено")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.danger)
+                    Spacer()
+                    if summary.oldestDaysOverdue > 0 {
+                        Text("Старейший долг: \(summary.oldestDaysOverdue) дн.")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                }
+                ForEach(summary.totalsByCurrency, id: \.currency) { entry in
+                    Text("Долг: \(AppFormatting.currency(entry.remaining, currency: entry.currency))")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                }
+            }
+        }
+    }
+
+    private func summaryLine(_ rows: [PaymentQueueItem]) -> some View {
         HStack(spacing: AppTheme.Spacing.xs) {
-            Text("\(viewModel.items.count)")
+            Text("\(rows.count)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.Colors.textPrimary)
-            Text(viewModel.scope == .past ? "платежей в истории" : "платежей в очереди")
+            Text(viewModel.segment == .history ? "платежей в истории" : "платежей")
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.Colors.textSecondary)
-
-            if !viewModel.totalsByCurrency.isEmpty {
-                Text("·")
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                Text(totalsLabel)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-            }
-
             Spacer()
         }
         .padding(.horizontal, AppTheme.Spacing.xs)
     }
 
-    private var totalsLabel: String {
-        viewModel.totalsByCurrency
-            .map { AppFormatting.currency($0.total, currency: $0.currency) }
-            .joined(separator: " + ")
-    }
-
-    private var rowsSection: some View {
+    private func rowsSection(_ rows: [PaymentQueueItem]) -> some View {
         LazyVStack(spacing: AppTheme.Spacing.sm) {
-            ForEach(viewModel.items) { item in
+            ForEach(rows) { item in
                 SurfaceCard(padding: AppTheme.Spacing.md) {
-                    if viewModel.scope == .past {
+                    if viewModel.segment == .history {
                         pastRow(item)
                     } else {
                         upcomingRow(item)
@@ -216,15 +236,32 @@ struct PaymentsQueueView: View {
                         .font(.headline)
                         .foregroundStyle(AppTheme.Colors.textPrimary)
 
+                    Text("Период: \(PaymentsQueueViewModel.periodLabel(of: item))")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                    if item.isOverdue, item.daysOverdue > 0 {
+                        Text("Просрочено на \(item.daysOverdue) дн.")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.danger)
+                    }
+
                     propertyTenantBlock(item)
                 }
 
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 6) {
-                    Text(AppFormatting.currency(item.expectedAmount, currency: item.currency))
+                    Text(AppFormatting.currency(item.outstandingAmount, currency: item.currency))
                         .font(.headline)
                         .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                    if let allocations = item.allocationCount, allocations > 0,
+                       item.outstandingAmount < item.expectedAmount {
+                        Text("из \(AppFormatting.currency(item.expectedAmount, currency: item.currency))")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
 
                     StatusBadge(status: PaymentsQueueViewModel.displayStatus(of: item, scope: .upcoming))
                 }
@@ -256,6 +293,29 @@ struct PaymentsQueueView: View {
                 }
             }
             .disabled(viewModel.isMutating)
+
+            collectionActionsRow(item)
+        }
+    }
+
+    /// Tenant contact + open-context actions (GAP-034). Contact buttons appear
+    /// only when the channel exists; open navigates to the property/tenant.
+    @ViewBuilder
+    private func collectionActionsRow(_ item: PaymentQueueItem) -> some View {
+        HStack(spacing: AppTheme.Spacing.sm) {
+            if let phone = item.tenantPhone, !phone.isEmpty,
+               let telURL = URL(string: "tel:\(phone.filter { !$0.isWhitespace })") {
+                rowActionButton(title: "Позвонить", systemImage: "phone") { openURL(telURL) }
+                if let smsURL = URL(string: "sms:\(phone.filter { !$0.isWhitespace })") {
+                    rowActionButton(title: "Написать", systemImage: "message") { openURL(smsURL) }
+                }
+            } else if let email = item.tenantEmail, !email.isEmpty,
+                      let mailURL = URL(string: "mailto:\(email)") {
+                rowActionButton(title: "Написать", systemImage: "envelope") { openURL(mailURL) }
+            }
+            rowActionButton(title: "Открыть", systemImage: "arrow.up.right.square") {
+                notificationRouter.open(NotificationRoute(kind: .property(item.propertyId)))
+            }
         }
     }
 

@@ -22,6 +22,12 @@ struct PaymentQueueItem: Identifiable, Decodable {
     let tenantId: String
     let tenantName: String
     let paymentDay: Int?
+    // GAP-034/040 collection context (optional: older API builds omit them).
+    var tenantPhone: String? = nil
+    var tenantEmail: String? = nil
+    var paidToDate: Double? = nil
+    var remainingAmount: Double? = nil
+    var allocationCount: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, status, currency
@@ -40,6 +46,17 @@ struct PaymentQueueItem: Identifiable, Decodable {
         case tenantId = "tenant_id"
         case tenantName = "tenant_name"
         case paymentDay = "payment_day"
+        case tenantPhone = "tenant_phone"
+        case tenantEmail = "tenant_email"
+        case paidToDate = "paid_to_date"
+        case remainingAmount = "remaining_amount"
+        case allocationCount = "allocation_count"
+    }
+
+    /// Outstanding amount: prefer the backend remaining balance (partial-aware),
+    /// fall back to the expected installment for older payloads.
+    var outstandingAmount: Double {
+        remainingAmount ?? expectedAmount
     }
 
     /// Bridges a queue row to the per-lease schedule model so the existing

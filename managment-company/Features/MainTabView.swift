@@ -15,6 +15,7 @@ struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @ObservedObject private var pendingMutations = PendingMutationQueue.shared
+    @ObservedObject private var overdueBadge = PaymentsOverdueBadge.shared
     @StateObject private var quickActions = QuickActionsController()
     @State private var selectedTab: AppTab = .dashboard
     
@@ -45,6 +46,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Оплата", systemImage: "calendar.badge.clock")
                 }
+                .badge(overdueBadge.count)
             PropertiesListView()
                 .tag(AppTab.properties)
                 .tabItem {

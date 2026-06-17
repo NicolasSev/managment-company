@@ -16,6 +16,55 @@ enum PaymentQueueScope: String, CaseIterable, Identifiable {
     }
 }
 
+/// Collection-workspace segments (GAP-034), iOS counterpart of web `/payments`
+/// `Просрочено`/`Сегодня`/`Скоро`/`История`. The first three partition the
+/// upcoming queue by the user's local date; history is the past scope.
+enum PaymentCollectionSegment: String, CaseIterable, Identifiable {
+    case overdue
+    case today
+    case upcoming
+    case history
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .overdue: return "Просрочено"
+        case .today: return "Сегодня"
+        case .upcoming: return "Скоро"
+        case .history: return "История"
+        }
+    }
+
+    var scope: PaymentQueueScope {
+        self == .history ? .past : .upcoming
+    }
+}
+
+/// Per-currency overdue debt totals + oldest age, shown on the `Просрочено`
+/// summary (GAP-034).
+struct OverdueSummary: Equatable {
+    let count: Int
+    let totalsByCurrency: [(currency: String, remaining: Double)]
+    let oldestDaysOverdue: Int
+
+    static func == (lhs: OverdueSummary, rhs: OverdueSummary) -> Bool {
+        lhs.count == rhs.count
+            && lhs.oldestDaysOverdue == rhs.oldestDaysOverdue
+            && lhs.totalsByCurrency.map(\.currency) == rhs.totalsByCurrency.map(\.currency)
+            && lhs.totalsByCurrency.map(\.remaining) == rhs.totalsByCurrency.map(\.remaining)
+    }
+}
+
+/// Shared overdue-installment count so the payments tab badge stays current
+/// across the app (GAP-034: the primary nav badge counts overdue only).
+@MainActor
+final class PaymentsOverdueBadge: ObservableObject {
+    static let shared = PaymentsOverdueBadge()
+    @Published var count = 0
+    private init() {}
+}
+
 /// Transport seam for `PaymentsQueueViewModel` so the logic is unit-testable
 /// without URLSession (mirrored test obligation for GAP-026).
 protocol PaymentQueueClient {
@@ -71,6 +120,12 @@ final class PaymentsQueueViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var scope: PaymentQueueScope = .upcoming
     @Published var months = 3
+    @Published var segment: PaymentCollectionSegment = .overdue {
+        didSet { scope = segment.scope }
+    }
+    /// Last-known overdue rows, retained across segments so the summary + tab
+    /// badge stay correct even while viewing history.
+    @Published private(set) var overdueItems: [PaymentQueueItem] = []
 
     static let horizonOptions = [3, 6, 12]
 
@@ -90,9 +145,36 @@ final class PaymentsQueueViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             items = try await client.fetchQueue(scope: scope, months: months)
+            if scope == .upcoming {
+                overdueItems = items.filter { $0.isOverdue }
+                PaymentsOverdueBadge.shared.count = overdueItems.count
+            }
         } catch {
             errorMessage = "Не удалось загрузить платежи."
         }
+    }
+
+    /// Rows shown for the active segment. The three upcoming segments partition
+    /// the fetched upcoming queue by the user's local date; history shows the
+    /// fetched past rows as-is.
+    func displayedItems(today: String) -> [PaymentQueueItem] {
+        switch segment {
+        case .history:
+            return scope == .past ? items : []
+        case .overdue, .today, .upcoming:
+            guard scope == .upcoming else { return [] }
+            let parts = Self.partition(items: items, today: today)
+            switch segment {
+            case .overdue: return parts.overdue
+            case .today: return parts.today
+            case .upcoming: return parts.upcoming
+            case .history: return []
+            }
+        }
+    }
+
+    var overdueSummary: OverdueSummary {
+        Self.overdueSummary(items: overdueItems)
     }
 
     /// Drops one installment from the queue (`action: "skip"`). Returns success.
@@ -158,6 +240,46 @@ final class PaymentsQueueViewModel: ObservableObject {
     }
 
     // MARK: - Pure presentation logic (unit-tested)
+
+    /// Partitions the upcoming queue into the GAP-034 collection segments by the
+    /// user's local date: overdue (flagged by the backend), due exactly today,
+    /// and everything later.
+    static func partition(
+        items: [PaymentQueueItem],
+        today: String
+    ) -> (overdue: [PaymentQueueItem], today: [PaymentQueueItem], upcoming: [PaymentQueueItem]) {
+        var overdue: [PaymentQueueItem] = []
+        var dueToday: [PaymentQueueItem] = []
+        var upcoming: [PaymentQueueItem] = []
+        for item in items {
+            if item.isOverdue {
+                overdue.append(item)
+            } else if item.dueDate == today {
+                dueToday.append(item)
+            } else {
+                upcoming.append(item)
+            }
+        }
+        return (overdue, dueToday, upcoming)
+    }
+
+    /// Overdue summary: row count, per-currency remaining-debt totals in
+    /// first-appearance order, and the oldest days-overdue.
+    static func overdueSummary(items: [PaymentQueueItem]) -> OverdueSummary {
+        var order: [String] = []
+        var sums: [String: Double] = [:]
+        var oldest = 0
+        for item in items {
+            if sums[item.currency] == nil { order.append(item.currency) }
+            sums[item.currency, default: 0] += item.outstandingAmount
+            oldest = max(oldest, item.daysOverdue)
+        }
+        return OverdueSummary(
+            count: items.count,
+            totalsByCurrency: order.map { ($0, sums[$0] ?? 0) },
+            oldestDaysOverdue: oldest
+        )
+    }
 
     /// Payload for the fast "paid today" action (GAP-030). The actual receipt date
     /// is today in the workspace timezone via the shared `AppFormatting.dayKey`

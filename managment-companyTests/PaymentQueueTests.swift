@@ -47,7 +47,9 @@ private func makeItem(
     actualAmount: Double? = nil,
     paidAt: String? = nil,
     status: String = "pending",
-    isOverdue: Bool = false
+    isOverdue: Bool = false,
+    daysOverdue: Int = 0,
+    remainingAmount: Double? = nil
 ) -> PaymentQueueItem {
     PaymentQueueItem(
         id: id,
@@ -61,13 +63,14 @@ private func makeItem(
         paidAt: paidAt,
         status: status,
         isOverdue: isOverdue,
-        daysOverdue: 0,
+        daysOverdue: daysOverdue,
         propertyId: "00000000-0000-0000-0000-00000000000c",
         propertyName: "Flat A",
         propertyAddress: "Street 1",
         tenantId: "00000000-0000-0000-0000-00000000000d",
         tenantName: "Иван",
-        paymentDay: 5
+        paymentDay: 5,
+        remainingAmount: remainingAmount
     )
 }
 
@@ -356,5 +359,63 @@ struct PaymentQueueTests {
 
         #expect(!ok)
         #expect(vm.errorMessage != nil)
+    }
+
+    // MARK: GAP-034 — collection workspace segments
+
+    @MainActor
+    @Test func partitionSplitsOverdueTodayAndUpcoming() {
+        let items = [
+            makeItem(id: "over", dueDate: "2026-05-01", isOverdue: true),
+            makeItem(id: "today", dueDate: "2026-06-17", isOverdue: false),
+            makeItem(id: "soon", dueDate: "2026-07-05", isOverdue: false),
+        ]
+        let parts = PaymentsQueueViewModel.partition(items: items, today: "2026-06-17")
+        #expect(parts.overdue.map(\.id) == ["over"])
+        #expect(parts.today.map(\.id) == ["today"])
+        #expect(parts.upcoming.map(\.id) == ["soon"])
+    }
+
+    @MainActor
+    @Test func overdueSummaryTotalsPerCurrencyAndOldestAge() {
+        // partial: only the remaining balance counts toward the overdue total.
+        let a = makeItem(id: "a", expectedAmount: 100000, currency: "KZT", isOverdue: true, daysOverdue: 12, remainingAmount: 40000)
+        let b = makeItem(id: "b", expectedAmount: 50000, currency: "KZT", isOverdue: true, daysOverdue: 47)
+        let c = makeItem(id: "c", expectedAmount: 300, currency: "USD", isOverdue: true, daysOverdue: 3)
+
+        let summary = PaymentsQueueViewModel.overdueSummary(items: [a, b, c])
+        #expect(summary.count == 3)
+        #expect(summary.oldestDaysOverdue == 47)
+        #expect(summary.totalsByCurrency.count == 2)
+        #expect(summary.totalsByCurrency[0].currency == "KZT")
+        #expect(summary.totalsByCurrency[0].remaining == 90000) // 40000 remaining + 50000
+        #expect(summary.totalsByCurrency[1].currency == "USD")
+        #expect(summary.totalsByCurrency[1].remaining == 300)
+    }
+
+    @Test func segmentScopeMapping() {
+        #expect(PaymentCollectionSegment.overdue.scope == .upcoming)
+        #expect(PaymentCollectionSegment.today.scope == .upcoming)
+        #expect(PaymentCollectionSegment.upcoming.scope == .upcoming)
+        #expect(PaymentCollectionSegment.history.scope == .past)
+    }
+
+    @MainActor
+    @Test func displayedItemsFilterBySegmentAndUpdateBadge() async {
+        let client = MockPaymentQueueClient()
+        client.queue = [
+            makeItem(id: "over", dueDate: "2026-05-01", isOverdue: true),
+            makeItem(id: "soon", dueDate: "2026-07-05", isOverdue: false),
+        ]
+        let vm = PaymentsQueueViewModel(client: client)
+        vm.segment = .overdue
+        await vm.load()
+
+        #expect(vm.displayedItems(today: "2026-06-17").map(\.id) == ["over"])
+        #expect(vm.overdueSummary.count == 1)
+        #expect(PaymentsOverdueBadge.shared.count == 1)
+
+        vm.segment = .upcoming
+        #expect(vm.displayedItems(today: "2026-06-17").map(\.id) == ["soon"])
     }
 }
