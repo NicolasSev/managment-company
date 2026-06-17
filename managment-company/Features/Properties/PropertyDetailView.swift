@@ -33,6 +33,7 @@ struct PropertyDetailView: View {
     @State private var showLeaseForm = false
     @State private var editingLease: Lease?
     @State private var leaseToTerminate: Lease?
+    @State private var depositLease: Lease?
     @State private var generatingScheduleLeaseId: String?
     @State private var linkedTransaction: LinkedTransactionRoute?
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
@@ -179,6 +180,10 @@ struct PropertyDetailView: View {
                 await loadData()
             }
             .environmentObject(authManager)
+        }
+        .sheet(item: $depositLease) { lease in
+            DepositView(authManager: authManager, leaseId: lease.id)
+                .environmentObject(authManager)
         }
         .sheet(item: $editingLease) { lease in
             LeaseFormSheet(propertyId: property.id, tenants: tenants, lease: lease) {
@@ -598,6 +603,14 @@ struct PropertyDetailView: View {
                                     color: AppTheme.Colors.accent
                                 ) {
                                     editingLease = lease
+                                }
+
+                                leaseActionButton(
+                                    title: "Депозит",
+                                    icon: "lock.shield",
+                                    color: AppTheme.Colors.info
+                                ) {
+                                    depositLease = lease
                                 }
 
                                 if lease.status.lowercased() == "active" {
