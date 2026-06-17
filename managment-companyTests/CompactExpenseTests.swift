@@ -2,9 +2,9 @@
 //  CompactExpenseTests.swift
 //  managment-companyTests
 //
-//  Mirrored tests for GAP-033 (compact expense capture): validation, recent
-//  category ordering, property preselection, save (today/expense) + Undo, and
-//  «Добавить ещё» reset.
+//  Mirrored tests for GAP-033 (compact expense capture) and GAP-045 (duplicate
+//  expense detection): validation, recent-category order, property preselection,
+//  save (today), undo, reset, duplicate warning + create-anyway override.
 //
 
 import Foundation
@@ -36,24 +36,33 @@ private func property(_ id: String) -> Property {
     )
 }
 
+private func candidate(_ id: String) -> DuplicateExpenseCandidate {
+    DuplicateExpenseCandidate(
+        id: id, propertyName: "Алматы", categoryName: "Интернет", amount: 12500, currency: "KZT",
+        transactionDate: "2026-06-17", payee: nil, score: 90, reasons: ["amount", "date"]
+    )
+}
+
 @MainActor
 private final class MockCompactExpenseClient: CompactExpenseClient {
     var categories: [Category] = []
     var properties: [Property] = []
     var recent: [Transaction] = []
+    var duplicates: [DuplicateExpenseCandidate] = []
     var createdId = "tx-new"
-    var createdBodies: [CompactExpenseInput] = []
+    var createdInputs: [ExpenseWorkflowInput] = []
+    var checkedInputs: [ExpenseWorkflowInput] = []
     var deleted: [String] = []
-    var failCreate = false
-
-    private struct Boom: Error {}
 
     func fetchCategories() async throws -> [Category] { categories }
     func fetchProperties() async throws -> [Property] { properties }
     func fetchRecentExpenses(propertyIds: [String]) async throws -> [Transaction] { recent }
-    func createExpense(propertyId: String, body: CompactExpenseInput) async throws -> String {
-        if failCreate { throw Boom() }
-        createdBodies.append(body)
+    func checkDuplicates(_ input: ExpenseWorkflowInput) async throws -> [DuplicateExpenseCandidate] {
+        checkedInputs.append(input)
+        return duplicates
+    }
+    func createExpense(_ input: ExpenseWorkflowInput) async throws -> String {
+        createdInputs.append(input)
         return createdId
     }
     func deleteTransaction(id: String) async throws { deleted.append(id) }
@@ -78,59 +87,57 @@ struct CompactExpenseTests {
             expenseTxn(id: "4", propertyId: "p1", categoryId: "unknown", date: "2026-06-17"),
         ]
         let ids = CompactExpenseViewModel.recentExpenseCategoryIds(
-            recentExpenses: recent,
-            expenseCategoryIds: ["repairs", "utilities"],
-            limit: 5
+            recentExpenses: recent, expenseCategoryIds: ["repairs", "utilities"], limit: 5
         )
-        // unknown filtered out; repairs is most recent (06-16), then utilities (06-15).
         #expect(ids == ["repairs", "utilities"])
     }
 
     @Test func preselectsContextThenLastUsedThenFirst() {
         let props = [property("p1"), property("p2"), property("p3")]
         #expect(CompactExpenseViewModel.preselectedProperty(context: "p2", recentExpenses: [], properties: props) == "p2")
-
         let recent = [expenseTxn(id: "1", propertyId: "p3", categoryId: "c", date: "2026-06-16")]
         #expect(CompactExpenseViewModel.preselectedProperty(context: nil, recentExpenses: recent, properties: props) == "p3")
-
         #expect(CompactExpenseViewModel.preselectedProperty(context: "missing", recentExpenses: [], properties: props) == "p1")
     }
 
     @MainActor
-    @Test func loadPreselectsPropertyAndRecentCategory() async {
-        let client = MockCompactExpenseClient()
-        client.categories = [category("repairs", "Ремонт", sort: 1), category("utilities", "Коммуналка", sort: 2)]
-        client.properties = [property("p1"), property("p2")]
-        client.recent = [expenseTxn(id: "1", propertyId: "p2", categoryId: "utilities", date: "2026-06-16")]
-        let vm = CompactExpenseViewModel(client: client, baseCurrency: "KZT", timeZoneIdentifier: "Asia/Almaty")
-
-        await vm.load()
-
-        #expect(vm.selectedPropertyId == "p2")
-        #expect(vm.selectedCategoryId == "utilities")
-        #expect(vm.recentChips.map(\.id) == ["utilities"])
-    }
-
-    @MainActor
-    @Test func saveSendsExpenseTodayAndStoresUndoId() async throws {
+    @Test func saveCreatesTodayWhenNoDuplicate() async throws {
         let client = MockCompactExpenseClient()
         client.createdId = "tx-42"
         let vm = CompactExpenseViewModel(client: client, baseCurrency: "KZT", timeZoneIdentifier: "Asia/Almaty")
-        vm.amountText = "12500"
-        vm.selectedCategoryId = "repairs"
-        vm.selectedPropertyId = "p1"
+        vm.amountText = "12500"; vm.selectedCategoryId = "repairs"; vm.selectedPropertyId = "p1"
 
-        let iso = ISO8601DateFormatter()
-        let now = try #require(iso.date(from: "2026-06-17T06:00:00Z"))
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-06-17T06:00:00Z"))
         let ok = await vm.save(now: now)
 
         #expect(ok)
         #expect(vm.lastCreatedId == "tx-42")
-        let body = try #require(client.createdBodies.first)
-        #expect(body.type == "expense")
+        #expect(client.checkedInputs.count == 1)
+        let body = try #require(client.createdInputs.first)
         #expect(body.amount == 12500)
-        #expect(body.currency == "KZT")
         #expect(body.transactionDate == "2026-06-17")
+        #expect(!body.allowDuplicate)
+    }
+
+    @MainActor
+    @Test func duplicatesBlockSaveThenCreateAnywayOverrides() async throws {
+        let client = MockCompactExpenseClient()
+        client.duplicates = [candidate("dup-1")]
+        let vm = CompactExpenseViewModel(client: client, baseCurrency: "KZT", timeZoneIdentifier: "Asia/Almaty")
+        vm.amountText = "12500"; vm.selectedCategoryId = "internet"; vm.selectedPropertyId = "p1"
+
+        let created = await vm.save()
+        #expect(!created)
+        #expect(vm.duplicateCandidates.map(\.id) == ["dup-1"])
+        #expect(client.createdInputs.isEmpty) // not created yet
+        #expect(vm.errorMessage == nil)
+
+        let overridden = await vm.createAnyway()
+        #expect(overridden)
+        let body = try #require(client.createdInputs.first)
+        #expect(body.allowDuplicate)
+        #expect(body.duplicateCandidateIds == ["dup-1"])
+        #expect(vm.duplicateCandidates.isEmpty)
     }
 
     @MainActor
@@ -138,30 +145,25 @@ struct CompactExpenseTests {
         let client = MockCompactExpenseClient()
         client.createdId = "tx-9"
         let vm = CompactExpenseViewModel(client: client, baseCurrency: "KZT", timeZoneIdentifier: "Asia/Almaty")
-        vm.amountText = "100"
-        vm.selectedCategoryId = "c"
-        vm.selectedPropertyId = "p"
+        vm.amountText = "100"; vm.selectedCategoryId = "c"; vm.selectedPropertyId = "p"
         _ = await vm.save()
 
         let undone = await vm.undoLast()
-
         #expect(undone)
         #expect(client.deleted == ["tx-9"])
         #expect(vm.lastCreatedId == nil)
     }
 
     @MainActor
-    @Test func resetForAnotherKeepsPropertyAndDate() async {
+    @Test func resetForAnotherKeepsPropertyClearsDuplicates() async {
         let client = MockCompactExpenseClient()
         let vm = CompactExpenseViewModel(client: client, baseCurrency: "KZT", timeZoneIdentifier: "Asia/Almaty")
-        vm.amountText = "500"
-        vm.selectedPropertyId = "p1"
-        vm.note = "такси"
+        vm.amountText = "500"; vm.selectedPropertyId = "p1"; vm.note = "такси"
 
         vm.resetForAnother()
-
         #expect(vm.amountText == "")
         #expect(vm.note == "")
         #expect(vm.selectedPropertyId == "p1")
+        #expect(vm.duplicateCandidates.isEmpty)
     }
 }

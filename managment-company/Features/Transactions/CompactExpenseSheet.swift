@@ -29,6 +29,27 @@ struct CompactExpenseSheet: View {
                 if let error = viewModel.errorMessage {
                     Section { Text(error).foregroundStyle(AppTheme.Colors.danger) }
                 }
+                if !viewModel.duplicateCandidates.isEmpty {
+                    Section("Похоже на дубликат") {
+                        ForEach(viewModel.duplicateCandidates) { candidate in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(candidate.categoryName.isEmpty ? "Расход" : candidate.categoryName)
+                                        .font(.subheadline.weight(.medium))
+                                    Spacer()
+                                    Text(AppFormatting.currency(candidate.amount, currency: candidate.currency))
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                Text("\(candidate.propertyName) · \(AppFormatting.dateString(from: candidate.transactionDate) ?? candidate.transactionDate)")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                            }
+                        }
+                        Button("Всё равно создать") { Task { await createAnyway() } }
+                            .foregroundStyle(AppTheme.Colors.danger)
+                        Button("Отмена") { viewModel.dismissDuplicates() }
+                    }
+                }
                 if showUndo {
                     Section { undoRow }
                 }
@@ -156,6 +177,14 @@ struct CompactExpenseSheet: View {
 
     private func saveAndDismiss() async {
         if await viewModel.save() {
+            AppHaptics.success()
+            NotificationCenter.default.post(name: .quickActionCompleted, object: nil)
+            showUndo = true
+        }
+    }
+
+    private func createAnyway() async {
+        if await viewModel.createAnyway() {
             AppHaptics.success()
             NotificationCenter.default.post(name: .quickActionCompleted, object: nil)
             showUndo = true
