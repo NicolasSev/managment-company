@@ -107,6 +107,10 @@ private final class MockTodayClient: TodayDataClient {
     func fetchRecentTransactions(propertyIds: [String]) async throws -> [Transaction] { recent }
     var profitability = ProfitabilityReport(groupBy: "month", from: "", to: "", points: [], totals: [])
     func fetchProfitability(from: String, to: String) async throws -> ProfitabilityReport { profitability }
+    var dueRecurring: [RecurringExpenseTemplate] = []
+    func fetchDueRecurring() async throws -> [RecurringExpenseTemplate] { dueRecurring }
+    func confirmRecurring(id: String) async throws {}
+    func skipRecurring(id: String) async throws {}
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
         markPaidCalls.append(scheduleId)
         queue.removeAll { $0.id == scheduleId }

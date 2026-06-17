@@ -112,6 +112,9 @@ protocol TodayDataClient {
     func fetchTenants() async throws -> [Tenant]
     func fetchRecentTransactions(propertyIds: [String]) async throws -> [Transaction]
     func fetchProfitability(from: String, to: String) async throws -> ProfitabilityReport
+    func fetchDueRecurring() async throws -> [RecurringExpenseTemplate]
+    func confirmRecurring(id: String) async throws
+    func skipRecurring(id: String) async throws
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws
     func completeTask(id: String) async throws
 }
@@ -208,6 +211,14 @@ struct LiveTodayClient: TodayDataClient {
         )
     }
 
+    private var recurringClient: LiveRecurringExpenseClient { LiveRecurringExpenseClient(authManager: authManager) }
+
+    func fetchDueRecurring() async throws -> [RecurringExpenseTemplate] {
+        try await recurringClient.listDue()
+    }
+    func confirmRecurring(id: String) async throws { try await recurringClient.confirm(id: id) }
+    func skipRecurring(id: String) async throws { try await recurringClient.skip(id: id) }
+
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
         try await queueClient.markPaid(scheduleId: scheduleId, body: body, idempotencyKey: idempotencyKey)
     }
@@ -233,6 +244,7 @@ final class TodayViewModel: ObservableObject {
     @Published private(set) var attentionItems: [TodayAttentionItem] = []
     @Published private(set) var moneySummary: TodayMoneySummary?
     @Published private(set) var recentRows: [DashboardRecentTransactionRow] = []
+    @Published private(set) var dueRecurring: [RecurringExpenseTemplate] = []
     @Published private(set) var properties: [Property] = []
     @Published private(set) var performanceRows: [PropertyPerformanceRow] = []
     @Published var performanceSort: PropertyPerformanceSort = .net {
@@ -317,7 +329,20 @@ final class TodayViewModel: ObservableObject {
         }
         recentRows = DashboardRecentTransactionsLogic.rows(transactions: recent, propertyNames: propertyNames)
 
+        // Due recurring expense occurrences (GAP-039), best-effort.
+        dueRecurring = (try? await client.fetchDueRecurring()) ?? []
+
         failedSources = failures
+    }
+
+    func confirmDueRecurring(_ template: RecurringExpenseTemplate, now: Date = Date()) async -> Bool {
+        do { try await client.confirmRecurring(id: template.id); await load(now: now); return true }
+        catch { return false }
+    }
+
+    func skipDueRecurring(_ template: RecurringExpenseTemplate, now: Date = Date()) async -> Bool {
+        do { try await client.skipRecurring(id: template.id); await load(now: now); return true }
+        catch { return false }
     }
 
     /// Inline-resolve a rent row with today's actual date (GAP-030 semantics),

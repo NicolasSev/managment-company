@@ -11,6 +11,7 @@ struct TodayView: View {
     @ObservedObject private var expenseReminder = ExpenseReminderController.shared
 
     @State private var markPaidItem: PaymentQueueItem?
+    @State private var showRecurring = false
 
     init(authManager: AuthManager) {
         _viewModel = StateObject(wrappedValue: TodayViewModel(
@@ -39,6 +40,9 @@ struct TodayView: View {
                         Button { notificationRouter.selectTab = .settings } label: {
                             Label("Настройки", systemImage: "gearshape")
                         }
+                        Button { showRecurring = true } label: {
+                            Label("Повторяющиеся расходы", systemImage: "arrow.triangle.2.circlepath")
+                        }
                     } label: {
                         Image(systemName: "person.crop.circle")
                     }
@@ -56,6 +60,10 @@ struct TodayView: View {
             .onReceive(NotificationCenter.default.publisher(for: .quickActionCompleted)) { _ in
                 Task { await viewModel.load() }
             }
+            .sheet(isPresented: $showRecurring) {
+                RecurringExpensesView(authManager: authManager)
+                    .environmentObject(authManager)
+            }
         }
     }
 
@@ -71,6 +79,7 @@ struct TodayView: View {
                     if expenseReminder.shouldShowCard { expenseReminderCard }
                     quickActionsSection
                     attentionSection
+                    if !viewModel.dueRecurring.isEmpty { recurringSection }
                     if let money = viewModel.moneySummary { moneySection(money) }
                     if !viewModel.performanceRows.isEmpty { performanceSection }
                     if !viewModel.recentRows.isEmpty { recentSection }
@@ -255,6 +264,48 @@ struct TodayView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(viewModel.isLoading)
+            }
+        }
+    }
+
+    private var recurringSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                HStack {
+                    Text("Повторяющиеся расходы")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    Spacer()
+                    Button("Управление") { showRecurring = true }
+                        .font(.subheadline.weight(.semibold))
+                }
+                ForEach(viewModel.dueRecurring) { template in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(template.categoryName.isEmpty ? "Расход" : template.categoryName)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                            Spacer()
+                            Text(AppFormatting.currency(template.amount, currency: template.currency))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                        }
+                        Text(template.propertyName)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                        HStack(spacing: AppTheme.Spacing.sm) {
+                            Button("Подтвердить") {
+                                Task { if await viewModel.confirmDueRecurring(template) { AppHaptics.success() } }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button("Пропустить") {
+                                Task { _ = await viewModel.skipDueRecurring(template) }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
             }
         }
     }
