@@ -13,6 +13,7 @@ struct TodayView: View {
     @State private var markPaidItem: PaymentQueueItem?
     @State private var showRecurring = false
     @State private var showDocuments = false
+    @State private var showReconciliation = false
 
     init(authManager: AuthManager) {
         _viewModel = StateObject(wrappedValue: TodayViewModel(
@@ -47,6 +48,9 @@ struct TodayView: View {
                         Button { showDocuments = true } label: {
                             Label("Документы", systemImage: "folder")
                         }
+                        Button { showReconciliation = true } label: {
+                            Label("Сверка выписки", systemImage: "doc.text.magnifyingglass")
+                        }
                     } label: {
                         Image(systemName: "person.crop.circle")
                     }
@@ -70,6 +74,10 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showDocuments) {
                 DocumentHubView(authManager: authManager)
+                    .environmentObject(authManager)
+            }
+            .sheet(isPresented: $showReconciliation) {
+                ReconciliationView(authManager: authManager)
                     .environmentObject(authManager)
             }
         }
