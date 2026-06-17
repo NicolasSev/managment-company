@@ -18,7 +18,9 @@ struct MarkSchedulePaidSheet: View {
     init(schedule: LeasePaymentSchedule, onSuccess: @escaping () async -> Void) {
         self.schedule = schedule
         self.onSuccess = onSuccess
-        _amountText = State(initialValue: MarkSchedulePaidSheet.defaultAmountLabel(schedule.expectedAmount))
+        // GAP-040: default to the outstanding balance so a partial schedule
+        // settles its remainder; a smaller amount records another partial payment.
+        _amountText = State(initialValue: MarkSchedulePaidSheet.defaultAmountLabel(schedule.outstandingAmount))
         // GAP-030: default to the actual receipt date (today), never the
         // contractual due date. The user can still pick another day explicitly.
         _paymentDate = State(initialValue: Date())
@@ -45,7 +47,14 @@ struct MarkSchedulePaidSheet: View {
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
 
-                    Text("По умолчанию подставлена сумма из графика. Оставьте сумму пустой — сервер возьмёт ожидаемую.")
+                    if let paid = schedule.paidToDate, paid > 0 {
+                        Text("Уже оплачено \(AppFormatting.currency(paid, currency: schedule.currency)) из \(AppFormatting.currency(schedule.expectedAmount, currency: schedule.currency)). Остаток \(AppFormatting.currency(schedule.outstandingAmount, currency: schedule.currency)).")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text("По умолчанию — остаток к оплате. Введите меньшую сумму, чтобы записать частичный платёж; график останется открытым до полного погашения.")
                         .font(.caption)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

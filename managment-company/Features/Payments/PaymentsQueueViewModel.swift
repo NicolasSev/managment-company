@@ -291,7 +291,9 @@ final class PaymentsQueueViewModel: ObservableObject {
         now: Date = Date()
     ) -> MarkSchedulePaidRequest {
         MarkSchedulePaidRequest(
-            amount: item.expectedAmount,
+            // Partial-aware (GAP-040): paying "today" settles the outstanding
+            // balance, which closes a partially-paid schedule.
+            amount: item.outstandingAmount,
             currency: item.currency,
             paymentDate: AppFormatting.dayKey(for: now, timeZoneIdentifier: timeZoneIdentifier),
             notes: nil

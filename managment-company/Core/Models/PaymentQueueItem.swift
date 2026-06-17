@@ -78,7 +78,9 @@ struct PaymentQueueItem: Identifiable, Decodable {
             transactionId: nil,
             status: status,
             isOverdue: isOverdue,
-            daysOverdue: daysOverdue
+            daysOverdue: daysOverdue,
+            paidToDate: paidToDate,
+            remainingAmount: remainingAmount
         )
     }
 }

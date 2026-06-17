@@ -18,6 +18,9 @@ struct LeasePaymentSchedule: Identifiable, Codable {
     let status: String
     let isOverdue: Bool
     let daysOverdue: Int
+    // GAP-040 partial payments (optional: older payloads omit them).
+    var paidToDate: Double? = nil
+    var remainingAmount: Double? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, status, currency
@@ -34,5 +37,10 @@ struct LeasePaymentSchedule: Identifiable, Codable {
         case transactionId = "transaction_id"
         case isOverdue = "is_overdue"
         case daysOverdue = "days_overdue"
+        case paidToDate = "paid_to_date"
+        case remainingAmount = "remaining_amount"
     }
+
+    /// Outstanding balance (partial-aware): remaining if known, else expected.
+    var outstandingAmount: Double { remainingAmount ?? expectedAmount }
 }

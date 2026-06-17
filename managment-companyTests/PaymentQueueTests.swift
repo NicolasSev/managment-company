@@ -393,6 +393,55 @@ struct PaymentQueueTests {
         #expect(summary.totalsByCurrency[1].remaining == 300)
     }
 
+    // MARK: GAP-040 — partial payments
+
+    @MainActor
+    @Test func outstandingPrefersRemainingOverExpected() {
+        let full = makeItem(id: "f", expectedAmount: 100000)
+        #expect(full.outstandingAmount == 100000)
+        let partial = makeItem(id: "p", expectedAmount: 100000, remainingAmount: 40000)
+        #expect(partial.outstandingAmount == 40000)
+    }
+
+    @MainActor
+    @Test func fastMarkPaidUsesRemainingForPartialSchedule() {
+        let iso = ISO8601DateFormatter()
+        let now = iso.date(from: "2026-06-17T09:00:00Z")!
+        let partial = makeItem(id: "p", expectedAmount: 100000, remainingAmount: 40000)
+        let body = PaymentsQueueViewModel.fastMarkPaidBody(for: partial, timeZoneIdentifier: "Asia/Almaty", now: now)
+        #expect(body.amount == 40000)
+    }
+
+    @MainActor
+    @Test func bridgeCarriesPartialFieldsToSchedule() {
+        let partial = makeItem(id: "p", expectedAmount: 100000, remainingAmount: 40000)
+        let schedule = partial.asLeaseSchedule
+        #expect(schedule.remainingAmount == 40000)
+        #expect(schedule.outstandingAmount == 40000)
+    }
+
+    @Test func decodesPartialFieldsFromQueueEnvelope() throws {
+        let json = """
+        {"data":[{"id":"00000000-0000-0000-0000-000000000001","lease_id":"00000000-0000-0000-0000-000000000002",
+        "due_date":"2026-07-05","period_start_date":"2026-07-01","period_end_date":"2026-07-31",
+        "notification_due_date":null,"notification_sent_at":null,
+        "expected_amount":100000,"currency":"KZT",
+        "actual_payment_id":null,"actual_amount":null,"paid_to_date":40000,"remaining_amount":60000,"allocation_count":1,
+        "paid_at":null,"transaction_id":null,
+        "status":"pending","is_overdue":false,"days_overdue":0,
+        "property_id":"00000000-0000-0000-0000-000000000003","property_name":"Flat A","property_address":"Street 1",
+        "tenant_id":"00000000-0000-0000-0000-000000000004","tenant_name":"Иван","tenant_phone":"+7700","tenant_email":null,"payment_day":5}],
+        "page":1,"per_page":100,"total":1}
+        """
+        let decoded = try JSONDecoder().decode(APIListEnvelope<PaymentQueueItem>.self, from: json.data(using: .utf8)!)
+        let item = try #require(decoded.data.first)
+        #expect(item.paidToDate == 40000)
+        #expect(item.remainingAmount == 60000)
+        #expect(item.allocationCount == 1)
+        #expect(item.tenantPhone == "+7700")
+        #expect(item.outstandingAmount == 60000)
+    }
+
     @Test func segmentScopeMapping() {
         #expect(PaymentCollectionSegment.overdue.scope == .upcoming)
         #expect(PaymentCollectionSegment.today.scope == .upcoming)
