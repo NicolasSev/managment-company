@@ -44,6 +44,11 @@ final class PushNotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUse
         let userInfo = response.notification.request.content.userInfo
         Task { @MainActor in
             guard self.authManager?.isAuthenticated == true else { return }
+            // GAP-038: the daily expense reminder opens the compact expense flow.
+            if let reminder = userInfo["reminder"] as? String, reminder == "expense" {
+                NotificationCenter.default.post(name: .openCompactExpense, object: nil)
+                return
+            }
             self.deepLinkRouter?.handleNotificationOpen(userInfo: userInfo)
         }
         completionHandler()

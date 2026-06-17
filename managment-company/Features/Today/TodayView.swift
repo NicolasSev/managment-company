@@ -8,6 +8,7 @@ struct TodayView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @EnvironmentObject private var quickActions: QuickActionsController
+    @ObservedObject private var expenseReminder = ExpenseReminderController.shared
 
     @State private var markPaidItem: PaymentQueueItem?
 
@@ -67,6 +68,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
                     hero
                     if viewModel.hasPartialError { partialErrorBanner }
+                    if expenseReminder.shouldShowCard { expenseReminderCard }
                     quickActionsSection
                     attentionSection
                     if let money = viewModel.moneySummary { moneySection(money) }
@@ -103,6 +105,31 @@ struct TodayView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(.top, 2)
+            }
+        }
+    }
+
+    private var expenseReminderCard: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Label("Расходы за день", systemImage: "banknote")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                Text("Записать сегодняшние расходы по объектам?")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    Button("Записать расход") {
+                        quickActions.open(.expense)
+                    }
+                    .font(.caption.weight(.semibold))
+                    Button("Не сегодня") {
+                        expenseReminder.dismissForToday()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    Spacer()
+                }
             }
         }
     }

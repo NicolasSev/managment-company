@@ -85,6 +85,10 @@ struct MainTabView: View {
                 .background(AppTheme.Colors.accent.opacity(0.15))
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openCompactExpense)) { _ in
+            selectedTab = .today
+            quickActions.open(.expense)
+        }
         .onChange(of: notificationRouter.selectTab) { _, tab in
             guard let tab else { return }
             switch MainTabView.target(for: tab) {
@@ -121,6 +125,7 @@ enum AppNavigationTarget: Equatable {
 
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
+    @ObservedObject private var expenseReminder = ExpenseReminderController.shared
     @State private var profileName = ""
     @State private var timezone = "Asia/Almaty"
     @State private var baseCurrency = "KZT"
@@ -228,6 +233,8 @@ struct SettingsView: View {
                         }
 
                         mfaSection
+
+                        expenseReminderSettings
 
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
@@ -366,6 +373,70 @@ struct SettingsView: View {
                         isLoading: isMFAWorking,
                         systemImage: "qrcode"
                     )
+                }
+            }
+        }
+    }
+
+    private static let weekdayLabels: [(day: Int, label: String)] = [
+        (2, "Пн"), (3, "Вт"), (4, "Ср"), (5, "Чт"), (6, "Пт"), (7, "Сб"), (1, "Вс"),
+    ]
+
+    private var expenseReminderSettings: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                Text("Напоминание о расходах")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                Text("Это напоминание, а не Live Activity: карточка на «Сегодня» и опциональные локальные уведомления в выбранные дни и время.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .lineSpacing(2)
+
+                Toggle("Включить напоминание", isOn: Binding(
+                    get: { expenseReminder.prefs.enabled },
+                    set: { var p = expenseReminder.prefs; p.enabled = $0; expenseReminder.update(p) }
+                ))
+
+                if expenseReminder.prefs.enabled {
+                    DatePicker(
+                        "Время",
+                        selection: Binding(
+                            get: {
+                                Calendar.current.date(
+                                    from: DateComponents(hour: expenseReminder.prefs.hour, minute: expenseReminder.prefs.minute)
+                                ) ?? Date()
+                            },
+                            set: {
+                                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                                var p = expenseReminder.prefs
+                                p.hour = c.hour ?? 20
+                                p.minute = c.minute ?? 0
+                                expenseReminder.update(p)
+                            }
+                        ),
+                        displayedComponents: .hourAndMinute
+                    )
+
+                    HStack(spacing: 6) {
+                        ForEach(Self.weekdayLabels, id: \.day) { entry in
+                            let on = expenseReminder.prefs.weekdays.contains(entry.day)
+                            Button(entry.label) {
+                                var p = expenseReminder.prefs
+                                if on { p.weekdays.remove(entry.day) } else { p.weekdays.insert(entry.day) }
+                                expenseReminder.update(p)
+                            }
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 34, height: 34)
+                            .background((on ? AppTheme.Colors.accent : AppTheme.Colors.accent.opacity(0.12)))
+                            .foregroundStyle(on ? .white : AppTheme.Colors.accent)
+                            .clipShape(Circle())
+                        }
+                    }
                 }
             }
         }

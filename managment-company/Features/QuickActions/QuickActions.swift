@@ -215,4 +215,8 @@ extension Notification.Name {
     /// Broadcast after a global quick action completes so visible screens can
     /// refresh affected data.
     static let quickActionCompleted = Notification.Name("quickActionCompleted")
+
+    /// Broadcast when the daily expense reminder (GAP-038) is tapped, so the
+    /// shell opens the compact expense flow.
+    static let openCompactExpense = Notification.Name("openCompactExpense")
 }

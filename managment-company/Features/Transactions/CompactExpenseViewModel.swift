@@ -180,6 +180,8 @@ final class CompactExpenseViewModel: ObservableObject {
         do {
             lastCreatedId = try await client.createExpense(propertyId: propertyId, body: body)
             didSaveOnce = true
+            // GAP-038: an owner expense today suppresses the daily reminder.
+            ExpenseReminderController.shared.markExpenseRecorded(now: now)
             return true
         } catch {
             errorMessage = "Не удалось сохранить расход."
