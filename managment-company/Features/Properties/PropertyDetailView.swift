@@ -34,6 +34,7 @@ struct PropertyDetailView: View {
     @State private var editingLease: Lease?
     @State private var leaseToTerminate: Lease?
     @State private var depositLease: Lease?
+    @State private var checklistLease: Lease?
     @State private var generatingScheduleLeaseId: String?
     @State private var linkedTransaction: LinkedTransactionRoute?
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
@@ -183,6 +184,10 @@ struct PropertyDetailView: View {
         }
         .sheet(item: $depositLease) { lease in
             DepositView(authManager: authManager, leaseId: lease.id)
+                .environmentObject(authManager)
+        }
+        .sheet(item: $checklistLease) { lease in
+            ChecklistView(authManager: authManager, leaseId: lease.id)
                 .environmentObject(authManager)
         }
         .sheet(item: $editingLease) { lease in
@@ -611,6 +616,14 @@ struct PropertyDetailView: View {
                                     color: AppTheme.Colors.info
                                 ) {
                                     depositLease = lease
+                                }
+
+                                leaseActionButton(
+                                    title: "Чек-лист",
+                                    icon: "checklist",
+                                    color: AppTheme.Colors.accent
+                                ) {
+                                    checklistLease = lease
                                 }
 
                                 if lease.status.lowercased() == "active" {
