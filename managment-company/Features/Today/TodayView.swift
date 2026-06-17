@@ -12,6 +12,7 @@ struct TodayView: View {
 
     @State private var markPaidItem: PaymentQueueItem?
     @State private var showRecurring = false
+    @State private var showDocuments = false
 
     init(authManager: AuthManager) {
         _viewModel = StateObject(wrappedValue: TodayViewModel(
@@ -43,6 +44,9 @@ struct TodayView: View {
                         Button { showRecurring = true } label: {
                             Label("Повторяющиеся расходы", systemImage: "arrow.triangle.2.circlepath")
                         }
+                        Button { showDocuments = true } label: {
+                            Label("Документы", systemImage: "folder")
+                        }
                     } label: {
                         Image(systemName: "person.crop.circle")
                     }
@@ -62,6 +66,10 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showRecurring) {
                 RecurringExpensesView(authManager: authManager)
+                    .environmentObject(authManager)
+            }
+            .sheet(isPresented: $showDocuments) {
+                DocumentHubView(authManager: authManager)
                     .environmentObject(authManager)
             }
         }
