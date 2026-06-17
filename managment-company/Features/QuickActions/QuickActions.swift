@@ -175,12 +175,10 @@ struct QuickActionLauncher: View {
                 notificationRouter.selectTab = .payments
             }
         case .expense:
-            QuickTransactionSheet(
-                propertyId: controller.contextPropertyId,
-                properties: controller.contextPropertyId == nil ? properties : nil
-            ) {
-                await reload()
-            }
+            CompactExpenseSheet(
+                authManager: authManager,
+                contextPropertyId: controller.contextPropertyId
+            )
             .environmentObject(authManager)
         case .receipt:
             UtilityReceiptUploadSheet { Task { await reload() } }
