@@ -52,6 +52,7 @@ struct TodayView: View {
                     quickActionsSection
                     attentionSection
                     if let money = viewModel.moneySummary { moneySection(money) }
+                    if !viewModel.performanceRows.isEmpty { performanceSection }
                     if !viewModel.recentRows.isEmpty { recentSection }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
@@ -234,25 +235,82 @@ struct TodayView: View {
                 Text("Деньги · \(money.periodLabel)")
                     .font(.headline)
                     .foregroundStyle(AppTheme.Colors.textPrimary)
-                moneyRow("Аренда получена", money.rentReceived, money.currency, AppTheme.Colors.success)
-                moneyRow("Прочий доход", money.otherIncome, money.currency, AppTheme.Colors.textPrimary)
-                moneyRow("Расходы", money.expenses, money.currency, AppTheme.Colors.danger)
+                // Drilldowns (GAP-035): rent → collection, the rest → ledger.
+                moneyRow("Аренда получена", money.rentReceived, money.currency, AppTheme.Colors.success, tab: .payments)
+                moneyRow("Прочий доход", money.otherIncome, money.currency, AppTheme.Colors.textPrimary, tab: .transactions)
+                moneyRow("Расходы", money.expenses, money.currency, AppTheme.Colors.danger, tab: .transactions)
                 Divider()
                 moneyRow("Чистый поток", money.net, money.currency,
-                         money.net >= 0 ? AppTheme.Colors.success : AppTheme.Colors.danger)
+                         money.net >= 0 ? AppTheme.Colors.success : AppTheme.Colors.danger, tab: .transactions)
             }
         }
     }
 
-    private func moneyRow(_ label: String, _ amount: Double, _ currency: String, _ color: Color) -> some View {
-        HStack {
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Spacer()
-            Text(AppFormatting.currency(amount, currency: currency))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(color)
+    private func moneyRow(_ label: String, _ amount: Double, _ currency: String, _ color: Color, tab: AppTab) -> some View {
+        Button {
+            notificationRouter.selectTab = tab
+        } label: {
+            HStack {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                Spacer()
+                Text(AppFormatting.currency(amount, currency: currency))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(color)
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var performanceSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                HStack {
+                    Text("Доходность по объектам")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    Spacer()
+                    Menu {
+                        ForEach(PropertyPerformanceSort.allCases) { sort in
+                            Button {
+                                viewModel.performanceSort = sort
+                            } label: {
+                                if viewModel.performanceSort == sort {
+                                    Label(sort.title, systemImage: "checkmark")
+                                } else {
+                                    Text(sort.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(viewModel.performanceSort.title, systemImage: "arrow.up.arrow.down")
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+                ForEach(viewModel.performanceRows) { row in
+                    Button {
+                        notificationRouter.open(NotificationRoute(kind: .property(row.id)))
+                    } label: {
+                        HStack {
+                            Text(row.name)
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(AppFormatting.currency(row.net, currency: viewModel.moneySummary?.currency ?? "KZT"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(row.net >= 0 ? AppTheme.Colors.success : AppTheme.Colors.danger)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 

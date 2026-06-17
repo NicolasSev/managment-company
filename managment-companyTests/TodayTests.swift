@@ -105,6 +105,8 @@ private final class MockTodayClient: TodayDataClient {
     func fetchProperties() async throws -> [Property] { properties }
     func fetchTenants() async throws -> [Tenant] { tenants }
     func fetchRecentTransactions(propertyIds: [String]) async throws -> [Transaction] { recent }
+    var profitability = ProfitabilityReport(groupBy: "month", from: "", to: "", points: [], totals: [])
+    func fetchProfitability(from: String, to: String) async throws -> ProfitabilityReport { profitability }
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
         markPaidCalls.append(scheduleId)
         queue.removeAll { $0.id == scheduleId }
@@ -208,6 +210,35 @@ struct TodayTests {
         #expect(vm.failedSources.contains(.renewals))
         // The rest of the page still works.
         #expect(vm.attentionCount == 1)
+    }
+
+    // MARK: GAP-035 — property-performance drilldown
+
+    @Test func propertyPerformanceAggregatesByPropertyAndSorts() {
+        func point(_ pid: String, _ name: String, income: Double, expense: Double) -> ProfitabilityPoint {
+            ProfitabilityPoint(
+                propertyId: pid, propertyName: name, periodKey: "2026-06", periodLabel: "Июнь",
+                periodYear: 2026, periodMonth: 6, periodQuarter: nil, periodSeason: nil,
+                totalIncome: income, totalExpense: expense, utilityExpense: 0, operatingCost: 0,
+                netCashflow: income - expense, profitMarginPct: 0
+            )
+        }
+        let rows = TodayViewModel.propertyPerformance(points: [
+            point("p1", "Алматы", income: 300000, expense: 100000),
+            point("p2", "Астана", income: 150000, expense: 200000),
+            point("p1", "Алматы", income: 50000, expense: 0), // second period for p1
+        ])
+        // p1 aggregated: income 350000, expense 100000, net 250000.
+        let p1 = rows.first { $0.id == "p1" }
+        #expect(p1?.income == 350000)
+        #expect(p1?.net == 250000)
+
+        let byNet = TodayViewModel.sortPerformance(rows, by: .net)
+        #expect(byNet.first?.id == "p1")
+        let byName = TodayViewModel.sortPerformance(rows, by: .name)
+        #expect(byName.first?.name == "Алматы")
+        let byExpense = TodayViewModel.sortPerformance(rows, by: .expense)
+        #expect(byExpense.first?.id == "p2") // 200000 highest expense
     }
 
     @MainActor

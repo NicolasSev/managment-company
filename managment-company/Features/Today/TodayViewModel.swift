@@ -62,6 +62,32 @@ struct TodayMoneySummary: Equatable {
     let currency: String
 }
 
+/// One row of the Today property-performance drilldown table (GAP-035).
+struct PropertyPerformanceRow: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let income: Double
+    let expense: Double
+    var net: Double { income - expense }
+}
+
+enum PropertyPerformanceSort: String, CaseIterable, Identifiable {
+    case net
+    case income
+    case expense
+    case name
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .net: return "Прибыль"
+        case .income: return "Доход"
+        case .expense: return "Расход"
+        case .name: return "Название"
+        }
+    }
+}
+
 /// Independent data sources of the Today screen; tracked separately so a single
 /// failed endpoint degrades only its block instead of blanking the page.
 enum TodaySource: String, CaseIterable {
@@ -85,6 +111,7 @@ protocol TodayDataClient {
     func fetchProperties() async throws -> [Property]
     func fetchTenants() async throws -> [Tenant]
     func fetchRecentTransactions(propertyIds: [String]) async throws -> [Transaction]
+    func fetchProfitability(from: String, to: String) async throws -> ProfitabilityReport
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws
     func completeTask(id: String) async throws
 }
@@ -173,6 +200,14 @@ struct LiveTodayClient: TodayDataClient {
         return merged
     }
 
+    func fetchProfitability(from: String, to: String) async throws -> ProfitabilityReport {
+        try await APIClient.shared.request(
+            "/v1/analytics/profitability?from=\(from)&to=\(to)&group_by=month",
+            tokenProvider: token,
+            refreshAndRetry: refresh
+        )
+    }
+
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
         try await queueClient.markPaid(scheduleId: scheduleId, body: body, idempotencyKey: idempotencyKey)
     }
@@ -199,6 +234,10 @@ final class TodayViewModel: ObservableObject {
     @Published private(set) var moneySummary: TodayMoneySummary?
     @Published private(set) var recentRows: [DashboardRecentTransactionRow] = []
     @Published private(set) var properties: [Property] = []
+    @Published private(set) var performanceRows: [PropertyPerformanceRow] = []
+    @Published var performanceSort: PropertyPerformanceSort = .net {
+        didSet { performanceRows = Self.sortPerformance(performanceRows, by: performanceSort) }
+    }
     @Published private(set) var failedSources: Set<TodaySource> = []
     @Published private(set) var isLoading = false
 
@@ -258,6 +297,16 @@ final class TodayViewModel: ObservableObject {
             tenantNames: tenantNames
         )
         moneySummary = dashboard.map { Self.moneySummary(from: $0, baseCurrency: baseCurrency) }
+
+        // Property-performance drilldown table (GAP-035) over the dashboard period.
+        let from = dashboard?.periodFrom ?? "\(today.prefix(7))-01"
+        let to = dashboard?.periodTo ?? today
+        if let report = try? await client.fetchProfitability(from: from, to: to) {
+            performanceRows = Self.sortPerformance(
+                Self.propertyPerformance(points: report.points),
+                by: performanceSort
+            )
+        }
 
         // Recent activity is best-effort and never reports a partial error on its
         // own (it is a secondary block); the fan-out already swallows per-row
@@ -432,6 +481,43 @@ final class TodayViewModel: ObservableObject {
         if let due = task.dueDate, due.prefix(10) <= today { return true }
         let priority = task.priority.lowercased()
         return priority == "high" || priority == "urgent"
+    }
+
+    /// Aggregates canonical profitability points into one row per property
+    /// (summing income/expense across the period's points).
+    nonisolated static func propertyPerformance(points: [ProfitabilityPoint]) -> [PropertyPerformanceRow] {
+        var order: [String] = []
+        var income: [String: Double] = [:]
+        var expense: [String: Double] = [:]
+        var names: [String: String] = [:]
+        for point in points {
+            guard let id = point.propertyId else { continue }
+            if names[id] == nil {
+                order.append(id)
+                names[id] = point.propertyName ?? "Объект"
+            }
+            income[id, default: 0] += point.totalIncome
+            expense[id, default: 0] += point.totalExpense
+        }
+        return order.map {
+            PropertyPerformanceRow(id: $0, name: names[$0] ?? "Объект", income: income[$0] ?? 0, expense: expense[$0] ?? 0)
+        }
+    }
+
+    nonisolated static func sortPerformance(
+        _ rows: [PropertyPerformanceRow],
+        by sort: PropertyPerformanceSort
+    ) -> [PropertyPerformanceRow] {
+        switch sort {
+        case .name:
+            return rows.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+        case .income:
+            return rows.sorted { $0.income > $1.income }
+        case .expense:
+            return rows.sorted { $0.expense > $1.expense }
+        case .net:
+            return rows.sorted { $0.net > $1.net }
+        }
     }
 
     nonisolated static func moneySummary(from dashboard: AnalyticsDashboard, baseCurrency: String) -> TodayMoneySummary {
