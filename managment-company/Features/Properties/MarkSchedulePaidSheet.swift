@@ -19,7 +19,9 @@ struct MarkSchedulePaidSheet: View {
         self.schedule = schedule
         self.onSuccess = onSuccess
         _amountText = State(initialValue: MarkSchedulePaidSheet.defaultAmountLabel(schedule.expectedAmount))
-        _paymentDate = State(initialValue: MarkSchedulePaidSheet.dueAnchorDate(schedule.dueDate))
+        // GAP-030: default to the actual receipt date (today), never the
+        // contractual due date. The user can still pick another day explicitly.
+        _paymentDate = State(initialValue: Date())
         _currency = State(initialValue: schedule.currency)
         _notes = State(initialValue: "")
     }
@@ -27,7 +29,10 @@ struct MarkSchedulePaidSheet: View {
     private static let apiDayFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        // Extract the calendar day the user actually picked in the date picker,
+        // which operates in the device timezone (GAP-030: a UTC formatter could
+        // roll the chosen day back across midnight).
+        fmt.timeZone = .current
         fmt.dateFormat = "yyyy-MM-dd"
         return fmt
     }()
@@ -101,10 +106,6 @@ struct MarkSchedulePaidSheet: View {
 
     private func parsedAmount(_ text: String) -> Double? {
         Double(text.replacingOccurrences(of: ",", with: "."))
-    }
-
-    private static func dueAnchorDate(_ due: String) -> Date {
-        Self.apiDayFormatter.date(from: due) ?? Date()
     }
 
     private static func defaultAmountLabel(_ value: Double) -> String {

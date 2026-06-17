@@ -8,8 +8,6 @@ private struct AppRootView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var pushRegistration: PushDeviceRegistrationController
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
-    @EnvironmentObject private var liveActivityCoordinator: LiveActivityCoordinator
-    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
 
     var body: some View {
         Group {
@@ -23,30 +21,12 @@ private struct AppRootView: View {
             NotificationsInboxView(onDataChanged: { })
                 .environmentObject(authManager)
         }
-        .sheet(isPresented: Binding(
-            get: { rentPreviewRouter.pendingScheduleId != nil },
-            set: { isPresented in if !isPresented { rentPreviewRouter.clear() } }
-        )) {
-            if let scheduleId = rentPreviewRouter.pendingScheduleId {
-                RentPreviewSheet(
-                    scheduleId: scheduleId,
-                    onPaid: { rentPreviewRouter.markPaidRecorded() },
-                    onClose: { rentPreviewRouter.clear() }
-                )
-                .environmentObject(authManager)
-                .id(scheduleId)
-            }
-        }
-        .onOpenURL { url in
-            _ = rentPreviewRouter.handle(url: url)
-        }
         .task(id: authManager.isAuthenticated) {
             if authManager.isAuthenticated {
                 await requestNotificationAuthorizationAndRegister()
                 PendingMutationQueue.shared.startMonitoring(authManager: authManager)
                 await PendingMutationQueue.shared.processQueue(authManager: authManager)
                 await pushRegistration.syncRegistration(with: authManager)
-                await liveActivityCoordinator.syncLocalActivities()
             } else {
                 PendingMutationQueue.shared.stopMonitoring()
                 DashboardOverviewCache.clear()
@@ -58,7 +38,6 @@ private struct AppRootView: View {
             Task {
                 await PendingMutationQueue.shared.processQueue(authManager: authManager)
                 await pushRegistration.syncRegistration(with: authManager)
-                await liveActivityCoordinator.syncLocalActivities()
             }
         }
     }
@@ -80,18 +59,13 @@ struct managment_companyApp: App {
     @StateObject private var authManager = AuthManager()
     @StateObject private var pushRegistration = PushDeviceRegistrationController()
     @StateObject private var notificationRouter = NotificationDeepLinkRouter()
-    @StateObject private var liveActivityCoordinator = LiveActivityCoordinator()
-    @StateObject private var rentPreviewRouter = RentPreviewRouter()
 
     var body: some Scene {
         WindowGroup {
             AppRootView()
-                .preferredColorScheme(.light)
                 .environmentObject(authManager)
                 .environmentObject(pushRegistration)
                 .environmentObject(notificationRouter)
-                .environmentObject(liveActivityCoordinator)
-                .environmentObject(rentPreviewRouter)
                 .onAppear {
                     appDelegate.deepLinkRouter = notificationRouter
                     appDelegate.authManager = authManager
@@ -101,8 +75,6 @@ struct managment_companyApp: App {
                             await pushRegistration.syncRegistration(with: authManager)
                         }
                     }
-                    RentReminderActions.authManager = authManager
-                    liveActivityCoordinator.start(with: authManager)
                 }
                 .onChange(of: authManager.isAuthenticated) { _, _ in
                     appDelegate.authManager = authManager

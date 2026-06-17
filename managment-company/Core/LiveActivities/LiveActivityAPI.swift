@@ -58,7 +58,9 @@ enum LiveActivityAPI {
     }
 
     static func markPaid(scheduleId: String, amount: Double, currency: String, auth: AuthManager) async throws {
-        let today = ISO8601DateFormatter.dayString(from: Date())
+        // GAP-030: actual receipt date is today in the user's configured timezone,
+        // derived through the shared `AppFormatting.dayKey` helper — never a due date.
+        let today = AppFormatting.dayKey(timeZoneIdentifier: auth.user?.timezone ?? "Asia/Almaty")
         let idempotency = "live-activity-\(scheduleId)-\(today)"
         _ = try await APIClient.shared.requestData(
             "/v1/payment-schedules/\(scheduleId)/mark-paid",
@@ -118,16 +120,6 @@ enum LiveActivityAPI {
             liveActivityAPILog.error("/active-reminders FAILED: \(String(describing: error), privacy: .public)")
             return nil
         }
-    }
-}
-
-private extension ISO8601DateFormatter {
-    static func dayString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.calendar = Calendar(identifier: .iso8601)
-        formatter.timeZone = TimeZone(identifier: "Asia/Almaty")
-        return formatter.string(from: date)
     }
 }
 #endif

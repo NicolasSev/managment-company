@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private struct ListedTransaction: Identifiable, Sendable {
+private struct ListedTransaction: Identifiable {
     var id: String { transaction.id }
     let transaction: Transaction
     let propertyName: String
@@ -552,84 +552,39 @@ struct TransactionsListView: View {
         if rows.isEmpty { isLoading = true }
         defer { isLoading = false }
 
-        // 1. Properties are the entry point — a genuine failure here is the only
-        //    reason to show the full "Операции недоступны" state.
-        let properties: [Property]
         do {
-            properties = try await APIClient.shared.request(
+            let properties: [Property] = try await APIClient.shared.request(
                 "/v1/properties",
                 tokenProvider: { await MainActor.run { authManager.accessToken } },
                 refreshAndRetry: { await authManager.refreshToken() }
             )
-        } catch {
-            rows = []
-            errorMessage = "Не удалось загрузить журнал операций."
-            return
-        }
-
-        propertiesById = Dictionary(uniqueKeysWithValues: properties.map { ($0.id, $0) })
-        if !selectedPropertyId.isEmpty, propertiesById[selectedPropertyId] == nil {
-            selectedPropertyId = ""
-        }
-
-        guard !properties.isEmpty else {
-            rows = []
-            return
-        }
-
-        // 2. Fetch each property's transactions concurrently and tolerate partial
-        //    failures: one flaky request must not discard everything that loaded.
-        let auth = authManager
-        let outcome = await withTaskGroup(
-            of: (rows: [ListedTransaction], failed: Bool).self
-        ) { group in
-            for property in properties {
-                group.addTask {
-                    do {
-                        let data = try await APIClient.shared.requestData(
-                            "/v1/properties/\(property.id)/transactions?per_page=100",
-                            tokenProvider: { await MainActor.run { auth.accessToken } },
-                            refreshAndRetry: { await auth.refreshToken() }
-                        )
-                        let decoded = try JSONDecoder().decode(APIResponse<[Transaction]>.self, from: data)
-                        let listed = decoded.data.map {
-                            ListedTransaction(transaction: $0, propertyName: property.name)
-                        }
-                        return (listed, false)
-                    } catch {
-                        return ([], true)
-                    }
-                }
+            propertiesById = Dictionary(uniqueKeysWithValues: properties.map { ($0.id, $0) })
+            if !selectedPropertyId.isEmpty, propertiesById[selectedPropertyId] == nil {
+                selectedPropertyId = ""
             }
 
             var merged: [ListedTransaction] = []
-            var failures = 0
-            for await result in group {
-                merged.append(contentsOf: result.rows)
-                if result.failed { failures += 1 }
+            for property in properties {
+                let data = try await APIClient.shared.requestData(
+                    "/v1/properties/\(property.id)/transactions?per_page=100",
+                    tokenProvider: { await MainActor.run { authManager.accessToken } },
+                    refreshAndRetry: { await authManager.refreshToken() }
+                )
+                let decoded = try JSONDecoder().decode(APIResponse<[Transaction]>.self, from: data)
+                merged.append(contentsOf: decoded.data.map {
+                    ListedTransaction(transaction: $0, propertyName: property.name)
+                })
             }
-            return (merged, failures)
-        }
 
-        // 3. Every property request failed → nothing to show, surface the error.
-        if outcome.1 == properties.count {
+            merged.sort {
+                ($0.transaction.transactionDate, $0.id) > ($1.transaction.transactionDate, $1.id)
+            }
+            rows = merged
+            await handlePendingNotificationRoute()
+        } catch {
             rows = []
             errorMessage = "Не удалось загрузить журнал операций."
-            return
         }
-
-        var merged = outcome.0
-        merged.sort {
-            ($0.transaction.transactionDate, $0.id) > ($1.transaction.transactionDate, $1.id)
-        }
-        rows = merged
-
-        // 4. Partial success → keep the data, warn inline (banner above the list).
-        if outcome.1 > 0 {
-            errorMessage = "Часть объектов не загрузилась (\(outcome.1) из \(properties.count)). Потяните список вниз, чтобы повторить."
-        }
-
-        await handlePendingNotificationRoute()
     }
 
     private func handlePendingNotificationRoute() async {

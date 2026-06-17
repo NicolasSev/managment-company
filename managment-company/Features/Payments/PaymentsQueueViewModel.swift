@@ -21,6 +21,7 @@ enum PaymentQueueScope: String, CaseIterable, Identifiable {
 protocol PaymentQueueClient {
     func fetchQueue(scope: PaymentQueueScope, months: Int) async throws -> [PaymentQueueItem]
     func updateSchedule(scheduleId: String, body: PaymentScheduleUpdateRequest) async throws
+    func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws
 }
 
 /// Production client: shared `APIClient` with the standard JWT refresh/retry flow.
@@ -42,6 +43,17 @@ struct LivePaymentQueueClient: PaymentQueueClient {
             "/v1/payment-schedules/\(scheduleId)",
             method: "PATCH",
             body: body,
+            tokenProvider: { await MainActor.run { authManager.accessToken } },
+            refreshAndRetry: { await authManager.refreshToken() }
+        )
+    }
+
+    func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
+        _ = try await APIClient.shared.requestData(
+            "/v1/payment-schedules/\(scheduleId)/mark-paid",
+            method: "POST",
+            body: body,
+            idempotencyKey: idempotencyKey,
             tokenProvider: { await MainActor.run { authManager.accessToken } },
             refreshAndRetry: { await authManager.refreshToken() }
         )
@@ -94,6 +106,26 @@ final class PaymentsQueueViewModel: ObservableObject {
         await mutate(scheduleId: item.id, body: .restore, failureMessage: "Не удалось вернуть платёж в очередь.")
     }
 
+    /// Fast "paid today" action (GAP-030), iOS counterpart of the web `/payments`
+    /// one-tap mark-paid: records the expected installment with the actual receipt
+    /// date set to today in the workspace timezone, never the contractual due date.
+    /// The reversal path is the existing restore/un-pay action in `Прошлые платежи`.
+    func markPaidToday(_ item: PaymentQueueItem, timeZoneIdentifier: String, now: Date = Date()) async -> Bool {
+        let body = Self.fastMarkPaidBody(for: item, timeZoneIdentifier: timeZoneIdentifier, now: now)
+        let idempotencyKey = "ios-queue-\(item.id)-\(body.paymentDate ?? "")"
+        isMutating = true
+        errorMessage = nil
+        defer { isMutating = false }
+        do {
+            try await client.markPaid(scheduleId: item.id, body: body, idempotencyKey: idempotencyKey)
+            await load()
+            return true
+        } catch {
+            errorMessage = "Не удалось отметить оплату."
+            return false
+        }
+    }
+
     /// Applies the edit-sheet result: day first, then amount — one intent per
     /// PATCH, same order as web. Returns success.
     func applyEdit(to item: PaymentQueueItem, day: Int?, amount: Double?) async -> Bool {
@@ -126,6 +158,23 @@ final class PaymentsQueueViewModel: ObservableObject {
     }
 
     // MARK: - Pure presentation logic (unit-tested)
+
+    /// Payload for the fast "paid today" action (GAP-030). The actual receipt date
+    /// is today in the workspace timezone via the shared `AppFormatting.dayKey`
+    /// helper — identical semantics to the Live Activity / reminder-banner fast
+    /// action — and is independent of the installment's contractual `dueDate`.
+    static func fastMarkPaidBody(
+        for item: PaymentQueueItem,
+        timeZoneIdentifier: String,
+        now: Date = Date()
+    ) -> MarkSchedulePaidRequest {
+        MarkSchedulePaidRequest(
+            amount: item.expectedAmount,
+            currency: item.currency,
+            paymentDate: AppFormatting.dayKey(for: now, timeZoneIdentifier: timeZoneIdentifier),
+            notes: nil
+        )
+    }
 
     /// Per-currency totals, first-appearance currency order. In history only
     /// actually received money counts: skipped rows (no recorded payment) are

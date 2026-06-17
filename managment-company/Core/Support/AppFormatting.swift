@@ -19,6 +19,22 @@ enum AppFormatting {
         return "\(formatter.string(from: NSNumber(value: amount)) ?? "\(amount)") \(currency)"
     }
 
+    /// Actual-receipt day key (`yyyy-MM-dd`) for `date` in the workspace timezone.
+    /// Mirrors web `dateKeyInTimeZone` (GAP-030 actual-date invariant): every fast
+    /// mark-paid action records the real receipt date through this one helper,
+    /// never a schedule's contractual due date.
+    static func dayKey(
+        for date: Date = Date(),
+        timeZoneIdentifier: String = "Asia/Almaty"
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: timeZoneIdentifier) ?? TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: date)
+    }
+
     static func parsedDate(from value: String) -> Date? {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

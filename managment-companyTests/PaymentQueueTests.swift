@@ -17,6 +17,7 @@ private final class MockPaymentQueueClient: PaymentQueueClient {
     var fetchedScopes: [PaymentQueueScope] = []
     var fetchedMonths: [Int] = []
     var updates: [(scheduleId: String, body: PaymentScheduleUpdateRequest)] = []
+    var markPaidCalls: [(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String)] = []
     var updateError: Error?
 
     func fetchQueue(scope: PaymentQueueScope, months: Int) async throws -> [PaymentQueueItem] {
@@ -28,6 +29,11 @@ private final class MockPaymentQueueClient: PaymentQueueClient {
     func updateSchedule(scheduleId: String, body: PaymentScheduleUpdateRequest) async throws {
         if let updateError { throw updateError }
         updates.append((scheduleId, body))
+    }
+
+    func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
+        if let updateError { throw updateError }
+        markPaidCalls.append((scheduleId, body, idempotencyKey))
     }
 }
 
@@ -282,6 +288,71 @@ struct PaymentQueueTests {
         let vm = PaymentsQueueViewModel(client: client)
 
         let ok = await vm.skip(makeItem())
+
+        #expect(!ok)
+        #expect(vm.errorMessage != nil)
+    }
+
+    // MARK: GAP-030 — actual payment date correctness
+
+    /// The shared day-key helper resolves "today" in the workspace timezone, not
+    /// UTC: 20:30Z on 2026-06-16 is already 2026-06-17 in Asia/Almaty (UTC+5).
+    @Test func dayKeyUsesWorkspaceTimezoneNotUTC() throws {
+        let iso = ISO8601DateFormatter()
+        let instant = try #require(iso.date(from: "2026-06-16T20:30:00Z"))
+        #expect(AppFormatting.dayKey(for: instant, timeZoneIdentifier: "Asia/Almaty") == "2026-06-17")
+        #expect(AppFormatting.dayKey(for: instant, timeZoneIdentifier: "UTC") == "2026-06-16")
+    }
+
+    /// Regression for the GAP-030 invariant: an installment due in a previous
+    /// month but recorded today sends today's date — never the contractual due
+    /// date — and carries the expected amount/currency.
+    @MainActor
+    @Test func fastMarkPaidBodyRecordsTodayNotDueDate() throws {
+        let iso = ISO8601DateFormatter()
+        let now = try #require(iso.date(from: "2026-06-16T09:00:00Z"))
+        let overdue = makeItem(dueDate: "2026-04-05", expectedAmount: 95000, currency: "KZT", isOverdue: true)
+
+        let body = PaymentsQueueViewModel.fastMarkPaidBody(
+            for: overdue,
+            timeZoneIdentifier: "Asia/Almaty",
+            now: now
+        )
+
+        #expect(body.paymentDate == "2026-06-16")
+        #expect(body.paymentDate != overdue.dueDate)
+        #expect(body.amount == 95000)
+        #expect(body.currency == "KZT")
+    }
+
+    @MainActor
+    @Test func markPaidTodaySendsTodayDatedBodyAndReloads() async throws {
+        let iso = ISO8601DateFormatter()
+        let now = try #require(iso.date(from: "2026-06-16T09:00:00Z"))
+        let client = MockPaymentQueueClient()
+        let item = makeItem(dueDate: "2026-04-05", expectedAmount: 95000, currency: "KZT", isOverdue: true)
+        client.queue = [item]
+        let vm = PaymentsQueueViewModel(client: client)
+        await vm.load()
+        client.queue = []
+
+        let ok = await vm.markPaidToday(item, timeZoneIdentifier: "Asia/Almaty", now: now)
+
+        #expect(ok)
+        #expect(client.markPaidCalls.count == 1)
+        #expect(client.markPaidCalls[0].scheduleId == item.id)
+        #expect(client.markPaidCalls[0].body.paymentDate == "2026-06-16")
+        #expect(client.markPaidCalls[0].idempotencyKey == "ios-queue-\(item.id)-2026-06-16")
+        #expect(vm.items.isEmpty)
+    }
+
+    @MainActor
+    @Test func markPaidTodayFailureSurfacesError() async {
+        let client = MockPaymentQueueClient()
+        client.updateError = APIError.httpStatus(500)
+        let vm = PaymentsQueueViewModel(client: client)
+
+        let ok = await vm.markPaidToday(makeItem(), timeZoneIdentifier: "Asia/Almaty")
 
         #expect(!ok)
         #expect(vm.errorMessage != nil)

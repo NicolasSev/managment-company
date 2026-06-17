@@ -235,7 +235,21 @@ struct PaymentsQueueView: View {
                     editingItem = item
                 }
                 rowActionButton(title: "Оплачено", systemImage: "checkmark.circle") {
-                    markPaidItem = item
+                    Task {
+                        if await viewModel.markPaidToday(
+                            item,
+                            timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty"
+                        ) {
+                            AppHaptics.success()
+                        }
+                    }
+                }
+                .contextMenu {
+                    Button {
+                        markPaidItem = item
+                    } label: {
+                        Label("Указать дату и сумму…", systemImage: "calendar")
+                    }
                 }
                 rowActionButton(title: "Пропустить", systemImage: "forward.end") {
                     skipCandidate = item
