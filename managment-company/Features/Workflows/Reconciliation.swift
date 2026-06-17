@@ -14,6 +14,8 @@ struct BankStatementRow: Identifiable, Decodable, Equatable {
     let status: String
     let suggestedPropertyId: String?
     let suggestedCategoryId: String?
+    let suggestedScheduleId: String?
+    let suggestedTransactionId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, fingerprint, amount, currency, description, status
@@ -22,6 +24,8 @@ struct BankStatementRow: Identifiable, Decodable, Equatable {
         case transactionDate = "transaction_date"
         case suggestedPropertyId = "suggested_property_id"
         case suggestedCategoryId = "suggested_category_id"
+        case suggestedScheduleId = "suggested_schedule_id"
+        case suggestedTransactionId = "suggested_transaction_id"
     }
 }
 
@@ -62,11 +66,33 @@ struct BankDecisionPart: Encodable, Equatable {
     let type: String
     let amount: Double
     let description: String?
+    let scheduleId: String?
+    let transactionId: String?
+
+    nonisolated init(
+        propertyId: String,
+        categoryId: String,
+        type: String,
+        amount: Double,
+        description: String?,
+        scheduleId: String? = nil,
+        transactionId: String? = nil
+    ) {
+        self.propertyId = propertyId
+        self.categoryId = categoryId
+        self.type = type
+        self.amount = amount
+        self.description = description
+        self.scheduleId = scheduleId
+        self.transactionId = transactionId
+    }
 
     enum CodingKeys: String, CodingKey {
         case type, amount, description
         case propertyId = "property_id"
         case categoryId = "category_id"
+        case scheduleId = "schedule_id"
+        case transactionId = "transaction_id"
     }
 }
 
@@ -79,8 +105,9 @@ struct BankDecisionInput: Encodable {
 @MainActor
 protocol ReconciliationClient {
     func importRows(filename: String, rows: [BankImportRow]) async throws -> BankImportResult
-    func listPending() async throws -> [BankStatementRow]
+    func listRows(status: String) async throws -> [BankStatementRow]
     func decide(rowId: String, input: BankDecisionInput) async throws
+    func listRentSchedules(months: Int) async throws -> [PaymentQueueItem]
 }
 
 @MainActor
@@ -95,12 +122,16 @@ struct LiveReconciliationClient: ReconciliationClient {
         if let env = try? JSONDecoder().decode(Envelope.self, from: data) { return env.data }
         return try JSONDecoder().decode(BankImportResult.self, from: data)
     }
-    func listPending() async throws -> [BankStatementRow] {
-        let env: APIListEnvelope<BankStatementRow> = try await APIClient.shared.requestRoot("/v1/bank-rows?status=pending", tokenProvider: token, refreshAndRetry: refresh)
+    func listRows(status: String) async throws -> [BankStatementRow] {
+        let env: APIListEnvelope<BankStatementRow> = try await APIClient.shared.requestRoot("/v1/bank-rows?status=\(status)", tokenProvider: token, refreshAndRetry: refresh)
         return env.data
     }
     func decide(rowId: String, input: BankDecisionInput) async throws {
         _ = try await APIClient.shared.requestData("/v1/bank-rows/\(rowId)/decision", method: "POST", body: input, tokenProvider: token, refreshAndRetry: refresh)
+    }
+    func listRentSchedules(months: Int = 24) async throws -> [PaymentQueueItem] {
+        let env: APIListEnvelope<PaymentQueueItem> = try await APIClient.shared.requestRoot("/v1/payment-queue?scope=upcoming&months=\(months)", tokenProvider: token, refreshAndRetry: refresh)
+        return env.data
     }
 }
 
@@ -109,6 +140,7 @@ struct LiveReconciliationClient: ReconciliationClient {
 @MainActor
 final class ReconciliationViewModel: ObservableObject {
     @Published private(set) var pending: [BankStatementRow] = []
+    @Published private(set) var confirmed: [BankStatementRow] = []
     @Published private(set) var lastImport: BankImportResult?
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
@@ -123,7 +155,10 @@ final class ReconciliationViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        do { pending = try await client.listPending() }
+        do {
+            pending = try await client.listRows(status: "pending")
+            confirmed = try await client.listRows(status: "confirmed")
+        }
         catch { errorMessage = "Не удалось загрузить строки выписки." }
     }
 
@@ -148,6 +183,14 @@ final class ReconciliationViewModel: ObservableObject {
 
     func ignore(_ row: BankStatementRow) async -> Bool {
         await decide(row, input: BankDecisionInput(action: "ignore", note: nil, parts: []))
+    }
+
+    func rollback(_ row: BankStatementRow) async -> Bool {
+        await decide(row, input: BankDecisionInput(
+            action: "rollback",
+            note: "Откат из iOS: строка возвращена для повторной сверки.",
+            parts: []
+        ))
     }
 
     private func decide(_ row: BankStatementRow, input: BankDecisionInput) async -> Bool {
@@ -196,6 +239,33 @@ final class ReconciliationViewModel: ObservableObject {
             type: row.amount >= 0 ? "income" : "expense",
             amount: abs(row.amount),
             description: row.description.isEmpty ? nil : row.description
+        )
+    }
+
+    /// Builds a reconciliation decision that posts the bank row as a rent
+    /// allocation for one schedule (`schedule_id`). The backend owns the actual
+    /// rent transaction/category/tenant linkage through MarkSchedulePaid.
+    nonisolated static func rentAllocationPart(row: BankStatementRow, scheduleId: String, amount: Double? = nil) -> BankDecisionPart {
+        BankDecisionPart(
+            propertyId: "",
+            categoryId: "",
+            type: "income",
+            amount: amount ?? abs(row.amount),
+            description: row.description.isEmpty ? nil : row.description,
+            scheduleId: scheduleId
+        )
+    }
+
+    /// Links the bank row to an existing transaction instead of creating a
+    /// duplicate operation. Rollback later removes only this bank-row link.
+    nonisolated static func existingTransactionPart(row: BankStatementRow, transactionId: String, amount: Double? = nil) -> BankDecisionPart {
+        BankDecisionPart(
+            propertyId: "",
+            categoryId: "",
+            type: row.amount >= 0 ? "income" : "expense",
+            amount: amount ?? abs(row.amount),
+            description: row.description.isEmpty ? nil : row.description,
+            transactionId: transactionId
         )
     }
 }
