@@ -2,8 +2,9 @@
 //  DocumentHubTests.swift
 //  managment-companyTests
 //
-//  Mirrored tests for GAP-044 (cross-portfolio document hub): list-path building
-//  with filters, entity-type labels, pagination/load-more, and delete + reload.
+//  Mirrored tests for GAP-044/GAP-047 (cross-portfolio document hub): list-path
+//  building with filters, entity-type labels, pagination/load-more, delete + reload,
+//  and property/tenant/date filter path construction.
 //
 
 import Foundation
@@ -25,11 +26,20 @@ private final class MockDocumentHubClient: DocumentHubClient {
     var fetchedPaths: [String] = []
     var deleted: [String] = []
 
-    func fetch(search: String, entityType: String, fileType: String, page: Int, perPage: Int) async throws -> (files: [DocumentFile], total: Int) {
-        fetchedPaths.append(DocumentHubViewModel.listPath(search: search, entityType: entityType, fileType: fileType, page: page, perPage: perPage))
+    func fetch(search: String, entityType: String, fileType: String,
+               propertyId: String, tenantId: String, dateFrom: String, dateTo: String,
+               page: Int, perPage: Int) async throws -> (files: [DocumentFile], total: Int) {
+        fetchedPaths.append(DocumentHubViewModel.listPath(
+            search: search, entityType: entityType, fileType: fileType,
+            propertyId: propertyId, tenantId: tenantId, dateFrom: dateFrom, dateTo: dateTo,
+            page: page, perPage: perPage
+        ))
         let idx = page - 1
         return (idx < pages.count ? pages[idx] : [], total)
     }
+
+    func fetchProperties() async throws -> [Property] { [] }
+    func fetchTenants() async throws -> [Tenant] { [] }
     func delete(id: String) async throws { deleted.append(id) }
 }
 
@@ -43,6 +53,37 @@ struct DocumentHubTests {
         #expect(withFilters.contains("entity_type=lease"))
         #expect(withFilters.contains("file_type=contract"))
         #expect(withFilters.contains("search="))
+    }
+
+    @Test func listPathIncludesPropertyAndTenantFilters() {
+        let path = DocumentHubViewModel.listPath(
+            search: "", entityType: "", fileType: "",
+            propertyId: "prop-uuid", tenantId: "tenant-uuid",
+            page: 1, perPage: 50
+        )
+        #expect(path.contains("property_id=prop-uuid"))
+        #expect(path.contains("tenant_id=tenant-uuid"))
+        #expect(!path.contains("date_from"))
+        #expect(!path.contains("date_to"))
+    }
+
+    @Test func listPathIncludesDateFilters() {
+        let path = DocumentHubViewModel.listPath(
+            search: "", entityType: "", fileType: "",
+            dateFrom: "2026-01-01", dateTo: "2026-06-30",
+            page: 1, perPage: 50
+        )
+        #expect(path.contains("date_from=2026-01-01"))
+        #expect(path.contains("date_to=2026-06-30"))
+    }
+
+    @Test func listPathOmitsEmptyFilters() {
+        let path = DocumentHubViewModel.listPath(
+            search: "", entityType: "", fileType: "",
+            propertyId: "", tenantId: "", dateFrom: "", dateTo: "",
+            page: 1, perPage: 50
+        )
+        #expect(path == "/v1/files?page=1&per_page=50")
     }
 
     @Test func entityTypeLabelMapsKnownTypes() {
@@ -79,5 +120,22 @@ struct DocumentHubTests {
         let ok = await vm.delete(file("a"))
         #expect(ok)
         #expect(client.deleted == ["a"])
+    }
+
+    @MainActor
+    @Test func hasActiveFiltersReflectsFilterState() {
+        let client = MockDocumentHubClient()
+        let vm = DocumentHubViewModel(client: client)
+        #expect(!vm.hasActiveFilters)
+
+        vm.propertyIdFilter = "some-id"
+        #expect(vm.hasActiveFilters)
+
+        vm.clearFilters()
+        #expect(!vm.hasActiveFilters)
+        #expect(vm.propertyIdFilter == "")
+        #expect(vm.tenantIdFilter == "")
+        #expect(vm.dateFromFilter == nil)
+        #expect(vm.dateToFilter == nil)
     }
 }
