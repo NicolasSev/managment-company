@@ -15,6 +15,8 @@ struct PaymentsQueueView: View {
     @State private var markPaidItem: PaymentQueueItem?
     @State private var skipCandidate: PaymentQueueItem?
     @State private var unpayCandidate: PaymentQueueItem?
+    /// Per-allocation history sheet (GAP-048).
+    @State private var allocationItem: PaymentQueueItem?
 
     /// When embedded inside another navigation container (the GAP-037 «Деньги»
     /// hub), the view skips its own `NavigationStack`.
@@ -62,6 +64,7 @@ struct PaymentsQueueView: View {
                 }
                 .environmentObject(authManager)
             }
+            .sheet(item: $allocationItem, content: allocationSheet)
             .confirmationDialog(
                 "Пропустить этот платёж?",
                 isPresented: Binding(
@@ -103,6 +106,16 @@ struct PaymentsQueueView: View {
             } message: { item in
                 Text("\(item.propertyName) · \(PaymentsQueueViewModel.periodLabel(of: item)) · \(AppFormatting.currency(item.actualAmount ?? item.expectedAmount, currency: item.currency)). Связанная операция дохода будет удалена, а платёж вернётся в очередь.")
             }
+    }
+
+    @ViewBuilder
+    private func allocationSheet(for item: PaymentQueueItem) -> some View {
+        AllocationHistorySheet(
+            item: item,
+            onAllocationReversed: { Task { await viewModel.load() } },
+            onFullRestore: { await viewModel.restore(item) }
+        )
+        .environmentObject(authManager)
     }
 
     private var horizonMenu: some View {
@@ -283,6 +296,11 @@ struct PaymentsQueueView: View {
                 rowActionButton(title: "Изменить", systemImage: "pencil") {
                     editingItem = item
                 }
+                if let count = item.allocationCount, count > 0 {
+                    rowActionButton(title: "Платежи (\(count))", systemImage: "list.bullet.clipboard") {
+                        allocationItem = item
+                    }
+                }
                 rowActionButton(title: "Оплачено", systemImage: "checkmark.circle") {
                     Task {
                         if await viewModel.markPaidToday(
@@ -363,25 +381,29 @@ struct PaymentsQueueView: View {
                 }
             }
 
-            if PaymentsQueueViewModel.restoreRequiresConfirmation(for: item) {
-                rowActionButton(
-                    title: "Отменить оплату",
-                    systemImage: "arrow.uturn.backward.circle",
-                    tint: AppTheme.Colors.danger
-                ) {
-                    unpayCandidate = item
+            HStack(spacing: AppTheme.Spacing.sm) {
+                rowActionButton(title: "Платежи", systemImage: "list.bullet.clipboard") {
+                    allocationItem = item
                 }
-                .disabled(viewModel.isMutating)
-            } else {
-                rowActionButton(title: "Вернуть в очередь", systemImage: "arrow.counterclockwise.circle") {
-                    Task {
-                        if await viewModel.restore(item) {
-                            AppHaptics.success()
+                if PaymentsQueueViewModel.restoreRequiresConfirmation(for: item) {
+                    rowActionButton(
+                        title: "Отменить оплату",
+                        systemImage: "arrow.uturn.backward.circle",
+                        tint: AppTheme.Colors.danger
+                    ) {
+                        unpayCandidate = item
+                    }
+                } else {
+                    rowActionButton(title: "Вернуть в очередь", systemImage: "arrow.counterclockwise.circle") {
+                        Task {
+                            if await viewModel.restore(item) {
+                                AppHaptics.success()
+                            }
                         }
                     }
                 }
-                .disabled(viewModel.isMutating)
             }
+            .disabled(viewModel.isMutating)
         }
     }
 

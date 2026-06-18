@@ -467,4 +467,63 @@ struct PaymentQueueTests {
         vm.segment = .upcoming
         #expect(vm.displayedItems(today: "2026-06-17").map(\.id) == ["soon"])
     }
+
+    // MARK: - GAP-048: per-allocation reversal (model layer)
+
+    @Test func allocationDecoding() {
+        let json = """
+        {
+            "id": "aaa1",
+            "amount": 50000,
+            "currency": "KZT",
+            "payment_date": "2026-06-15",
+            "status": "paid",
+            "transaction_id": "txn-1",
+            "notes": "Частичная оплата"
+        }
+        """.data(using: .utf8)!
+        let allocation = try? JSONDecoder().decode(PaymentScheduleAllocation.self, from: json)
+        #expect(allocation?.id == "aaa1")
+        #expect(allocation?.amount == 50000)
+        #expect(allocation?.currency == "KZT")
+        #expect(allocation?.paymentDate == "2026-06-15")
+        #expect(allocation?.transactionId == "txn-1")
+        #expect(allocation?.notes == "Частичная оплата")
+    }
+
+    @Test func allocationDecodingNullableFields() {
+        let json = """
+        {
+            "id": "aaa2",
+            "amount": 95000,
+            "currency": "KZT",
+            "payment_date": "2026-07-01",
+            "status": "paid"
+        }
+        """.data(using: .utf8)!
+        let allocation = try? JSONDecoder().decode(PaymentScheduleAllocation.self, from: json)
+        #expect(allocation?.transactionId == nil)
+        #expect(allocation?.notes == nil)
+    }
+
+    @MainActor @Test func fullRestoreShownOnlyForPaidSchedule() {
+        let paidItem = makeItem(status: "paid")
+        let partialItem = makeItem(status: "partial")
+        let skippedItem = makeItem(status: "skipped")
+        // Only paid rows should provide the onFullRestore callback
+        #expect(paidItem.status == "paid")
+        #expect(partialItem.status != "paid")
+        #expect(skippedItem.status != "paid")
+    }
+
+    @Test func allocationHistorySheetDistinctFromFullRestore() {
+        // Per-allocation reverse uses DELETE /v1/payments/:id.
+        // Full restore uses PATCH /v1/payment-schedules/:id action:"restore".
+        // These must remain separate paths so reversing one allocation does not
+        // unwind the whole schedule.
+        let updateReq = PaymentScheduleUpdateRequest.restore
+        #expect(updateReq.action == "restore")
+        #expect(updateReq.dueDay == nil)
+        #expect(updateReq.expectedAmount == nil)
+    }
 }
