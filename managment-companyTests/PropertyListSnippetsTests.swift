@@ -99,6 +99,72 @@ struct PropertyListSnippetsTests {
         #expect(PropertyListSnippetLogic.utilityTypeLabel("cold_water") == "Холодная вода")
     }
 
+    @Test func utilitySummarySumsAllLinesOfLatestReceipt() {
+        let utilities = [
+            makeUtility(
+                id: "may", year: 2026, month: 5, paidAt: "2026-05-30",
+                receiptId: "receipt-may", amount: 9999, utilityType: "utilities"
+            ),
+            makeUtility(
+                id: "june-water", year: 2026, month: 6, paidAt: "2026-06-10",
+                receiptId: "receipt-june", amount: 1155, utilityType: "cold_water"
+            ),
+            makeUtility(
+                id: "june-power", year: 2026, month: 6, paidAt: "2026-06-09",
+                receiptId: "receipt-june", amount: 8200, utilityType: "electricity"
+            ),
+            makeUtility(
+                id: "june-gas", year: 2026, month: 6, paidAt: "2026-06-08",
+                receiptId: "receipt-june", amount: 1300, utilityType: "gas"
+            ),
+        ]
+
+        let summary = PropertyListSnippetLogic.utilitySummary(utilities)
+
+        #expect(summary?.receiptId == "receipt-june")
+        #expect(summary?.amount == 10_655.0)
+        #expect(summary?.lineCount == 3)
+        #expect(summary?.detail == "Алсеко · июнь 2026")
+    }
+
+    @Test func utilitySummaryKeepsTypeDetailForSingleLineReceipt() {
+        let utilities = [
+            makeUtility(
+                id: "june", year: 2026, month: 6, paidAt: "2026-06-10",
+                receiptId: "receipt-june", amount: 15253,
+                utilityType: "utilities", provider: "АЛСЕКО"
+            ),
+        ]
+
+        let summary = PropertyListSnippetLogic.utilitySummary(utilities)
+
+        #expect(summary?.amount == 15253)
+        #expect(summary?.receiptId == "receipt-june")
+        #expect(summary?.lineCount == 1)
+        #expect(summary?.detail == "Коммуналка · АЛСЕКО · июнь 2026")
+    }
+
+    @Test func utilitySummaryShowsSingleLineForManualRecordWithoutReceipt() {
+        let utilities = [
+            makeUtility(
+                id: "june", year: 2026, month: 6, paidAt: "2026-06-10",
+                receiptId: nil, amount: 4200,
+                utilityType: "electricity", provider: "АЖК"
+            ),
+        ]
+
+        let summary = PropertyListSnippetLogic.utilitySummary(utilities)
+
+        #expect(summary?.amount == 4200)
+        #expect(summary?.receiptId == nil)
+        #expect(summary?.lineCount == 1)
+        #expect(summary?.detail == "Электричество · АЖК · июнь 2026")
+    }
+
+    @Test func utilitySummaryIsNilWhenNoRecords() {
+        #expect(PropertyListSnippetLogic.utilitySummary([]) == nil)
+    }
+
     private func makeProperty(status: String) -> Property {
         Property(
             id: "property-a",
@@ -193,7 +259,11 @@ struct PropertyListSnippetsTests {
         year: Int,
         month: Int,
         paidAt: String?,
-        receiptId: String?
+        receiptId: String?,
+        amount: Double = 5000,
+        utilityType: String = "cold_water",
+        provider: String? = "Алсеко",
+        currency: String = "KZT"
     ) -> PropertyUtility {
         PropertyUtility(
             id: id,
@@ -202,10 +272,10 @@ struct PropertyListSnippetsTests {
             leaseId: nil,
             periodYear: year,
             periodMonth: month,
-            utilityType: "cold_water",
-            provider: "Алсеко",
-            amount: 5000,
-            currency: "KZT",
+            utilityType: utilityType,
+            provider: provider,
+            amount: amount,
+            currency: currency,
             dueDate: "2026-06-15",
             paidAt: paidAt,
             status: "paid",

@@ -616,7 +616,7 @@ struct PropertyRowView: View {
         )
     }
 
-    private func utilitySnippet(_ utility: PropertyUtility?) -> some View {
+    private func utilitySnippet(_ utility: PropertyUtilitySnippet?) -> some View {
         guard let utility else {
             return snippetMetric(
                 icon: "doc.text",
@@ -629,28 +629,14 @@ struct PropertyRowView: View {
             )
         }
 
-        let type = PropertyListSnippetLogic.utilityTypeLabel(utility.utilityType)
-        let period = PropertyListSnippetLogic.utilityPeriodLabel(
-            year: utility.periodYear,
-            month: utility.periodMonth
-        )
-        let provider = utility.provider?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let detail = provider?.isEmpty == false
-            ? "\(type) · \(provider!) · \(period)"
-            : "\(type) · \(period)"
-        let receiptId = utility.sourceReceiptId?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfBlank
-
         return snippetMetric(
             icon: "doc.text",
             title: "Коммуналка",
             value: AppFormatting.compactAmount(utility.amount, currency: utility.currency),
-            detail: detail,
+            detail: utility.detail,
             status: nil,
             statusColor: nil,
-            action: receiptId.map { id in { onOpenReceipt(id) } }
+            action: utility.receiptId.map { id in { onOpenReceipt(id) } }
         )
     }
 

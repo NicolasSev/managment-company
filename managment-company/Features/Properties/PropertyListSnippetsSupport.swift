@@ -13,10 +13,21 @@ struct PropertyTenantSnippet: Equatable {
     let relevantDate: String?
 }
 
+/// Коммуналка-сниппет показывает сумму последней квитанции, а не одну её строку.
+/// Квитанция — это один документ за период; вода / свет / газ — её строки,
+/// объединённые общим `sourceReceiptId`.
+struct PropertyUtilitySnippet: Equatable {
+    let amount: Double
+    let currency: String
+    let detail: String
+    let receiptId: String?
+    let lineCount: Int
+}
+
 struct PropertyListSnippetSummary {
     let tenant: PropertyTenantSnippet
     let payment: Transaction?
-    let utility: PropertyUtility?
+    let utility: PropertyUtilitySnippet?
 }
 
 enum PropertyListSnippetLogic {
@@ -36,7 +47,7 @@ enum PropertyListSnippetLogic {
                 today: today
             ),
             payment: latestIncome(transactions),
-            utility: latestUtility(utilities)
+            utility: utilitySummary(utilities)
         )
     }
 
@@ -108,8 +119,64 @@ enum PropertyListSnippetLogic {
         }.first
     }
 
+    /// Сумма последней квитанции (всех её строк), а не одной записи. Строки
+    /// группируются по `sourceReceiptId` и суммируются в валюте квитанции.
+    /// Запись без квитанции (ручной ввод) показывается как одна строка.
+    static func utilitySummary(_ utilities: [PropertyUtility]) -> PropertyUtilitySnippet? {
+        guard let latest = latestUtility(utilities) else { return nil }
+
+        let period = utilityPeriodLabel(year: latest.periodYear, month: latest.periodMonth)
+        let receiptId = latest.sourceReceiptId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfBlank
+
+        if let receiptId {
+            let lines = utilities.filter { utility in
+                let id = utility.sourceReceiptId?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .nilIfBlank
+                return id == receiptId && utility.currency == latest.currency
+            }
+            let total = lines.reduce(0) { $0 + $1.amount }
+            let providers = Set(
+                lines.compactMap {
+                    $0.provider?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+                }
+            )
+            let provider = providers.count == 1 ? providers.first : nil
+            let detail: String
+            if lines.count == 1 {
+                let type = utilityTypeLabel(latest.utilityType)
+                detail = provider.map { "\(type) · \($0) · \(period)" } ?? "\(type) · \(period)"
+            } else {
+                detail = provider.map { "\($0) · \(period)" } ?? period
+            }
+            return PropertyUtilitySnippet(
+                amount: total,
+                currency: latest.currency,
+                detail: detail,
+                receiptId: receiptId,
+                lineCount: lines.count
+            )
+        }
+
+        let type = utilityTypeLabel(latest.utilityType)
+        let provider = latest.provider?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfBlank
+        let detail = provider.map { "\(type) · \($0) · \(period)" } ?? "\(type) · \(period)"
+        return PropertyUtilitySnippet(
+            amount: latest.amount,
+            currency: latest.currency,
+            detail: detail,
+            receiptId: nil,
+            lineCount: 1
+        )
+    }
+
     static func utilityTypeLabel(_ type: String) -> String {
         switch type {
+        case "utilities": return "Коммуналка"
         case "electricity": return "Электричество"
         case "cold_water": return "Холодная вода"
         case "hot_water": return "Горячая вода"
