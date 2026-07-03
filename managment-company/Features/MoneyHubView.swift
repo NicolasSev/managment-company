@@ -4,6 +4,8 @@ import SwiftUI
 /// the two separate money routes — the rent collection queue (`Платежи`) and
 /// the operations ledger (`Операции`) — under one entry without merging their
 /// backend concepts. Each child is embedded (no own `NavigationStack`).
+/// «Личные» (GAP-050) — тонкий клиент внешнего portfolio-dashboard API для личных
+/// трат/доходов; он не смешивается с арендным доменом и не пишет в базу PropManager.
 struct MoneyHubView: View {
     let authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
@@ -11,8 +13,15 @@ struct MoneyHubView: View {
     enum MoneySegment: String, CaseIterable, Identifiable {
         case payments
         case operations
+        case personal
         var id: String { rawValue }
-        var title: String { self == .payments ? "Платежи" : "Операции" }
+        var title: String {
+            switch self {
+            case .payments: return "Платежи"
+            case .operations: return "Операции"
+            case .personal: return "Личные"
+            }
+        }
     }
 
     @State private var segment: MoneySegment = .payments
@@ -32,6 +41,8 @@ struct MoneyHubView: View {
                     PaymentsQueueView(authManager: authManager, embedded: true)
                 case .operations:
                     TransactionsListView(embedded: true)
+                case .personal:
+                    PersonalFinanceView(embedded: true)
                 }
             }
         }
