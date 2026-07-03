@@ -19,6 +19,9 @@ private final class MockPaymentQueueClient: PaymentQueueClient {
     var updates: [(scheduleId: String, body: PaymentScheduleUpdateRequest)] = []
     var markPaidCalls: [(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String)] = []
     var updateError: Error?
+    /// Per-schedule mark-paid failures (GAP-050: a failing batch row must not
+    /// abort the rest).
+    var markPaidErrorScheduleIds: Set<String> = []
 
     func fetchQueue(scope: PaymentQueueScope, months: Int) async throws -> [PaymentQueueItem] {
         fetchedScopes.append(scope)
@@ -33,6 +36,7 @@ private final class MockPaymentQueueClient: PaymentQueueClient {
 
     func markPaid(scheduleId: String, body: MarkSchedulePaidRequest, idempotencyKey: String) async throws {
         if let updateError { throw updateError }
+        if markPaidErrorScheduleIds.contains(scheduleId) { throw APIError.httpStatus(500) }
         markPaidCalls.append((scheduleId, body, idempotencyKey))
     }
 }
@@ -49,7 +53,8 @@ private func makeItem(
     status: String = "pending",
     isOverdue: Bool = false,
     daysOverdue: Int = 0,
-    remainingAmount: Double? = nil
+    remainingAmount: Double? = nil,
+    propertyName: String = "Flat A"
 ) -> PaymentQueueItem {
     PaymentQueueItem(
         id: id,
@@ -65,7 +70,7 @@ private func makeItem(
         isOverdue: isOverdue,
         daysOverdue: daysOverdue,
         propertyId: "00000000-0000-0000-0000-00000000000c",
-        propertyName: "Flat A",
+        propertyName: propertyName,
         propertyAddress: "Street 1",
         tenantId: "00000000-0000-0000-0000-00000000000d",
         tenantName: "Иван",
@@ -466,6 +471,120 @@ struct PaymentQueueTests {
 
         vm.segment = .upcoming
         #expect(vm.displayedItems(today: "2026-06-17").map(\.id) == ["soon"])
+    }
+
+    // MARK: GAP-050 — batch mark-paid
+
+    @MainActor
+    @Test func selectionTotalsSumOutstandingPerCurrency() {
+        let items = [
+            makeItem(id: "1", expectedAmount: 100000, currency: "KZT", remainingAmount: 40000),
+            makeItem(id: "2", expectedAmount: 300, currency: "USD"),
+            makeItem(id: "3", expectedAmount: 50000, currency: "KZT"),
+        ]
+        let totals = PaymentsQueueViewModel.selectionTotals(items: items)
+        #expect(totals.count == 2)
+        #expect(totals[0].currency == "KZT")
+        #expect(totals[0].total == 90000) // 40000 remaining + 50000 full
+        #expect(totals[1].currency == "USD")
+        #expect(totals[1].total == 300)
+    }
+
+    @MainActor
+    @Test func selectedRowsIgnoreIdsThatLeftTheQueue() {
+        let vm = PaymentsQueueViewModel(client: MockPaymentQueueClient())
+        vm.selectedIds = ["gone", "kept"]
+        let rows = [makeItem(id: "kept"), makeItem(id: "other")]
+        #expect(vm.selectedRows(in: rows).map(\.id) == ["kept"])
+    }
+
+    @MainActor
+    @Test func toggleSelectAllSelectsThenClears() {
+        let vm = PaymentsQueueViewModel(client: MockPaymentQueueClient())
+        let rows = [makeItem(id: "1"), makeItem(id: "2")]
+
+        vm.toggleSelectAll(rows: rows)
+        #expect(vm.selectedIds == ["1", "2"])
+
+        vm.toggleSelectAll(rows: rows)
+        #expect(vm.selectedIds.isEmpty)
+    }
+
+    @MainActor
+    @Test func segmentChangeClearsSelection() {
+        let vm = PaymentsQueueViewModel(client: MockPaymentQueueClient())
+        vm.selectedIds = ["1"]
+        vm.segment = .today
+        #expect(vm.selectedIds.isEmpty)
+    }
+
+    /// Every selected row settles for its outstanding balance with today's
+    /// actual date and the single-action idempotency key shape; the selection
+    /// empties and the queue reloads once.
+    @MainActor
+    @Test func batchMarkPaidSettlesEverySelectedRowWithTodayDate() async throws {
+        let iso = ISO8601DateFormatter()
+        let now = try #require(iso.date(from: "2026-07-03T09:00:00Z"))
+        let client = MockPaymentQueueClient()
+        let full = makeItem(id: "full", dueDate: "2026-05-05", expectedAmount: 95000, isOverdue: true)
+        let partial = makeItem(id: "partial", expectedAmount: 100000, remainingAmount: 40000)
+        client.queue = [full, partial]
+        let vm = PaymentsQueueViewModel(client: client)
+        await vm.load()
+        vm.selectedIds = ["full", "partial"]
+        client.queue = []
+
+        let result = await vm.batchMarkPaid(
+            rows: [full, partial],
+            timeZoneIdentifier: "Asia/Almaty",
+            now: now
+        )
+
+        #expect(result == BatchMarkPaidResult(succeeded: 2, failedPropertyNames: []))
+        #expect(client.markPaidCalls.count == 2)
+        #expect(client.markPaidCalls[0].scheduleId == "full")
+        #expect(client.markPaidCalls[0].body.amount == 95000)
+        #expect(client.markPaidCalls[0].body.paymentDate == "2026-07-03")
+        #expect(client.markPaidCalls[0].idempotencyKey == "ios-queue-full-2026-07-03")
+        #expect(client.markPaidCalls[1].scheduleId == "partial")
+        #expect(client.markPaidCalls[1].body.amount == 40000)
+        #expect(vm.selectedIds.isEmpty)
+        #expect(vm.errorMessage == nil)
+        #expect(vm.items.isEmpty)
+    }
+
+    /// A failing row is reported by property name, does not abort the rest,
+    /// and stays selected for a retry.
+    @MainActor
+    @Test func batchMarkPaidContinuesAfterRowFailure() async {
+        let client = MockPaymentQueueClient()
+        let good = makeItem(id: "good", propertyName: "Flat A")
+        let bad = makeItem(id: "bad", propertyName: "Flat B")
+        client.queue = [good, bad]
+        client.markPaidErrorScheduleIds = ["bad"]
+        let vm = PaymentsQueueViewModel(client: client)
+        await vm.load()
+        vm.selectedIds = ["good", "bad"]
+
+        let result = await vm.batchMarkPaid(rows: [good, bad], timeZoneIdentifier: "Asia/Almaty")
+
+        #expect(result.succeeded == 1)
+        #expect(result.failedPropertyNames == ["Flat B"])
+        #expect(client.markPaidCalls.map(\.scheduleId) == ["good"])
+        #expect(vm.selectedIds == ["bad"])
+        #expect(vm.errorMessage == "Не удалось отметить: Flat B.")
+    }
+
+    @MainActor
+    @Test func batchMarkPaidWithEmptySelectionIsANoOp() async {
+        let client = MockPaymentQueueClient()
+        let vm = PaymentsQueueViewModel(client: client)
+
+        let result = await vm.batchMarkPaid(rows: [makeItem()], timeZoneIdentifier: "Asia/Almaty")
+
+        #expect(result == BatchMarkPaidResult(succeeded: 0, failedPropertyNames: []))
+        #expect(client.markPaidCalls.isEmpty)
+        #expect(client.fetchedScopes.isEmpty)
     }
 
     // MARK: - GAP-048: per-allocation reversal (model layer)

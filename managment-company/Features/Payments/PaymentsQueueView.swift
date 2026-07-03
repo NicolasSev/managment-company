@@ -15,6 +15,8 @@ struct PaymentsQueueView: View {
     @State private var markPaidItem: PaymentQueueItem?
     @State private var skipCandidate: PaymentQueueItem?
     @State private var unpayCandidate: PaymentQueueItem?
+    /// Batch mark-paid confirmation (GAP-050).
+    @State private var batchConfirmPresented = false
     /// Per-allocation history sheet (GAP-048).
     @State private var allocationItem: PaymentQueueItem?
 
@@ -165,6 +167,10 @@ struct PaymentsQueueView: View {
                         emptyState
                     } else {
                         summaryLine(rows)
+                        if viewModel.segment != .history,
+                           !viewModel.selectedRows(in: rows).isEmpty {
+                            selectionBar(rows)
+                        }
                         rowsSection(rows)
                     }
                 }
@@ -235,8 +241,79 @@ struct PaymentsQueueView: View {
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.Colors.textSecondary)
             Spacer()
+            if viewModel.segment != .history {
+                Button {
+                    viewModel.toggleSelectAll(rows: rows)
+                } label: {
+                    Text(
+                        viewModel.selectedRows(in: rows).count == rows.count
+                            ? "Снять выбор"
+                            : "Выбрать все"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .disabled(viewModel.isBatchRunning)
+                .accessibilityLabel("Выбрать все платежи")
+            }
         }
         .padding(.horizontal, AppTheme.Spacing.xs)
+    }
+
+    /// Selection bar for batch mark-paid (GAP-050): count, per-currency
+    /// outstanding totals, clear + one confirmed batch action.
+    private func selectionBar(_ rows: [PaymentQueueItem]) -> some View {
+        let selected = viewModel.selectedRows(in: rows)
+        let totals = PaymentsQueueViewModel.selectionTotals(items: selected)
+        return SurfaceCard(padding: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                HStack {
+                    Text("Выбрано: \(selected.count)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    Spacer()
+                    Button("Сбросить") {
+                        viewModel.selectedIds = []
+                    }
+                    .font(.caption.weight(.semibold))
+                    .disabled(viewModel.isBatchRunning)
+                }
+                ForEach(totals, id: \.currency) { entry in
+                    Text("К получению: \(AppFormatting.currency(entry.total, currency: entry.currency))")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+                rowActionButton(
+                    title: viewModel.isBatchRunning ? "Записываем…" : "Отметить оплаченными (\(selected.count))",
+                    systemImage: "checkmark.circle"
+                ) {
+                    batchConfirmPresented = true
+                }
+                .disabled(viewModel.isBatchRunning)
+            }
+        }
+        .confirmationDialog(
+            "Отметить оплаченными?",
+            isPresented: $batchConfirmPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Оплачено (\(selected.count))") {
+                Task {
+                    let result = await viewModel.batchMarkPaid(
+                        rows: viewModel.displayedItems(today: today),
+                        timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty"
+                    )
+                    if result.succeeded > 0 {
+                        AppHaptics.success()
+                    }
+                }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            let totalsText = totals
+                .map { AppFormatting.currency($0.total, currency: $0.currency) }
+                .joined(separator: " + ")
+            Text("Платежей: \(selected.count) на \(totalsText). Каждый будет закрыт на остаток суммы с сегодняшней датой получения; плановая дата и период не меняются.")
+        }
     }
 
     private func rowsSection(_ rows: [PaymentQueueItem]) -> some View {
@@ -254,8 +331,20 @@ struct PaymentsQueueView: View {
     }
 
     private func upcomingRow(_ item: PaymentQueueItem) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+        let isSelected = viewModel.selectedIds.contains(item.id)
+        return VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
             HStack(alignment: .top) {
+                Button {
+                    viewModel.toggleSelection(item)
+                } label: {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isBatchRunning)
+                .accessibilityLabel("Выбрать платёж: \(item.propertyName)")
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(AppFormatting.dateString(from: item.dueDate) ?? item.dueDate)
                         .font(.headline)

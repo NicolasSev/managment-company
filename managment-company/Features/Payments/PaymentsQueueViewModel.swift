@@ -65,6 +65,13 @@ final class PaymentsOverdueBadge: ObservableObject {
     private init() {}
 }
 
+/// Outcome of one batch mark-paid run (GAP-050): settled row count plus the
+/// property names of rows that failed. A failing row never aborts the rest.
+struct BatchMarkPaidResult: Equatable {
+    let succeeded: Int
+    let failedPropertyNames: [String]
+}
+
 /// Transport seam for `PaymentsQueueViewModel` so the logic is unit-testable
 /// without URLSession (mirrored test obligation for GAP-026).
 protocol PaymentQueueClient {
@@ -121,8 +128,17 @@ final class PaymentsQueueViewModel: ObservableObject {
     @Published var scope: PaymentQueueScope = .upcoming
     @Published var months = 3
     @Published var segment: PaymentCollectionSegment = .overdue {
-        didSet { scope = segment.scope }
+        didSet {
+            scope = segment.scope
+            // Selection is per-segment (GAP-050): switching segments must not
+            // silently carry hidden rows into the next batch confirmation.
+            selectedIds = []
+        }
     }
+    /// Multi-select state for batch mark-paid (GAP-050). History rows are never
+    /// selectable; ids of rows that leave the queue drop out via `selectedRows`.
+    @Published var selectedIds: Set<String> = []
+    @Published private(set) var isBatchRunning = false
     /// Last-known overdue rows, retained across segments so the summary + tab
     /// badge stay correct even while viewing history.
     @Published private(set) var overdueItems: [PaymentQueueItem] = []
@@ -206,6 +222,87 @@ final class PaymentsQueueViewModel: ObservableObject {
             errorMessage = "Не удалось отметить оплату."
             return false
         }
+    }
+
+    // MARK: - Batch mark-paid (GAP-050)
+
+    /// Rows of the current segment that are actually selected. This is the
+    /// effective selection: ids whose rows left the queue are ignored.
+    func selectedRows(in rows: [PaymentQueueItem]) -> [PaymentQueueItem] {
+        rows.filter { selectedIds.contains($0.id) }
+    }
+
+    func toggleSelection(_ item: PaymentQueueItem) {
+        if selectedIds.contains(item.id) {
+            selectedIds.remove(item.id)
+        } else {
+            selectedIds.insert(item.id)
+        }
+    }
+
+    /// Header select-all over the visible segment rows: selects all when any
+    /// are unselected, clears otherwise (same as the web header checkbox).
+    func toggleSelectAll(rows: [PaymentQueueItem]) {
+        if selectedRows(in: rows).count == rows.count, !rows.isEmpty {
+            selectedIds = []
+        } else {
+            selectedIds = Set(rows.map(\.id))
+        }
+    }
+
+    /// Settles every selected row for its outstanding balance with today's
+    /// actual date (GAP-030 semantics per row) through the same idempotent
+    /// mark-paid call as the single fast action. Sequential on purpose: rows
+    /// are few and each success must leave the selection even if a later row
+    /// fails. Failures are collected by property name and never abort the run.
+    func batchMarkPaid(
+        rows: [PaymentQueueItem],
+        timeZoneIdentifier: String,
+        now: Date = Date()
+    ) async -> BatchMarkPaidResult {
+        let targets = selectedRows(in: rows)
+        guard !targets.isEmpty else {
+            return BatchMarkPaidResult(succeeded: 0, failedPropertyNames: [])
+        }
+        isBatchRunning = true
+        isMutating = true
+        errorMessage = nil
+        defer {
+            isBatchRunning = false
+            isMutating = false
+        }
+        var succeeded = 0
+        var failed: [String] = []
+        for item in targets {
+            let body = Self.fastMarkPaidBody(for: item, timeZoneIdentifier: timeZoneIdentifier, now: now)
+            // Same key shape as the single fast action, so a batch retry after
+            // an interruption cannot double-record a row settled either way.
+            let idempotencyKey = "ios-queue-\(item.id)-\(body.paymentDate ?? "")"
+            do {
+                try await client.markPaid(scheduleId: item.id, body: body, idempotencyKey: idempotencyKey)
+                succeeded += 1
+                selectedIds.remove(item.id)
+            } catch {
+                failed.append(item.propertyName)
+            }
+        }
+        await load()
+        if !failed.isEmpty {
+            errorMessage = "Не удалось отметить: \(failed.joined(separator: ", "))."
+        }
+        return BatchMarkPaidResult(succeeded: succeeded, failedPropertyNames: failed)
+    }
+
+    /// Per-currency outstanding totals of the selected rows, first-appearance
+    /// order — shown in the selection bar and the batch confirmation.
+    static func selectionTotals(items: [PaymentQueueItem]) -> [(currency: String, total: Double)] {
+        var order: [String] = []
+        var sums: [String: Double] = [:]
+        for item in items {
+            if sums[item.currency] == nil { order.append(item.currency) }
+            sums[item.currency, default: 0] += item.outstandingAmount
+        }
+        return order.map { ($0, sums[$0] ?? 0) }
     }
 
     /// Applies the edit-sheet result: day first, then amount — one intent per
