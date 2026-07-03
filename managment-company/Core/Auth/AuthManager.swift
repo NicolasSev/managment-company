@@ -61,6 +61,14 @@ class AuthManager: ObservableObject {
     }
     
     init() {
+        #if DEBUG
+        // UI-тесты стартуют с чистой сессией: без этого удачный логин одного
+        // теста оседает в keychain симулятора и следующий cold launch
+        // показывает дашборд вместо экрана входа.
+        if ProcessInfo.processInfo.arguments.contains("--uitest-reset-auth") {
+            _ = keychain.clearTokens()
+        }
+        #endif
         restoreFromKeychain()
     }
     

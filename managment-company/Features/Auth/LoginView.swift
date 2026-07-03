@@ -127,6 +127,13 @@ struct LoginView: View {
             }
             .onAppear {
                 #if DEBUG
+                // UI-тесты: клавиатурный ввод в SecureField на симуляторах
+                // теряет клавиши с неактивной раскладки, поэтому пароль
+                // подставляется напрямую из окружения запуска.
+                if let prefill = ProcessInfo.processInfo.environment["UITEST_PASSWORD"],
+                   !prefill.isEmpty {
+                    password = prefill
+                }
                 Task { await checkAPIHealth() }
                 #endif
             }
