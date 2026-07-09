@@ -57,6 +57,14 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.nicolascooper.rentfolio.refresh-live-activity-token</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

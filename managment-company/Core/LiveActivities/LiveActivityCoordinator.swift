@@ -1,10 +1,55 @@
 #if os(iOS)
 import ActivityKit
+import BackgroundTasks
 import Combine
 import Foundation
 import os.log
 
 private let liveActivityLog = Logger(subsystem: "com.nicolascooper.rentfolio", category: "LiveActivity")
+
+/// Daily best-effort refresh of the push-to-start token for a rarely-opened app.
+///
+/// Push-to-start tokens are handed to the app only while it runs; a mostly-closed
+/// app would otherwise never re-send a rotated token and the server's copy would
+/// silently go stale. This schedules a `BGAppRefreshTask` roughly once a day that
+/// grabs the current token and re-registers it. Best-effort by nature: iOS picks
+/// the actual moment and will not run it at all while the app is force-quit — the
+/// foreground path in `LiveActivityCoordinator` remains the primary refresh.
+enum LiveActivityBackgroundRefresh {
+    static let taskIdentifier = "com.nicolascooper.rentfolio.refresh-live-activity-token"
+
+    /// Ask the system to run our refresh in ~24h. Registration is handled by the
+    /// SwiftUI `.backgroundTask(.appRefresh:)` modifier; here we only submit the
+    /// request. Call on entering background and again after each run.
+    static func schedule() {
+        let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
+        request.earliestBeginDate = Date().addingTimeInterval(24 * 60 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            liveActivityLog.error("schedule token refresh failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// One-shot body invoked from the app's `.backgroundTask` handler: restore the
+    /// session from Keychain, take the current push-to-start token that ActivityKit
+    /// emits on subscription, and re-register it. Respects task cancellation (the
+    /// background budget) so it never hangs when no token is available.
+    @available(iOS 17.2, *)
+    static func run() async {
+        let auth = await MainActor.run { AuthManager() }
+        guard await MainActor.run(body: { auth.isAuthenticated }) else {
+            liveActivityLog.notice("bg token refresh skipped: not authenticated")
+            return
+        }
+        for await tokenData in Activity<RentPaymentAttributes>.pushToStartTokenUpdates {
+            let hex = tokenData.map { String(format: "%02x", $0) }.joined()
+            await LiveActivityAPI.registerStartToken(hex, auth: auth)
+            liveActivityLog.notice("bg token refresh: re-registered push-to-start token")
+            return
+        }
+    }
+}
 
 /// Subscribes to ActivityKit token streams and reports them back to the API so
 /// the backend can deliver push-to-start and update pushes for rent payment
