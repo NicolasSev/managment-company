@@ -4,6 +4,7 @@ import SwiftUI
 
 struct NotificationRoute: Identifiable, Equatable {
     enum Kind: Equatable {
+        case today
         case dashboard
         case transactions
         case transaction(String)
@@ -19,6 +20,8 @@ struct NotificationRoute: Identifiable, Equatable {
 
     var tab: AppTab {
         switch kind {
+        case .today:
+            return .today
         case .dashboard:
             return .dashboard
         case .transactions, .transaction:
@@ -59,6 +62,11 @@ struct NotificationRoute: Identifiable, Equatable {
 
         if let taskId, !taskId.isEmpty {
             self.init(kind: .task(taskId))
+            return
+        }
+
+        if notificationType == "daily_summary" || entityType == "today" {
+            self.init(kind: .today)
             return
         }
 
