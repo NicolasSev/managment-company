@@ -126,6 +126,10 @@ final class LiveActivityCoordinator: ObservableObject {
             let reason = wantedIds.contains(scheduleId) ? "respawning" : "orphan"
             liveActivityLog.notice("ending \(reason, privacy: .public) activity id=\(activity.id, privacy: .public) schedule=\(scheduleId, privacy: .public)")
             await activity.end(nil, dismissalPolicy: .immediate)
+            // Report the end so the backend frees the update-token slot instead of
+            // leaving it 'active' forever (stranded tokens otherwise saturate the
+            // per-user cap and block backend push-to-start).
+            await LiveActivityAPI.endActivity(activityId: activity.id, auth: auth)
         }
 
         for reminder in reminders {
