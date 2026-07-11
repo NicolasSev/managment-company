@@ -71,11 +71,17 @@ final class LiveActivityCoordinator: ObservableObject {
 
     func start(with authManager: AuthManager) {
         self.authManager = authManager
+        // App Intents launched from a Live Activity execute in the app process,
+        // but they do not receive SwiftUI environment objects. Keep the shared
+        // intent bridge wired to the live auth session; without this, tapping
+        // "Оплачено" returns successfully but never calls the mark-paid API.
+        RentReminderActions.authManager = authManager
         startPushToStartListener()
         startActivityListener()
     }
 
     func stop() {
+        RentReminderActions.authManager = nil
         pushToStartTask?.cancel()
         activityListenerTask?.cancel()
         pushToStartTask = nil

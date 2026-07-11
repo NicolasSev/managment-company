@@ -77,6 +77,21 @@ private func makeItem(
 @Suite(.serialized)
 struct PaymentQueueTests {
 
+    // MARK: Live Activity intent bridge
+
+    @MainActor
+    @Test func liveActivityCoordinatorWiresIntentAuthBridge() {
+        let auth = AuthManager()
+        let coordinator = LiveActivityCoordinator()
+
+        #expect(RentReminderActions.authManager == nil)
+        coordinator.start(with: auth)
+        #expect(RentReminderActions.authManager === auth)
+
+        coordinator.stop()
+        #expect(RentReminderActions.authManager == nil)
+    }
+
     // MARK: Wire decoding
 
     @Test func decodesPaymentQueueListEnvelope() throws {
