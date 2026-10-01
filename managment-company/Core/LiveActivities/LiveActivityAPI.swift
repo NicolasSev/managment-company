@@ -57,6 +57,24 @@ enum LiveActivityAPI {
         }
     }
 
+    /// Tells the backend an activity was ended locally so it can mark the update
+    /// token ended and free a concurrency slot. Best-effort: the backend also
+    /// ages stale update tokens out of the per-user cap.
+    static func endActivity(activityId: String, auth: AuthManager) async {
+        guard auth.isAuthenticated else { return }
+        do {
+            _ = try await APIClient.shared.requestData(
+                "/v1/live-activities/\(activityId)/end",
+                method: "POST",
+                body: Optional<String>.none as Encodable?,
+                tokenProvider: { auth.accessToken },
+                refreshAndRetry: { await auth.refreshToken() }
+            )
+        } catch {
+            // best-effort
+        }
+    }
+
     static func markPaid(scheduleId: String, amount: Double, currency: String, auth: AuthManager) async throws {
         // GAP-030: actual receipt date is today in the user's configured timezone,
         // derived through the shared `AppFormatting.dayKey` helper — never a due date.

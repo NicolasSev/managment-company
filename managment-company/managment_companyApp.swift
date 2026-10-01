@@ -8,6 +8,7 @@ private struct AppRootView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var pushRegistration: PushDeviceRegistrationController
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @EnvironmentObject private var liveActivityCoordinator: LiveActivityCoordinator
 
     var body: some View {
         Group {
@@ -27,17 +28,34 @@ private struct AppRootView: View {
                 PendingMutationQueue.shared.startMonitoring(authManager: authManager)
                 await PendingMutationQueue.shared.processQueue(authManager: authManager)
                 await pushRegistration.syncRegistration(with: authManager)
+                // Observe push-to-start / activity tokens and reconcile any due
+                // rent Live Activities. This also re-registers a fresh
+                // push-to-start token on every launch (Apple's guidance for
+                // keeping the token live server-side).
+                liveActivityCoordinator.start(with: authManager)
+                await liveActivityCoordinator.syncLocalActivities()
             } else {
                 PendingMutationQueue.shared.stopMonitoring()
                 DashboardOverviewCache.clear()
                 pushRegistration.resetForLogout()
+                liveActivityCoordinator.stop()
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .active, authManager.isAuthenticated else { return }
-            Task {
-                await PendingMutationQueue.shared.processQueue(authManager: authManager)
-                await pushRegistration.syncRegistration(with: authManager)
+            switch newPhase {
+            case .active:
+                guard authManager.isAuthenticated else { return }
+                Task {
+                    await PendingMutationQueue.shared.processQueue(authManager: authManager)
+                    await pushRegistration.syncRegistration(with: authManager)
+                    await liveActivityCoordinator.syncLocalActivities()
+                }
+            case .background:
+                // Arm the daily push-to-start token refresh so a mostly-closed
+                // app keeps a live token server-side.
+                LiveActivityBackgroundRefresh.schedule()
+            default:
+                break
             }
         }
     }
@@ -59,6 +77,7 @@ struct managment_companyApp: App {
     @StateObject private var authManager = AuthManager()
     @StateObject private var pushRegistration = PushDeviceRegistrationController()
     @StateObject private var notificationRouter = NotificationDeepLinkRouter()
+    @StateObject private var liveActivityCoordinator = LiveActivityCoordinator()
 
     var body: some Scene {
         WindowGroup {
@@ -66,6 +85,7 @@ struct managment_companyApp: App {
                 .environmentObject(authManager)
                 .environmentObject(pushRegistration)
                 .environmentObject(notificationRouter)
+                .environmentObject(liveActivityCoordinator)
                 .onAppear {
                     appDelegate.deepLinkRouter = notificationRouter
                     appDelegate.authManager = authManager
@@ -92,6 +112,13 @@ struct managment_companyApp: App {
                 } message: {
                     Text(authManager.sessionExpiredMessage ?? "")
                 }
+        }
+        .backgroundTask(.appRefresh(LiveActivityBackgroundRefresh.taskIdentifier)) {
+            if #available(iOS 17.2, *) {
+                await LiveActivityBackgroundRefresh.run()
+            }
+            // Re-arm for the next day at the end of every run.
+            LiveActivityBackgroundRefresh.schedule()
         }
     }
 }

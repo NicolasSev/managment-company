@@ -8,6 +8,9 @@ final class KeychainManager {
     private let serviceName = "com.propmanager.tokens"
     private let accessTokenKey = "access_token"
     private let refreshTokenKey = "refresh_token"
+    // Bearer-токен внешнего portfolio-dashboard API (экран «Личные финансы») —
+    // отдельный ключ, не связан с сессией PropManager и не чистится при logout.
+    private let personalFinanceTokenKey = "personal_finance_token"
     
     private init() {}
     
@@ -33,6 +36,18 @@ final class KeychainManager {
     
     func clearTokens() -> Bool {
         delete(key: accessTokenKey) && delete(key: refreshTokenKey)
+    }
+
+    func storePersonalFinanceToken(_ token: String) -> Bool {
+        store(key: personalFinanceTokenKey, value: token)
+    }
+
+    func getPersonalFinanceToken() -> String? {
+        retrieve(key: personalFinanceTokenKey)
+    }
+
+    func clearPersonalFinanceToken() -> Bool {
+        delete(key: personalFinanceTokenKey)
     }
     
     private func store(key: String, value: String) -> Bool {
