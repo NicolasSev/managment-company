@@ -8,6 +8,7 @@ struct TodayView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @EnvironmentObject private var quickActions: QuickActionsController
+    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
     @ObservedObject private var expenseReminder = ExpenseReminderController.shared
 
     @State private var markPaidItem: PaymentQueueItem?
@@ -58,6 +59,9 @@ struct TodayView: View {
                 }
             }
             .task { await viewModel.load() }
+            .onChange(of: rentPreviewRouter.paidSignal) { _, _ in
+                Task { await viewModel.load() }
+            }
             .refreshable { await viewModel.load() }
             .sheet(item: $markPaidItem) { item in
                 MarkSchedulePaidSheet(schedule: item.asLeaseSchedule) {

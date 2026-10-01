@@ -9,6 +9,7 @@ private struct AppRootView: View {
     @EnvironmentObject private var pushRegistration: PushDeviceRegistrationController
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @EnvironmentObject private var liveActivityCoordinator: LiveActivityCoordinator
+    @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
 
     var body: some View {
         Group {
@@ -21,6 +22,21 @@ private struct AppRootView: View {
         .sheet(isPresented: $notificationRouter.presentNotificationsInbox) {
             NotificationsInboxView(onDataChanged: { })
                 .environmentObject(authManager)
+        }
+        // «Просмотреть» on the rent Live Activity opens propmanager://schedule/<id>/preview.
+        .sheet(item: Binding(
+            get: { rentPreviewRouter.pendingScheduleId.map(RentPreviewItem.init) },
+            set: { newValue in if newValue == nil { rentPreviewRouter.clear() } }
+        )) { item in
+            RentPreviewSheet(
+                scheduleId: item.id,
+                onPaid: { rentPreviewRouter.markPaidRecorded() },
+                onClose: { rentPreviewRouter.clear() }
+            )
+            .environmentObject(authManager)
+        }
+        .onOpenURL { url in
+            _ = rentPreviewRouter.handle(url: url)
         }
         .task(id: authManager.isAuthenticated) {
             if authManager.isAuthenticated {
@@ -78,6 +94,9 @@ struct managment_companyApp: App {
     @StateObject private var pushRegistration = PushDeviceRegistrationController()
     @StateObject private var notificationRouter = NotificationDeepLinkRouter()
     @StateObject private var liveActivityCoordinator = LiveActivityCoordinator()
+    // DashboardView and TodayView read it from the environment: without it the
+    // first one to render crashes the app.
+    @StateObject private var rentPreviewRouter = RentPreviewRouter()
 
     var body: some Scene {
         WindowGroup {
@@ -86,6 +105,7 @@ struct managment_companyApp: App {
                 .environmentObject(pushRegistration)
                 .environmentObject(notificationRouter)
                 .environmentObject(liveActivityCoordinator)
+                .environmentObject(rentPreviewRouter)
                 .onAppear {
                     appDelegate.deepLinkRouter = notificationRouter
                     appDelegate.authManager = authManager
