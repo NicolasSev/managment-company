@@ -2,7 +2,7 @@ import SwiftUI
 
 /// «Личные финансы» — quick-add личной траты/дохода в portfolio-dashboard.
 /// Тонкий клиент внешнего API: домены не смешиваются, в базу PropManager
-/// личные транзакции не пишутся (hub-and-spoke, см. product-manifest GAP-050).
+/// личные транзакции не пишутся (hub-and-spoke, см. product-manifest GAP-053).
 struct PersonalFinanceView: View {
     var embedded = false
     @Environment(\.openURL) private var openURL
