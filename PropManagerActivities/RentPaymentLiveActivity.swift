@@ -4,54 +4,75 @@ import SwiftUI
 import WidgetKit
 import AppIntents
 
-/// Accent color tying the period badge + key figures together. Picked to read
-/// well on both Lock Screen and the Dynamic Island over arbitrary wallpapers.
-private let rentAccent = Color(red: 0.20, green: 0.55, blue: 0.98)
+/// Glass palette: the Lock Screen card is a light translucent tint over the
+/// wallpaper, so everything is drawn in white ink with a soft shadow and
+/// translucent white tiles rather than opaque system fills.
+private enum RentGlass {
+    static let background = Color.white.opacity(0.2)
+    static let ink = Color.white
+    static let muted = Color.white.opacity(0.72)
+    static let faint = Color.white.opacity(0.55)
+    static let tile = Color.white.opacity(0.18)
+    static let tileStroke = Color.white.opacity(0.28)
+    static let paid = Color(red: 0.36, green: 0.86, blue: 0.52)
+    static let shadow = Color.black.opacity(0.28)
+}
+
+private extension View {
+    /// Soft drop shadow that keeps white ink legible over bright wallpapers.
+    func inkShadow() -> some View {
+        shadow(color: RentGlass.shadow, radius: 2, x: 0, y: 1)
+    }
+}
 
 /// Lock Screen + Dynamic Island UI for the rent payment Live Activity.
 struct RentPaymentLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RentPaymentAttributes.self) { context in
             LockScreenView(context: context)
-                .activityBackgroundTint(Color(.systemBackground))
-                .activitySystemActionForegroundColor(.primary)
+                .activityBackgroundTint(RentGlass.background)
+                .activitySystemActionForegroundColor(RentGlass.ink)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: "house.fill")
-                        .font(.title2)
-                        .foregroundStyle(rentAccent)
+                    IconTile(size: 36)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    PeriodBadge(label: context.attributes.periodLabel)
+                    PeriodChip(label: context.attributes.periodLabel)
                 }
                 DynamicIslandExpandedRegion(.center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(context.attributes.propertyName)
                             .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(RentGlass.ink)
                             .lineLimit(1)
                         Text(context.attributes.tenantName)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(RentGlass.muted)
                             .lineLimit(1)
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(amountString(context.attributes))
-                            .font(.system(.title3, design: .rounded).weight(.bold))
-                            .monospacedDigit()
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(amountString(context.attributes))
+                                .font(.system(.title3, design: .rounded).weight(.bold))
+                                .monospacedDigit()
+                                .foregroundStyle(RentGlass.ink)
+                            Text("до \(RentFormatting.dueDate(context.attributes.dueDate))")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(RentGlass.muted)
+                        }
                         Spacer()
                         if context.state.status == "paid" {
-                            Label("Оплачено", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(.subheadline.weight(.semibold))
+                            PaidChip()
                         } else {
                             HStack(spacing: 8) {
                                 Button(intent: MarkRentNotPaidIntent(scheduleId: context.attributes.scheduleId)) {
                                     Image(systemName: "clock")
                                 }
                                 .buttonStyle(.bordered)
+                                .tint(RentGlass.ink)
                                 Button(intent: MarkRentPaidIntent(
                                     scheduleId: context.attributes.scheduleId,
                                     amount: context.attributes.amount,
@@ -60,20 +81,21 @@ struct RentPaymentLiveActivity: Widget {
                                     Label("Оплачено", systemImage: "checkmark.circle.fill")
                                 }
                                 .buttonStyle(.borderedProminent)
-                                .tint(.green)
+                                .tint(RentGlass.paid)
                             }
                         }
                     }
                 }
             } compactLeading: {
                 Image(systemName: "house.fill")
-                    .foregroundStyle(rentAccent)
+                    .foregroundStyle(RentGlass.ink)
             } compactTrailing: {
                 Text(amountString(context.attributes))
                     .monospacedDigit()
+                    .foregroundStyle(RentGlass.ink)
             } minimal: {
                 Image(systemName: "house.fill")
-                    .foregroundStyle(rentAccent)
+                    .foregroundStyle(RentGlass.ink)
             }
         }
     }
@@ -83,19 +105,50 @@ struct RentPaymentLiveActivity: Widget {
     }
 }
 
-/// Tinted capsule that makes the rent period the primary visual accent.
-private struct PeriodBadge: View {
+/// Translucent rounded tile holding the house glyph.
+private struct IconTile: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image(systemName: "house.fill")
+            .font(.system(size: size * 0.44, weight: .semibold))
+            .foregroundStyle(RentGlass.ink)
+            .frame(width: size, height: size)
+            .background(RentGlass.tile, in: .rect(cornerRadius: size * 0.3))
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.3)
+                    .strokeBorder(RentGlass.tileStroke, lineWidth: 0.5)
+            )
+    }
+}
+
+/// Translucent capsule carrying the rent period.
+private struct PeriodChip: View {
     let label: String
 
     var body: some View {
         Text(label.uppercased())
-            .font(.caption.weight(.bold))
+            .font(.caption2.weight(.bold))
             .tracking(0.5)
-            .foregroundStyle(rentAccent)
+            .foregroundStyle(RentGlass.ink)
             .lineLimit(1)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(rentAccent.opacity(0.16), in: Capsule())
+            .background(RentGlass.tile, in: Capsule())
+            .overlay(Capsule().strokeBorder(RentGlass.tileStroke, lineWidth: 0.5))
+    }
+}
+
+/// Status chip shown once the schedule is paid.
+private struct PaidChip: View {
+    var body: some View {
+        Label("Оплачено", systemImage: "checkmark.circle.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(RentGlass.ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(RentGlass.paid.opacity(0.35), in: Capsule())
+            .overlay(Capsule().strokeBorder(RentGlass.paid.opacity(0.6), lineWidth: 0.5))
     }
 }
 
@@ -105,43 +158,52 @@ private struct LockScreenView: View {
     var body: some View {
         // Lock Screen Live Activities are capped at ~160pt tall and overflow is
         // clipped, so the layout stays to three tight rows:
-        //   1. object + tenant  ·  period badge (the primary accent)
-        //   2. amount  ·  due date
-        //   3. actions
+        //   1. icon tile · object + tenant  ·  period chip
+        //   2. amount  ·  due date chip
+        //   3. actions (or paid status)
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .center, spacing: 10) {
+                IconTile(size: 34)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(context.attributes.propertyName)
                         .font(.headline.weight(.semibold))
+                        .foregroundStyle(RentGlass.ink)
                         .lineLimit(1)
                     HStack(spacing: 4) {
                         Image(systemName: "person.fill")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
                         Text(context.attributes.tenantName)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    .foregroundStyle(RentGlass.muted)
                 }
                 Spacer(minLength: 8)
-                PeriodBadge(label: context.attributes.periodLabel)
+                PeriodChip(label: context.attributes.periodLabel)
             }
+            .inkShadow()
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(RentFormatting.amount(context.attributes.amount, currency: context.attributes.currency))
                     .font(.system(.title, design: .rounded).weight(.bold))
                     .monospacedDigit()
+                    .foregroundStyle(RentGlass.ink)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                Text("СРОК")
-                    .font(.system(size: 9).weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                Text(RentFormatting.dueDate(context.attributes.dueDate))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("СРОК")
+                        .font(.system(size: 9).weight(.semibold))
+                        .foregroundStyle(RentGlass.faint)
+                    Text(RentFormatting.dueDate(context.attributes.dueDate))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(RentGlass.ink)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(RentGlass.tile, in: Capsule())
             }
+            .inkShadow()
 
             actionRow
         }
@@ -152,12 +214,8 @@ private struct LockScreenView: View {
     @ViewBuilder
     private var actionRow: some View {
         if context.state.status == "paid" {
-            Label("Оплачено", systemImage: "checkmark.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.green)
+            PaidChip()
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 6)
-                .background(Color.green.opacity(0.15), in: .rect(cornerRadius: 10))
         } else {
             HStack(spacing: 8) {
                 Button(intent: MarkRentNotPaidIntent(scheduleId: context.attributes.scheduleId)) {
@@ -166,15 +224,17 @@ private struct LockScreenView: View {
                         .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .tint(RentGlass.ink)
                 .frame(width: 56)
 
                 Link(destination: URL(string: "propmanager://schedule/\(context.attributes.scheduleId)/preview")!) {
                     Image(systemName: "eye")
+                        .foregroundStyle(RentGlass.ink)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
                 .frame(width: 56)
-                .background(Color.gray.opacity(0.2), in: .rect(cornerRadius: 8))
+                .background(RentGlass.tile, in: .rect(cornerRadius: 8))
 
                 Button(intent: MarkRentPaidIntent(
                     scheduleId: context.attributes.scheduleId,
@@ -187,7 +247,7 @@ private struct LockScreenView: View {
                         .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(RentGlass.paid)
             }
         }
     }
