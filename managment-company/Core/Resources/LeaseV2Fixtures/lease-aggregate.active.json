@@ -1,0 +1,755 @@
+{
+  "data": {
+    "id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01",
+    "status": "active",
+    "version": 15,
+    "origin": "v2",
+    "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10",
+    "tenant_id": "a52d7e19-0c64-4f1b-8e3a-9b7f2c6d4e21",
+    "renewed_from_lease_id": null,
+    "replaced_by_lease_id": null,
+    "start_date": "2026-03-15",
+    "end_date": "2027-03-14",
+    "activation_date": "2026-03-15",
+    "move_out_date": null,
+    "rent_amount": 350000,
+    "rent_currency": "KZT",
+    "current_rent_amount": 380000,
+    "deposit_amount": 350000,
+    "deposit_currency": "KZT",
+    "due_day": 10,
+    "remind_days_before": 2,
+    "utilities_paid_by": "tenant",
+    "renewal_reminder_days": 30,
+    "prolongation_count": 0,
+    "next_period_start": "2026-11-15",
+    "ends_in_days": 133,
+    "is_ending_soon": false,
+    "notes": "Парковочное место №112 включено в стоимость",
+    "termination_reason": null,
+    "property_name": "ЖК «Есентай Парк», кв. 47",
+    "move_in_date": "2026-03-15",
+    "payment_day": 10,
+    "payment_due_day": 10,
+    "payment_window_start_day": null,
+    "payment_window_end_day": null,
+    "terminated_at": null,
+    "auto_renew": true,
+    "property": {
+      "id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10",
+      "name": "ЖК «Есентай Парк», кв. 47",
+      "address": "г. Алматы, пр. Аль-Фараби, 77/8, кв. 47"
+    },
+    "tenant": {
+      "id": "a52d7e19-0c64-4f1b-8e3a-9b7f2c6d4e21",
+      "first_name": "Айгерим",
+      "last_name": "Касымова",
+      "middle_name": "Нурлановна",
+      "full_name": "Касымова Айгерим Нурлановна",
+      "phone": "+7 701 555 12 34",
+      "email": "aigerim.kasymova@example.kz",
+      "iin": "950312401236"
+    },
+    "tenant_snapshot": {
+      "first_name": "Айгерим",
+      "last_name": "Касымова",
+      "middle_name": "Нурлановна",
+      "full_name": "Касымова Айгерим Нурлановна",
+      "iin": "950312401236",
+      "document_type": "id_card",
+      "document_number": "041177203",
+      "document_issued_by": "МВД РК",
+      "document_issued_at": "2018-05-21",
+      "birth_date": "1995-03-12",
+      "registration_address": "г. Алматы, мкр. Орбита-1, д. 12, кв. 34",
+      "phone": "+7 701 555 12 34",
+      "email": "aigerim.kasymova@example.kz",
+      "captured_at": "2026-03-12T10:05:00+05:00"
+    },
+    "property_snapshot": {
+      "name": "ЖК «Есентай Парк», кв. 47",
+      "address": "г. Алматы, пр. Аль-Фараби, 77/8, кв. 47",
+      "captured_at": "2026-03-12T10:05:00+05:00"
+    },
+    "lifecycle": {
+      "created_at": "2026-03-10T09:30:00+05:00",
+      "sent_for_signature_at": "2026-03-12T10:05:00+05:00",
+      "signed_on": "2026-03-14",
+      "activated_at": "2026-03-14T16:20:00+05:00",
+      "terminated_at": null,
+      "ended_at": null,
+      "cancelled_at": null,
+      "cancel_reason": null,
+      "last_prolonged_at": null
+    },
+    "amendments": [
+      {
+        "id": "a1c4e7f2-3b6d-4e9a-8c5f-020260820001",
+        "effective_from": "2026-09-15",
+        "rent_amount": 380000,
+        "due_day": null,
+        "note": "Индексация по допсоглашению №1",
+        "created_at": "2026-08-20T12:00:00+05:00"
+      }
+    ],
+    "documents": {
+      "template_id": "e1a4c7f2-9b36-4d58-8c0e-2f7b5a9d3c14",
+      "contract_file": {
+        "id": "6a3f1d8e-2c74-4b9a-8e05-7d1c3b9f4a21",
+        "filename": "Договор аренды — Касымова — Есентай Парк 47.docx",
+        "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "size_bytes": 48211,
+        "uploaded_at": "2026-03-12T10:04:40+05:00"
+      },
+      "signed_file": {
+        "id": "8b2e4c6a-0d91-4f37-a5c8-1e6d3f9b7a42",
+        "filename": "Договор подписанный скан.pdf",
+        "mime_type": "application/pdf",
+        "size_bytes": 2318457,
+        "uploaded_at": "2026-03-14T16:18:05+05:00"
+      },
+      "files": [
+        {
+          "id": "6a3f1d8e-2c74-4b9a-8e05-7d1c3b9f4a21",
+          "filename": "Договор аренды — Касымова — Есентай Парк 47.docx",
+          "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size_bytes": 48211,
+          "uploaded_at": "2026-03-12T10:04:40+05:00"
+        },
+        {
+          "id": "8b2e4c6a-0d91-4f37-a5c8-1e6d3f9b7a42",
+          "filename": "Договор подписанный скан.pdf",
+          "mime_type": "application/pdf",
+          "size_bytes": 2318457,
+          "uploaded_at": "2026-03-14T16:18:05+05:00"
+        },
+        {
+          "id": "3c9d7f1b-5e28-4a6c-b0d4-9f2e8a1c6b53",
+          "filename": "Акт приёма-передачи.pdf",
+          "mime_type": "application/pdf",
+          "size_bytes": 912304,
+          "uploaded_at": "2026-03-15T19:02:11+05:00"
+        }
+      ]
+    },
+    "balance": {
+      "currency": "KZT",
+      "as_of": "2026-11-01",
+      "charged_to_date": 3235000,
+      "waived_to_date": 0,
+      "paid_to_date": 3030000,
+      "outstanding": 205000,
+      "overdue": 205000,
+      "overdue_charges": 2,
+      "upcoming": 1140000,
+      "prepaid": 0,
+      "tenant_credit": 0,
+      "received_total": 3030000,
+      "next_charge": {
+        "id": "d8b5c2e9-1f47-4a3b-9e6d-0c2a7f4b8e19",
+        "kind": "rent",
+        "due_date": "2026-11-10",
+        "amount": 380000,
+        "outstanding": 380000
+      }
+    },
+    "charges": [
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-0d0260315001",
+        "kind": "deposit",
+        "period_start": "2026-03-15",
+        "period_end": "2026-03-15",
+        "due_date": "2026-03-15",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260300001",
+        "kind": "rent",
+        "period_start": "2026-03-15",
+        "period_end": "2026-04-14",
+        "due_date": "2026-03-15",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260400001",
+        "kind": "rent",
+        "period_start": "2026-04-15",
+        "period_end": "2026-05-14",
+        "due_date": "2026-04-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260500001",
+        "kind": "rent",
+        "period_start": "2026-05-15",
+        "period_end": "2026-06-14",
+        "due_date": "2026-05-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260600001",
+        "kind": "rent",
+        "period_start": "2026-06-15",
+        "period_end": "2026-07-14",
+        "due_date": "2026-06-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260700001",
+        "kind": "rent",
+        "period_start": "2026-07-15",
+        "period_end": "2026-08-14",
+        "due_date": "2026-07-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260800001",
+        "kind": "rent",
+        "period_start": "2026-08-15",
+        "period_end": "2026-09-14",
+        "due_date": "2026-08-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 350000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020260900002",
+        "kind": "rent",
+        "period_start": "2026-09-15",
+        "period_end": "2026-10-14",
+        "due_date": "2026-09-10",
+        "amount": 380000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 380000,
+        "outstanding": 0,
+        "payment_status": "paid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260900001",
+        "can_pay": false,
+        "can_waive": false,
+        "can_unwaive": false
+      },
+      {
+        "id": "f2a6d9c3-8e14-4b7a-a5d0-3c9e1b6f2a88",
+        "kind": "rent",
+        "period_start": "2026-10-15",
+        "period_end": "2026-11-14",
+        "due_date": "2026-10-10",
+        "amount": 380000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 200000,
+        "outstanding": 180000,
+        "payment_status": "partial",
+        "is_overdue": true,
+        "days_overdue": 22,
+        "replaces_charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020261000001",
+        "can_pay": true,
+        "can_waive": true,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-0e0261020001",
+        "kind": "extra",
+        "period_start": "2026-10-20",
+        "period_end": "2026-10-20",
+        "due_date": "2026-10-20",
+        "amount": 25000,
+        "currency": "KZT",
+        "description": "Повреждён смеситель на кухне, замена",
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 0,
+        "outstanding": 25000,
+        "payment_status": "unpaid",
+        "is_overdue": true,
+        "days_overdue": 12,
+        "replaces_charge_id": null,
+        "can_pay": true,
+        "can_waive": true,
+        "can_unwaive": false
+      },
+      {
+        "id": "d8b5c2e9-1f47-4a3b-9e6d-0c2a7f4b8e19",
+        "kind": "rent",
+        "period_start": "2026-11-15",
+        "period_end": "2026-12-14",
+        "due_date": "2026-11-10",
+        "amount": 380000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 0,
+        "outstanding": 380000,
+        "payment_status": "unpaid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020261100001",
+        "can_pay": true,
+        "can_waive": true,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020261200001",
+        "kind": "rent",
+        "period_start": "2026-12-15",
+        "period_end": "2027-01-14",
+        "due_date": "2026-12-10",
+        "amount": 380000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 0,
+        "outstanding": 380000,
+        "payment_status": "unpaid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": true,
+        "can_waive": true,
+        "can_unwaive": false
+      },
+      {
+        "id": "c8a3e1d0-5f2b-4a7c-9e61-020270100001",
+        "kind": "rent",
+        "period_start": "2027-01-15",
+        "period_end": "2027-02-14",
+        "due_date": "2027-01-10",
+        "amount": 380000,
+        "currency": "KZT",
+        "description": null,
+        "state": "open",
+        "waived_amount": 0,
+        "allocated": 0,
+        "outstanding": 380000,
+        "payment_status": "unpaid",
+        "is_overdue": false,
+        "days_overdue": 0,
+        "replaces_charge_id": null,
+        "can_pay": true,
+        "can_waive": true,
+        "can_unwaive": false
+      }
+    ],
+    "charges_preview": [],
+    "payments": [
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020261014002",
+        "direction": "in",
+        "received_on": "2026-10-14",
+        "amount": 200000,
+        "currency": "KZT",
+        "method": "cash",
+        "source": "manual",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020261014002",
+        "deposit_part": 0,
+        "notes": null,
+        "reversed_at": "2026-10-15T11:05:00+05:00",
+        "reverse_reason": "Ошибочно внесён дважды",
+        "allocations": [],
+        "unallocated": 0,
+        "can_reverse": false
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020261014001",
+        "direction": "in",
+        "received_on": "2026-10-14",
+        "amount": 200000,
+        "currency": "KZT",
+        "method": "cash",
+        "source": "manual",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020261014001",
+        "deposit_part": 0,
+        "notes": "Остаток обещала до 5 ноября",
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "f2a6d9c3-8e14-4b7a-a5d0-3c9e1b6f2a88", "kind": "rent", "amount": 200000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020260912001",
+        "direction": "in",
+        "received_on": "2026-09-12",
+        "amount": 380000,
+        "currency": "KZT",
+        "method": "kaspi",
+        "source": "manual",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260912001",
+        "deposit_part": 0,
+        "notes": null,
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260900002", "kind": "rent", "amount": 380000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020260810001",
+        "direction": "in",
+        "received_on": "2026-08-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "method": "kaspi",
+        "source": "telegram",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260810001",
+        "deposit_part": 0,
+        "notes": null,
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260800001", "kind": "rent", "amount": 350000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020260710001",
+        "direction": "in",
+        "received_on": "2026-07-10",
+        "amount": 350000,
+        "currency": "KZT",
+        "method": "kaspi",
+        "source": "manual",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260710001",
+        "deposit_part": 0,
+        "notes": null,
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260700001", "kind": "rent", "amount": 350000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020260508001",
+        "direction": "in",
+        "received_on": "2026-05-08",
+        "amount": 700000,
+        "currency": "KZT",
+        "method": "bank",
+        "source": "bank",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260508001",
+        "deposit_part": 0,
+        "notes": "Оплата за два периода одним переводом",
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260500001", "kind": "rent", "amount": 350000 },
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260600001", "kind": "rent", "amount": 350000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020260409001",
+        "direction": "in",
+        "received_on": "2026-04-09",
+        "amount": 350000,
+        "currency": "KZT",
+        "method": "kaspi",
+        "source": "manual",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260409001",
+        "deposit_part": 0,
+        "notes": null,
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260400001", "kind": "rent", "amount": 350000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      },
+      {
+        "id": "b5d2f8a1-6c3e-4f9b-8d27-020260315001",
+        "direction": "in",
+        "received_on": "2026-03-15",
+        "amount": 700000,
+        "currency": "KZT",
+        "method": "kaspi",
+        "source": "manual",
+        "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260315001",
+        "deposit_part": 350000,
+        "notes": "Депозит и первый период при заселении",
+        "reversed_at": null,
+        "reverse_reason": null,
+        "allocations": [
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-0d0260315001", "kind": "deposit", "amount": 350000 },
+          { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260300001", "kind": "rent", "amount": 350000 }
+        ],
+        "unallocated": 0,
+        "can_reverse": true
+      }
+    ],
+    "deposit": {
+      "amount": 350000,
+      "currency": "KZT",
+      "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-0d0260315001",
+      "received": 350000,
+      "returned": 0,
+      "forfeited": 0,
+      "applied_to_debt": 0,
+      "held": 350000,
+      "outstanding": 0,
+      "status": "held",
+      "suggested_apply_to_debt": 205000,
+      "ledger": [
+        {
+          "id": "4d7a9e2c-8b1f-4c3d-a6e5-020260315001",
+          "entry_type": "received",
+          "amount": 350000,
+          "entry_date": "2026-03-15",
+          "reason": "Депозит при заселении",
+          "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260315099",
+          "lease_payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020260315001",
+          "reverses_entry_id": null,
+          "reversed_by_entry_id": null,
+          "created_at": "2026-03-15T19:10:00+05:00"
+        }
+      ]
+    },
+    "checklists": [
+      { "kind": "move_in", "status": "completed", "done": 6, "total": 6 }
+    ],
+    "events": [
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020261101001",
+        "at": "2026-11-01T03:00:12+05:00",
+        "type": "charges.generated",
+        "actor": null,
+        "payload": { "count": 1, "through": "2027-02-14", "generated_by": "horizon_job" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020261020001",
+        "at": "2026-10-20T17:45:00+05:00",
+        "type": "charge.added",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-0e0261020001", "kind": "extra", "amount": 25000, "due_date": "2026-10-20", "description": "Повреждён смеситель на кухне, замена" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020261015001",
+        "at": "2026-10-15T11:05:00+05:00",
+        "type": "payment.reversed",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020261014002", "amount": 200000, "reason": "Ошибочно внесён дважды" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020261014002",
+        "at": "2026-10-14T18:40:21+05:00",
+        "type": "payment.recorded",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020261014002", "amount": 200000, "allocations": [ { "charge_id": "f2a6d9c3-8e14-4b7a-a5d0-3c9e1b6f2a88", "amount": 180000 }, { "charge_id": "d8b5c2e9-1f47-4a3b-9e6d-0c2a7f4b8e19", "amount": 20000 } ] }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020261014001",
+        "at": "2026-10-14T18:32:02+05:00",
+        "type": "payment.recorded",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020261014001", "amount": 200000, "allocations": [ { "charge_id": "f2a6d9c3-8e14-4b7a-a5d0-3c9e1b6f2a88", "amount": 200000 } ] }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260820001",
+        "at": "2026-08-20T12:00:00+05:00",
+        "type": "lease.amended",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": {
+          "amendment_id": "a1c4e7f2-3b6d-4e9a-8c5f-020260820001",
+          "effective_from": "2026-09-15",
+          "changes": { "rent_amount": [350000, 380000] },
+          "note": "Индексация по допсоглашению №1",
+          "voided_charge_ids": [
+            "c8a3e1d0-5f2b-4a7c-9e61-020260900001",
+            "c8a3e1d0-5f2b-4a7c-9e61-020261000001",
+            "c8a3e1d0-5f2b-4a7c-9e61-020261100001"
+          ],
+          "reissued_charge_ids": [
+            "c8a3e1d0-5f2b-4a7c-9e61-020260900002",
+            "f2a6d9c3-8e14-4b7a-a5d0-3c9e1b6f2a88",
+            "d8b5c2e9-1f47-4a3b-9e6d-0c2a7f4b8e19"
+          ],
+          "kept_charge_ids": []
+        }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260508001",
+        "at": "2026-05-08T14:12:40+05:00",
+        "type": "payment.recorded",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": {
+          "payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020260508001",
+          "amount": 700000,
+          "allocations": [
+            { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260500001", "amount": 350000 },
+            { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260600001", "amount": 350000 }
+          ]
+        }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260315003",
+        "at": "2026-03-15T19:10:00+05:00",
+        "type": "deposit.received",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "entry_id": "4d7a9e2c-8b1f-4c3d-a6e5-020260315001", "payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020260315001", "amount": 350000 }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260315002",
+        "at": "2026-03-15T19:10:00+05:00",
+        "type": "payment.recorded",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": {
+          "payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020260315001",
+          "amount": 700000,
+          "allocations": [
+            { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-0d0260315001", "amount": 350000 },
+            { "charge_id": "c8a3e1d0-5f2b-4a7c-9e61-020260300001", "amount": 350000 }
+          ]
+        }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260314003",
+        "at": "2026-03-14T16:20:00+05:00",
+        "type": "charges.generated",
+        "actor": null,
+        "payload": { "count": 5, "through": "2026-07-14", "generated_by": "activation" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260314002",
+        "at": "2026-03-14T16:20:00+05:00",
+        "type": "lease.activated",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "activation_date": "2026-03-15" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260314001",
+        "at": "2026-03-14T16:19:58+05:00",
+        "type": "lease.signed",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "signed_on": "2026-03-14", "signed_file_id": "8b2e4c6a-0d91-4f37-a5c8-1e6d3f9b7a42" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260312002",
+        "at": "2026-03-12T10:05:00+05:00",
+        "type": "lease.sent_for_signature",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": {}
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260312001",
+        "at": "2026-03-12T10:04:40+05:00",
+        "type": "contract.generated",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": { "file_id": "6a3f1d8e-2c74-4b9a-8e05-7d1c3b9f4a21", "template_id": "e1a4c7f2-9b36-4d58-8c0e-2f7b5a9d3c14" }
+      },
+      {
+        "id": "5e8c1a3f-7b2d-4e9a-8c6f-020260310001",
+        "at": "2026-03-10T09:30:00+05:00",
+        "type": "lease.created",
+        "actor": { "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60", "name": "Арман Сейткали" },
+        "payload": {}
+      }
+    ],
+    "available_actions": ["update", "amend_rent", "add_extra_charge", "record_payment", "terminate", "prolong", "replace_with_new", "return_deposit", "upload_signed_scan"]
+  }
+}

@@ -110,6 +110,10 @@ struct TenantDetailView: View {
                     .environmentObject(authManager)
 
                     leaseHistorySection
+
+                    if LeaseV2ServiceProvider.isMockEntryVisible {
+                        leaseV2PreviewSection
+                    }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.lg)
@@ -168,6 +172,38 @@ struct TenantDetailView: View {
                             leaseHistoryRow(lease)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// Temporary entry into `LeaseDetailView` on the lease-v2 fixtures (task L12). Final
+    /// navigation from the tenants tab and the property card is task L13.
+    private var leaseV2PreviewSection: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Text("Договор v2 (макет)")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                Text("Экран договора на тестовых данных, без обращения к серверу.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                ForEach(Array(LeaseV2ServiceProvider.mockLeaseIds.enumerated()), id: \.element) { index, leaseId in
+                    NavigationLink {
+                        LeaseDetailView(
+                            leaseId: leaseId,
+                            service: LeaseV2ServiceProvider.makeService(authManager: authManager)
+                        )
+                    } label: {
+                        HStack {
+                            Label(index == 0 ? "Действующий договор" : "Ожидает подписи", systemImage: "doc.text")
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.accent)
+                    }
+                    .accessibilityIdentifier("tenant.detail.lease_v2.\(index == 0 ? "active" : "pending")")
                 }
             }
         }

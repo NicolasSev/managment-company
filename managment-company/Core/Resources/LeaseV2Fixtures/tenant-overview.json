@@ -1,0 +1,118 @@
+{
+  "data": {
+    "as_of": "2026-11-01",
+    "window": { "from": "2026-06", "to": "2027-02" },
+    "tenant": {
+      "id": "a52d7e19-0c64-4f1b-8e3a-9b7f2c6d4e21",
+      "first_name": "Айгерим",
+      "last_name": "Касымова",
+      "middle_name": "Нурлановна",
+      "full_name": "Касымова Айгерим Нурлановна",
+      "phone": "+7 701 555 12 34",
+      "email": "aigerim.kasymova@example.kz",
+      "iin": "950312401236",
+      "document_type": "id_card",
+      "document_number": "041177203",
+      "birth_date": "1995-03-12",
+      "registration_address": "г. Алматы, мкр. Орбита-1, д. 12, кв. 34",
+      "cohabitants": "Касымов Тимур (супруг)",
+      "notes": null
+    },
+    "current_lease": {
+      "id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01",
+      "status": "active",
+      "property": {
+        "id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10",
+        "name": "ЖК «Есентай Парк», кв. 47",
+        "address": "г. Алматы, пр. Аль-Фараби, 77/8, кв. 47"
+      },
+      "start_date": "2026-03-15",
+      "end_date": "2027-03-14",
+      "activation_date": "2026-03-15",
+      "move_out_date": null,
+      "current_rent_amount": 380000,
+      "rent_currency": "KZT",
+      "due_day": 10,
+      "prolongation_count": 0,
+      "ends_in_days": 133,
+      "is_ending_soon": false,
+      "balance": {
+        "currency": "KZT",
+        "outstanding": 205000,
+        "overdue": 205000,
+        "tenant_credit": 0,
+        "next_charge": {
+          "id": "d8b5c2e9-1f47-4a3b-9e6d-0c2a7f4b8e19",
+          "kind": "rent",
+          "due_date": "2026-11-10",
+          "amount": 380000,
+          "outstanding": 380000
+        }
+      },
+      "deposit": { "amount": 350000, "held": 350000, "status": "held" },
+      "available_actions": ["update", "amend_rent", "add_extra_charge", "record_payment", "terminate", "prolong", "replace_with_new", "return_deposit", "upload_signed_scan"]
+    },
+    "leases": [
+      {
+        "id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01",
+        "status": "active",
+        "property": {
+          "id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10",
+          "name": "ЖК «Есентай Парк», кв. 47",
+          "address": "г. Алматы, пр. Аль-Фараби, 77/8, кв. 47"
+        },
+        "start_date": "2026-03-15",
+        "end_date": "2027-03-14",
+        "activation_date": "2026-03-15",
+        "move_out_date": null,
+        "current_rent_amount": 380000,
+        "rent_currency": "KZT",
+        "due_day": 10,
+        "prolongation_count": 0,
+        "ends_in_days": 133,
+        "is_ending_soon": false,
+        "balance": {
+          "currency": "KZT",
+          "outstanding": 205000,
+          "overdue": 205000,
+          "tenant_credit": 0,
+          "next_charge": {
+            "id": "d8b5c2e9-1f47-4a3b-9e6d-0c2a7f4b8e19",
+            "kind": "rent",
+            "due_date": "2026-11-10",
+            "amount": 380000,
+            "outstanding": 380000
+          }
+        },
+        "deposit": { "amount": 350000, "held": 350000, "status": "held" },
+        "available_actions": ["update", "amend_rent", "add_extra_charge", "record_payment", "terminate", "prolong", "replace_with_new", "return_deposit", "upload_signed_scan"]
+      }
+    ],
+    "totals": [
+      {
+        "currency": "KZT",
+        "charged_to_date": 3235000,
+        "waived_to_date": 0,
+        "paid_to_date": 3030000,
+        "outstanding": 205000,
+        "overdue": 205000,
+        "upcoming": 1140000,
+        "prepaid": 0,
+        "tenant_credit": 0,
+        "received_total": 3030000,
+        "deposit_held": 350000
+      }
+    ],
+    "months": [
+      { "period": "2026-06", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 350000, "paid": 350000, "waived": 0, "outstanding": 0, "due_date": "2026-06-10", "kinds": ["rent"], "status": "paid" },
+      { "period": "2026-07", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 350000, "paid": 350000, "waived": 0, "outstanding": 0, "due_date": "2026-07-10", "kinds": ["rent"], "status": "paid" },
+      { "period": "2026-08", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 350000, "paid": 350000, "waived": 0, "outstanding": 0, "due_date": "2026-08-10", "kinds": ["rent"], "status": "paid" },
+      { "period": "2026-09", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 380000, "paid": 380000, "waived": 0, "outstanding": 0, "due_date": "2026-09-10", "kinds": ["rent"], "status": "paid" },
+      { "period": "2026-10", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 405000, "paid": 200000, "waived": 0, "outstanding": 205000, "due_date": "2026-10-10", "kinds": ["rent", "extra"], "status": "overdue" },
+      { "period": "2026-11", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 380000, "paid": 0, "waived": 0, "outstanding": 380000, "due_date": "2026-11-10", "kinds": ["rent"], "status": "upcoming" },
+      { "period": "2026-12", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 380000, "paid": 0, "waived": 0, "outstanding": 380000, "due_date": "2026-12-10", "kinds": ["rent"], "status": "upcoming" },
+      { "period": "2027-01", "lease_id": "7c1e2a40-5b3d-4f8e-9a61-2d4c8b1f0a01", "property_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10", "currency": "KZT", "charged": 380000, "paid": 0, "waived": 0, "outstanding": 380000, "due_date": "2027-01-10", "kinds": ["rent"], "status": "upcoming" },
+      { "period": "2027-02", "lease_id": null, "property_id": null, "currency": "KZT", "charged": 0, "paid": 0, "waived": 0, "outstanding": 0, "due_date": null, "kinds": [], "status": "none" }
+    ]
+  }
+}

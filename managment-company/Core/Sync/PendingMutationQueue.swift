@@ -50,7 +50,7 @@ final class PendingMutationQueue: ObservableObject {
         idempotencyKey: String
     ) throws {
         let data = try JSONEncoder().encode(body)
-        items.removeAll { $0.scheduleId == scheduleId }
+        items.removeAll { $0.scheduleId == scheduleId && $0.kind == nil }
         items.append(
             QueuedMarkPaidMutation(
                 idempotencyKey: idempotencyKey,
@@ -64,6 +64,31 @@ final class PendingMutationQueue: ObservableObject {
         save()
     }
 
+    /// Lease v2: parks `POST /v1/lease-charges/:id/payments` for retry. Unlike mark-paid it never
+    /// replaces an earlier entry for the same charge: every entry is a separate user intent with
+    /// its own `Idempotency-Key`, so two partial payments must both survive.
+    func enqueueLeaseChargePayment(
+        chargeId: String,
+        leaseId: String,
+        body: PayChargeRequest,
+        idempotencyKey: String
+    ) throws {
+        let data = try JSONEncoder().encode(body)
+        guard !items.contains(where: { $0.idempotencyKey == idempotencyKey }) else { return }
+        items.append(
+            QueuedMarkPaidMutation(
+                idempotencyKey: idempotencyKey,
+                scheduleId: chargeId,
+                leaseId: leaseId,
+                bodyJSON: data,
+                attemptCount: 0,
+                createdAt: Date(),
+                kind: QueuedMutationKind.leaseChargePayment
+            )
+        )
+        save()
+    }
+
     func processQueue(authManager: AuthManager) async {
         guard !items.isEmpty, !isProcessing else { return }
         guard authManager.isAuthenticated else { return }
@@ -72,15 +97,27 @@ final class PendingMutationQueue: ObservableObject {
 
         processingLoop: while let first = items.first {
             do {
-                let body = try JSONDecoder().decode(MarkSchedulePaidRequest.self, from: first.bodyJSON)
-                _ = try await APIClient.shared.request(
-                    "/v1/payment-schedules/\(first.scheduleId)/mark-paid",
-                    method: "POST",
-                    body: body,
-                    idempotencyKey: first.idempotencyKey,
-                    tokenProvider: { await MainActor.run { authManager.accessToken } },
-                    refreshAndRetry: { await authManager.refreshToken() }
-                ) as SchedulePaymentResult
+                if first.kind == QueuedMutationKind.leaseChargePayment {
+                    let body = try JSONDecoder().decode(PayChargeRequest.self, from: first.bodyJSON)
+                    _ = try await APIClient.shared.request(
+                        "/v1/lease-charges/\(first.scheduleId)/payments",
+                        method: "POST",
+                        body: body,
+                        idempotencyKey: first.idempotencyKey,
+                        tokenProvider: { await MainActor.run { authManager.accessToken } },
+                        refreshAndRetry: { await authManager.refreshToken() }
+                    ) as LeaseCommandResult
+                } else {
+                    let body = try JSONDecoder().decode(MarkSchedulePaidRequest.self, from: first.bodyJSON)
+                    _ = try await APIClient.shared.request(
+                        "/v1/payment-schedules/\(first.scheduleId)/mark-paid",
+                        method: "POST",
+                        body: body,
+                        idempotencyKey: first.idempotencyKey,
+                        tokenProvider: { await MainActor.run { authManager.accessToken } },
+                        refreshAndRetry: { await authManager.refreshToken() }
+                    ) as SchedulePaymentResult
+                }
                 let leaseId = first.leaseId
                 items.removeFirst()
                 save()
@@ -184,6 +221,13 @@ extension Notification.Name {
     static let pendingMarkPaidQueueLeaseAffected = Notification.Name("app.propmanager.pendingMarkPaidQueueLeaseAffected")
 }
 
+/// Discriminator of queued entries; `nil` (entries written before lease v2) means mark-paid.
+private enum QueuedMutationKind {
+    static let leaseChargePayment = "lease_charge_payment"
+}
+
+/// `scheduleId` holds the payment-schedule id for mark-paid and the lease charge id for
+/// `lease_charge_payment` entries.
 private struct QueuedMarkPaidMutation: Codable, Equatable {
     let idempotencyKey: String
     let scheduleId: String
@@ -191,4 +235,5 @@ private struct QueuedMarkPaidMutation: Codable, Equatable {
     var bodyJSON: Data
     var attemptCount: Int
     let createdAt: Date
+    var kind: String? = nil
 }

@@ -1,0 +1,37 @@
+{
+  "tenant": {
+    "first_name": "Ерлан",
+    "last_name": "Ахметов",
+    "middle_name": "Серикович",
+    "phone": "+7 707 410 22 91",
+    "email": "erlan.akhmetov@example.kz",
+    "iin": "900722304561",
+    "document_type": "id_card",
+    "document_number": "052318774",
+    "document_issued_by": "МВД РК",
+    "document_issued_at": "2019-08-14",
+    "birth_date": "1990-07-22",
+    "registration_address": "г. Алматы, ул. Розыбакиева, 247, кв. 15",
+    "cohabitants": null,
+    "notes": "Распознано с фото удостоверения, проверено вручную"
+  },
+  "tenant_id": null,
+  "property_id": "5b8e0f37-2c19-4d7a-b6e4-1f3a9c7d2e50",
+  "replaces_lease_id": null,
+  "lease": {
+    "start_date": "2026-11-15",
+    "end_date": "2027-11-14",
+    "rent_amount": 280000,
+    "rent_currency": "KZT",
+    "deposit_amount": 280000,
+    "due_day": 31,
+    "remind_days_before": 2,
+    "utilities_paid_by": "tenant",
+    "renewal_reminder_days": 30,
+    "notes": "Без животных, курение запрещено"
+  },
+  "template_id": "e1a4c7f2-9b36-4d58-8c0e-2f7b5a9d3c14",
+  "generate_contract": true,
+  "send_for_signature": true,
+  "identity_document_file_id": "2a6e9c1d-7f3b-4d8a-b5e0-4c1f8a3d9e67"
+}

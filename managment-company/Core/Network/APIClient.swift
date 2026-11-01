@@ -27,6 +27,7 @@ final class APIClient {
         method: String = "GET",
         body: Encodable? = nil,
         idempotencyKey: String? = nil,
+        extraHeaders: [String: String] = [:],
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> T {
@@ -35,6 +36,7 @@ final class APIClient {
             method: method,
             body: body,
             idempotencyKey: idempotencyKey,
+            extraHeaders: extraHeaders,
             tokenProvider: tokenProvider,
             refreshAndRetry: refreshAndRetry
         )
@@ -69,13 +71,14 @@ final class APIClient {
         method: String = "GET",
         body: Encodable? = nil,
         idempotencyKey: String? = nil,
+        extraHeaders: [String: String] = [:],
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> Data {
         guard let token = await tokenProvider() else {
             throw APIError.unauthorized
         }
-        var req = buildRequest(path: path, method: method, body: body, token: token, idempotencyKey: idempotencyKey)
+        var req = buildRequest(path: path, method: method, body: body, token: token, idempotencyKey: idempotencyKey, extraHeaders: extraHeaders)
         var (data, response) = try await session.data(for: req)
         var httpResponse = response as? HTTPURLResponse
         
@@ -84,7 +87,7 @@ final class APIClient {
             guard refreshed, let newToken = await tokenProvider() else {
                 throw APIError.unauthorized
             }
-            req = buildRequest(path: path, method: method, body: body, token: newToken, idempotencyKey: idempotencyKey)
+            req = buildRequest(path: path, method: method, body: body, token: newToken, idempotencyKey: idempotencyKey, extraHeaders: extraHeaders)
             (data, response) = try await session.data(for: req)
             httpResponse = response as? HTTPURLResponse
         }
@@ -223,7 +226,14 @@ final class APIClient {
         }
     }
 
-    private func buildRequest(path: String, method: String, body: Encodable?, token: String, idempotencyKey: String?) -> URLRequest {
+    private func buildRequest(
+        path: String,
+        method: String,
+        body: Encodable?,
+        token: String,
+        idempotencyKey: String?,
+        extraHeaders: [String: String] = [:]
+    ) -> URLRequest {
         let url = URL(string: "\(baseURL)\(path)")!
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -231,6 +241,9 @@ final class APIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let idempotencyKey {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        }
+        for (name, value) in extraHeaders {
+            request.setValue(value, forHTTPHeaderField: name)
         }
         if let body = body {
             request.httpBody = try? JSONEncoder().encode(AnyEncodable(body))
