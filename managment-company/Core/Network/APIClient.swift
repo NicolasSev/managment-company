@@ -168,7 +168,8 @@ final class APIClient {
     }
 
     /// `POST multipart/form-data` with text fields and a single file field.
-    /// Decodes the standard `{ "data": T }` API wrapper.
+    /// Decodes the standard `{ "data": T }` API wrapper. With `typedErrors` a non-2xx answer that
+    /// carries the error envelope throws `APIError.server` (see `requestData`).
     func uploadMultipart<T: Decodable>(
         _ path: String,
         fields: [String: String],
@@ -176,6 +177,7 @@ final class APIClient {
         fileData: Data,
         fileName: String,
         mimeType: String,
+        typedErrors: Bool = false,
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> T {
@@ -212,7 +214,7 @@ final class APIClient {
                 throw APIError.invalidResponse
             }
             guard (200...299).contains(status) else {
-                throw APIError.httpStatus(status)
+                throw APIError.make(status: status, body: data, typed: typedErrors)
             }
             return data
         }

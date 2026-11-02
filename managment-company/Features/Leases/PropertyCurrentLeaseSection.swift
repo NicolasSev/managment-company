@@ -72,10 +72,10 @@ final class PropertyCurrentLeaseViewModel: ObservableObject {
 }
 
 /// «Текущий договор» at the top of the property card: tenant, status, next payment and debt, a
-/// tap opens `LeaseDetailView`. Without an open lease it offers «Заселить», a stub until the
-/// settle wizard of L14 (the v1 lease form would create a lease outside `leases` before the cutover).
+/// tap opens `LeaseDetailView`. Without an open lease it offers «Заселить», which opens the
+/// move-in wizard (`SettleWizardView`); after it the card reloads and «К договору» pushes the lease.
 struct PropertyCurrentLeaseSection: View {
-    @State private var showSettleStub = false
+    @State private var settleContext: SettleWizardContext?
     @StateObject private var viewModel: PropertyCurrentLeaseViewModel
     private let canSettle: Bool
 
@@ -125,7 +125,7 @@ struct PropertyCurrentLeaseSection: View {
         .onAppear {
             Task { await viewModel.load() }
         }
-        .sheet(isPresented: $showSettleStub) { settleStub }
+        .settleWizard(context: $settleContext) { await viewModel.load() }
         .onReceive(NotificationCenter.default.publisher(for: .pendingMarkPaidQueueLeaseAffected)) { _ in
             Task { await viewModel.load() }
         }
@@ -141,42 +141,12 @@ struct PropertyCurrentLeaseSection: View {
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
                 if canSettle {
-                    PrimaryButton(title: "Заселить", action: { showSettleStub = true }, systemImage: "person.badge.plus")
+                    PrimaryButton(title: "Заселить", action: { settleContext = .property(viewModel.propertyId) }, systemImage: "person.badge.plus")
                         .accessibilityIdentifier("property.currentLease.settle")
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("property.currentLease.empty")
-    }
-}
-
-extension PropertyCurrentLeaseSection {
-    /// Placeholder of the settle wizard (L14).
-    fileprivate var settleStub: some View {
-        NavigationStack {
-            VStack(spacing: AppTheme.Spacing.md) {
-                Image(systemName: "person.badge.plus")
-                    .font(.largeTitle)
-                    .foregroundStyle(AppTheme.Colors.accent)
-                Text("Мастер заселения появится в следующем обновлении")
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-            }
-            .padding(AppTheme.Spacing.xl)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppScreenBackground())
-            .navigationTitle("Заселить")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") { showSettleStub = false }
-                        .accessibilityIdentifier("property.settle.stub.close")
-                }
-            }
-        }
-        .presentationDetents([.medium])
-        .accessibilityIdentifier("property.settle.stub")
     }
 }

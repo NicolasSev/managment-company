@@ -81,6 +81,21 @@ final class LiveLeaseV2Service: LeaseV2Service {
         return result.lease
     }
 
+    func settle(_ request: SettleRequest, idempotencyKey: String) async throws -> SettleResponse {
+        do {
+            return try await sendWrapped(
+                "/v1/workflows/settle",
+                method: "POST",
+                body: request,
+                version: nil,
+                idempotencyKey: idempotencyKey,
+                mapsErrors: false
+            )
+        } catch {
+            throw Self.mapSettle(error)
+        }
+    }
+
     // MARK: Transport
 
     private func send(
@@ -97,7 +112,8 @@ final class LiveLeaseV2Service: LeaseV2Service {
         method: String,
         body: Encodable?,
         version: Int?,
-        idempotencyKey: String?
+        idempotencyKey: String?,
+        mapsErrors: Bool = true
     ) async throws -> T {
         let auth = authManager
         do {
@@ -112,6 +128,7 @@ final class LiveLeaseV2Service: LeaseV2Service {
                 refreshAndRetry: { await auth.refreshToken() }
             )
         } catch {
+            if !mapsErrors { throw error }
             throw Self.map(error)
         }
     }
@@ -155,6 +172,56 @@ final class LiveLeaseV2Service: LeaseV2Service {
         }
         if PendingMutationQueue.isRetryableTransportError(error) { return .transport }
         return .unknown
+    }
+
+    /// Maps a settle failure: the codes the wizard answers by name, the rest as `LeaseV2Error`.
+    static func mapSettle(_ error: Error) -> SettleError {
+        if let known = error as? SettleError { return known }
+        if case APIError.server(_, let body) = error {
+            switch body.code {
+            case "TENANT_IIN_CONFLICT":
+                return .tenantIINConflict(stored: decode(body.detail("tenant")), provided: providedName(body.detail("provided")))
+            case "LEASE_OVERLAP":
+                var from: String?
+                var to: String?
+                if case .object(let range)? = body.detail("conflicting_range") {
+                    from = range["from"]?.stringValue
+                    to = range["to"]?.stringValue
+                }
+                return .leaseOverlap(conflictingLeaseId: body.detail("conflicting_lease_id")?.stringValue, from: from, to: to)
+            case "TENANT_IDENTITY_INCOMPLETE":
+                var missing: [String] = []
+                if case .array(let items)? = body.detail("missing") { missing = items.compactMap(\.stringValue) }
+                return .identityIncomplete(missing: missing)
+            case "REPLACE_TARGET_INVALID":
+                return .replaceTargetInvalid
+            case "VALIDATION_ERROR":
+                if case .array(let items) = body.details {
+                    let fields = items.compactMap { item -> SettleFieldError? in
+                        guard let field = item["field"]?.stringValue else { return nil }
+                        return SettleFieldError(field: field, message: item["message"]?.stringValue ?? "")
+                    }
+                    if !fields.isEmpty { return .validation(fields: fields) }
+                }
+            default:
+                break
+            }
+        }
+        return .other(map(error))
+    }
+
+    private static func decode<T: Decodable>(_ value: JSONValue?) -> T? {
+        guard let value, let data = try? JSONEncoder().encode(value) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    private static func providedName(_ value: JSONValue?) -> SettleProvidedName? {
+        guard let value else { return nil }
+        return SettleProvidedName(
+            firstName: value["first_name"]?.stringValue,
+            lastName: value["last_name"]?.stringValue,
+            middleName: value["middle_name"]?.stringValue
+        )
     }
 
     static func mapCode(_ body: APIErrorBody, status: Int) -> LeaseV2Error? {

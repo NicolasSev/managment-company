@@ -14,6 +14,7 @@ struct TenantDetailView: View {
     @State private var editingTenant: Tenant?
     @State private var showDeleteConfirmation = false
     @State private var hasAppeared = false
+    @State private var settleContext: SettleWizardContext?
 
     init(tenantId: String, authManager: AuthManager, onChanged: @escaping () async -> Void) {
         self.tenantId = tenantId
@@ -57,6 +58,11 @@ struct TenantDetailView: View {
                 await onChanged()
             }
             .environmentObject(authManager)
+        }
+        // «Заселить» (a tenant without a current lease) opens the wizard with this tenant chosen.
+        .settleWizard(context: $settleContext) {
+            await viewModel.load()
+            await onChanged()
         }
         .confirmationDialog(
             "Удалить арендатора?",
@@ -185,6 +191,12 @@ struct TenantDetailView: View {
                     Text("Сейчас у арендатора нет действующего договора.")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
+                    PrimaryButton(
+                        title: "Заселить",
+                        action: { settleContext = .tenant(tenantId) },
+                        systemImage: "person.badge.plus"
+                    )
+                    .accessibilityIdentifier("tenants.detail.settle")
                 }
             }
             .accessibilityElement(children: .contain)

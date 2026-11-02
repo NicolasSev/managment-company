@@ -9,6 +9,7 @@ enum LeaseV2Fixtures {
     static let pendingName = "lease-aggregate.pending"
     static let tenantOverviewName = "tenant-overview"
     static let paymentQueueName = "payment-queue"
+    static let settleResponseName = "settle-response"
 
     static func data(named name: String, bundle: Bundle? = nil) throws -> Data {
         let bundle = bundle ?? Bundle(for: LeaseV2FixtureBundleToken.self)
@@ -21,6 +22,10 @@ enum LeaseV2Fixtures {
 
     static func aggregate(named name: String, bundle: Bundle? = nil) throws -> LeaseAggregate {
         try JSONDecoder().decode(APIResponse<LeaseAggregate>.self, from: data(named: name, bundle: bundle)).data
+    }
+
+    static func settleResponse(bundle: Bundle? = nil) throws -> SettleResponse {
+        try JSONDecoder().decode(APIResponse<SettleResponse>.self, from: data(named: settleResponseName, bundle: bundle)).data
     }
 
     static func tenantOverview(bundle: Bundle? = nil) throws -> TenantOverview {
@@ -53,10 +58,15 @@ final class MockLeaseV2Service: LeaseV2Service {
 
     /// Throw this from the next command (tests: network failure, 412...). Cleared after use.
     var failNextCommand: LeaseV2Error?
+    /// Throw this from the next `settle` (tests: 409 TENANT_IIN_CONFLICT, 409 LEASE_OVERLAP...).
+    var failNextSettle: SettleError?
 
     private(set) var leases: [String: LeaseAggregate]
     private(set) var commandLog: [String] = []
+    /// Every `settle` that reached the service: the body and the `Idempotency-Key`.
+    private(set) var settleCalls: [(request: SettleRequest, idempotencyKey: String)] = []
     private var replayStore: [String: (fingerprint: String, result: LeaseAggregate)] = [:]
+    private var settleReplay: [String: (fingerprint: String, result: SettleResponse)] = [:]
     private var idCounter = 0
 
     init(leases: [LeaseAggregate], today: String = "2026-11-01", latency: Duration = .zero) {
@@ -449,6 +459,148 @@ final class MockLeaseV2Service: LeaseV2Service {
                 }
             }
         }
+    }
+
+    // MARK: Settle (spec §9.7)
+
+    /// Moves a tenant in from the `settle-response` fixture: a new lease with a fresh id, the
+    /// terms of the request, then the same transitions the API chains (signed, activated).
+    /// Same key and body again replays the first answer; the same key with another body is
+    /// `IDEMPOTENCY_KEY_REUSED`.
+    func settle(_ request: SettleRequest, idempotencyKey: String) async throws -> SettleResponse {
+        try await simulateLatency()
+        commandLog.append("settle")
+        settleCalls.append((request, idempotencyKey))
+        if let failure = failNextSettle {
+            failNextSettle = nil
+            throw failure
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let fingerprint = String(data: (try? encoder.encode(request)) ?? Data(), encoding: .utf8) ?? ""
+        if let stored = settleReplay[idempotencyKey] {
+            guard stored.fingerprint == fingerprint else { throw SettleError.other(.idempotencyKeyReused) }
+            return stored.result
+        }
+        guard request.tenant != nil || request.tenantId != nil else {
+            throw SettleError.validation(fields: [SettleFieldError(field: "tenant", message: "Укажите арендатора.")])
+        }
+
+        var response = try LeaseV2Fixtures.settleResponse()
+        var lease = response.lease
+        let currency = request.lease.rentCurrency
+        lease.id = nextId()
+        lease.version = 1
+        lease.propertyId = request.propertyId
+        lease.property.id = request.propertyId
+        lease.replacedByLeaseId = nil
+        lease.renewedFromLeaseId = request.replacesLeaseId
+        lease.startDate = request.lease.startDate
+        lease.endDate = request.lease.endDate
+            ?? request.lease.termMonths.flatMap { SettleTerms.endDate(start: request.lease.startDate, months: $0) }
+        lease.rentAmount = Money(major: request.lease.rentAmount, currency: currency)
+        lease.currentRentAmount = lease.rentAmount
+        lease.depositAmount = request.lease.depositAmount.map { Money(major: $0, currency: currency) }
+        lease.dueDay = request.lease.dueDay ?? lease.dueDay
+        lease.remindDaysBefore = request.lease.remindDaysBefore ?? lease.remindDaysBefore
+        lease.utilitiesPaidBy = request.lease.utilitiesPaidBy
+        lease.renewalReminderDays = request.lease.renewalReminderDays ?? lease.renewalReminderDays
+        lease.notes = request.lease.notes
+        for index in lease.chargesPreview.indices {
+            switch lease.chargesPreview[index].kind {
+            case .rent: lease.chargesPreview[index].amount = lease.rentAmount
+            case .deposit: lease.chargesPreview[index].amount = lease.depositAmount ?? Money.zero(currency)
+            default: break
+            }
+        }
+        lease.lifecycle.createdAt = now
+
+        var tenant = response.tenant
+        if let input = request.tenant {
+            tenant.id = nextId()
+            tenant.firstName = input.firstName
+            tenant.lastName = input.lastName
+            tenant.middleName = input.middleName
+            tenant.phone = input.phone
+            tenant.email = input.email
+            tenant.iin = input.iin
+            tenant.documentType = input.documentType
+            tenant.documentNumber = input.documentNumber
+            tenant.documentIssuedBy = input.documentIssuedBy
+            tenant.documentIssuedAt = input.documentIssuedAt
+            tenant.birthDate = input.birthDate
+            tenant.registrationAddress = input.registrationAddress
+            tenant.notes = input.notes
+            tenant.cohabitants = input.cohabitants
+            response.tenantCreated = true
+        } else if let tenantId = request.tenantId {
+            tenant.id = tenantId
+            response.tenantCreated = false
+        }
+        lease.tenantId = tenant.id
+        lease.tenant = LeaseTenantCard(
+            id: tenant.id,
+            firstName: tenant.firstName,
+            lastName: tenant.lastName,
+            middleName: tenant.middleName,
+            fullName: [tenant.lastName, tenant.firstName, tenant.middleName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " "),
+            phone: tenant.phone,
+            email: tenant.email,
+            iin: tenant.iin
+        )
+
+        // Draft first, then the transitions of the request (activate > signed_on > send).
+        lease.status = .draft
+        lease.lifecycle.sentForSignatureAt = nil
+        lease.lifecycle.signedOn = nil
+        lease.tenantSnapshot = nil
+        lease.propertySnapshot = nil
+        lease.events = []
+        log(&lease, .created, payload: .object(["via": .string("workflows.settle")]))
+        LeaseV2MockEngine.recalculate(&lease, today: today)
+        leases[lease.id] = lease
+
+        var result = lease
+        // The mock calendar is fixed (`today`); a device date after it must not read as the future.
+        let signedOn = request.signedOn.map { min($0, today) }
+        if request.activate == true {
+            let signed = signedOn ?? today
+            _ = try await markSigned(leaseId: lease.id, version: result.version, request: MarkSignedRequest(signedOn: signed), scan: nil)
+            result = try await activate(
+                leaseId: lease.id,
+                version: leases[lease.id]?.version ?? result.version,
+                request: ActivateLeaseRequest(activationDate: request.activationDate ?? request.lease.startDate, signedOn: signed)
+            )
+        } else if let signedOn {
+            result = try await markSigned(leaseId: lease.id, version: result.version, request: MarkSignedRequest(signedOn: signedOn), scan: nil)
+        } else if request.sendForSignature == true {
+            result = try await markSignedOrSend(leaseId: lease.id)
+        }
+        log(&result, .unknown("workflow.settled"), payload: .object([
+            "source": .string(request.source),
+            "tenant_created": .bool(response.tenantCreated),
+        ]))
+        leases[result.id] = result
+
+        response.tenant = tenant
+        response.lease = result
+        settleReplay[idempotencyKey] = (fingerprint, response)
+        return response
+    }
+
+    /// `send-for-signature` has no method on the service seam (the app has no button for it);
+    /// the mock moves the draft to `pending_signature` itself.
+    private func markSignedOrSend(leaseId: String) async throws -> LeaseAggregate {
+        guard var lease = leases[leaseId] else { throw LeaseV2Error.notFound }
+        lease.status = .pendingSignature
+        lease.version += 1
+        lease.lifecycle.sentForSignatureAt = now
+        lease.tenantSnapshot = snapshot(of: lease.tenant)
+        lease.propertySnapshot = LeasePropertySnapshot(name: lease.property.name, address: lease.property.address, capturedAt: now)
+        log(&lease, .sentForSignature, payload: .object([:]))
+        LeaseV2MockEngine.recalculate(&lease, today: today)
+        leases[leaseId] = lease
+        return lease
     }
 
     // MARK: Plumbing

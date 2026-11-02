@@ -30,7 +30,7 @@ struct PropertyDetailView: View {
     @State private var transactionToDelete: Transaction?
     @State private var utilityToDelete: PropertyUtility?
     @State private var receiptToDelete: UtilityReceiptPayload?
-    @State private var showLeaseForm = false
+    @State private var settleContext: SettleWizardContext?
     @State private var editingLease: Lease?
     @State private var leaseToTerminate: Lease?
     @State private var depositLease: Lease?
@@ -176,12 +176,8 @@ struct PropertyDetailView: View {
             }
             .environmentObject(authManager)
         }
-        .sheet(isPresented: $showLeaseForm) {
-            LeaseFormSheet(propertyId: property.id, tenants: tenants) {
-                await loadData()
-            }
-            .environmentObject(authManager)
-        }
+        // «Заселить арендатора» opens the move-in wizard; `LeaseFormSheet` stays for editing a lease.
+        .settleWizard(context: $settleContext) { await loadData() }
         .sheet(item: $depositLease) { lease in
             DepositView(authManager: authManager, leaseId: lease.id)
                 .environmentObject(authManager)
@@ -534,7 +530,7 @@ struct PropertyDetailView: View {
                     Spacer()
 
                     Button {
-                        showLeaseForm = true
+                        settleContext = .property(property.id)
                     } label: {
                         Image(systemName: "person.badge.plus")
                             .font(.headline)
@@ -542,6 +538,7 @@ struct PropertyDetailView: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(AppTheme.Colors.accent)
                     .accessibilityLabel("Заселить арендатора")
+                    .accessibilityIdentifier("property.tenants.settle")
                 }
 
                 if leases.isEmpty {

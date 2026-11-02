@@ -68,6 +68,47 @@ protocol LeaseV2Service {
     func addExtraCharge(leaseId: String, version: Int, request: AddExtraChargeRequest, idempotencyKey: String) async throws -> LeaseAggregate
     func payCharge(leaseId: String, chargeId: String, request: PayChargeRequest, idempotencyKey: String) async throws -> LeaseAggregate
     func returnDeposit(leaseId: String, version: Int, request: ReturnDepositRequest, idempotencyKey: String) async throws -> LeaseAggregate
+
+    /// `POST /v1/workflows/settle` (spec §9.7): tenant, draft lease and the next step in one
+    /// transaction. One `idempotencyKey` per wizard opening: a repeat after a network failure
+    /// replays the first answer. Failures are `SettleError`.
+    func settle(_ request: SettleRequest, idempotencyKey: String) async throws -> SettleResponse
+}
+
+/// Failures of the settle command the wizard answers one by one (spec §9.7 and §11).
+enum SettleError: Error, Equatable {
+    /// `409 TENANT_IIN_CONFLICT`: the owner has a tenant with this IIN under another name.
+    case tenantIINConflict(stored: SettleTenant?, provided: SettleProvidedName?)
+    /// `409 LEASE_OVERLAP`: the dates collide with another lease of the property.
+    case leaseOverlap(conflictingLeaseId: String?, from: String?, to: String?)
+    /// `422 TENANT_IDENTITY_INCOMPLETE`: `details.missing`, field names of the tenant.
+    case identityIncomplete(missing: [String])
+    /// `400 VALIDATION_ERROR`: `details[]` with body paths (`tenant.iin`, `lease.rent_amount`).
+    case validation(fields: [SettleFieldError])
+    /// `422 REPLACE_TARGET_INVALID`.
+    case replaceTargetInvalid
+    /// Anything else, in the vocabulary of the lease screens (`transport`, `unauthorized`, ...).
+    case other(LeaseV2Error)
+
+    var isTransport: Bool {
+        if case .other(.transport) = self { return true }
+        return false
+    }
+}
+
+nonisolated struct SettleProvidedName: Equatable {
+    var firstName: String?
+    var lastName: String?
+    var middleName: String?
+
+    var fullName: String {
+        [lastName, firstName, middleName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+    }
+}
+
+nonisolated struct SettleFieldError: Equatable {
+    var field: String
+    var message: String
 }
 
 /// Picks the service the lease screens use: `LiveLeaseV2Service` by default. The fixture-backed

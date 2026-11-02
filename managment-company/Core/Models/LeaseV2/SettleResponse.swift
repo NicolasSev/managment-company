@@ -2,7 +2,7 @@ import Foundation
 
 /// The tenant of a settle answer: found by id or IIN, or just created. Same identity fields as
 /// `TenantResponse` in the contract (`Tenant` of the v1 screens does not carry the passport data).
-struct SettleTenant: Codable, Hashable, Identifiable {
+nonisolated struct SettleTenant: Codable, Hashable, Identifiable {
     var id: String
     var firstName: String
     var lastName: String?

@@ -1,33 +1,26 @@
 import SwiftUI
 
-/// Placeholder for «заменить новым договором» (spec §3.10). The flow that creates the
-/// replacing lease belongs to the tenants/lease creation work; this sheet only explains it.
+/// «Заменить новым договором» (spec §3.10): the move-in wizard for the tenant and property of the
+/// current lease, with `replaces_lease_id` set. Nothing happens to the current lease until the new
+/// one is activated. After the settle the lease behind reloads; «К договору» opens the new lease
+/// inside the sheet.
 struct ReplaceWithNewLeaseSheet: View {
     @ObservedObject var viewModel: LeaseDetailViewModel
+    @EnvironmentObject private var authManager: AuthManager
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: AppTheme.Spacing.lg) {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(AppTheme.Colors.accent)
-                Text("Замена договора новым")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                Text("Новый договор с другой ставкой и сроком вместо продления появится в одном из ближайших обновлений. Текущий договор при этом не изменяется.")
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                    .accessibilityIdentifier("lease.detail.sheet.replace_with_new.message")
-                PrimaryButton(title: "Понятно") { viewModel.dismissSheet() }
-                    .accessibilityIdentifier("lease.detail.sheet.replace_with_new.close")
+        Group {
+            if let lease = viewModel.lease {
+                SettleWizardView(
+                    context: .replacing(lease),
+                    authManager: authManager,
+                    onSettled: { _ in Task { await viewModel.reload() } },
+                    onOpenLease: nil
+                )
+            } else {
+                ProgressView()
             }
-            .padding(AppTheme.Spacing.lg)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .navigationTitle("Новый договор")
-            .navigationBarTitleDisplayMode(.inline)
         }
         .accessibilityIdentifier("lease.detail.sheet.replace_with_new")
-        .presentationDetents([.medium])
     }
 }
