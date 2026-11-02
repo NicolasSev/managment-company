@@ -13,6 +13,10 @@ struct NotificationRoute: Identifiable, Equatable {
         case tenants
         case tasks
         case task(String)
+        /// A utility bill from a push (`utility_bill_needs_review`, `utility_bill_missing`).
+        case utilityBill(billId: String, propertyId: String?)
+        /// The review inbox of the utilities (`utility_upload_other`, or a push without a bill).
+        case utilitiesInbox
     }
 
     let id = UUID()
@@ -32,12 +36,14 @@ struct NotificationRoute: Identifiable, Equatable {
             return .tenants
         case .tasks, .task:
             return .tasks
+        case .utilityBill, .utilitiesInbox:
+            return .utilities
         }
     }
 
     var opensNestedDestination: Bool {
         switch kind {
-        case .transaction, .property, .task:
+        case .transaction, .property, .task, .utilityBill, .utilitiesInbox:
             return true
         default:
             return false
@@ -48,12 +54,40 @@ struct NotificationRoute: Identifiable, Equatable {
         self.kind = kind
     }
 
+    /// Push types of the utility bills. The reminder for a missing receipt is sent as
+    /// `utility_bill_missing`; `utility_missing_reminder` is accepted as its alias.
+    private static let utilityBillTypes: Set<String> = [
+        "utility_bill_needs_review", "utility_bill_missing", "utility_missing_reminder",
+    ]
+
+    /// Where a utility push leads: the bill when the payload names one, else the inbox.
+    static func utilityKind(notificationType: String?, data: [String: String]) -> Kind? {
+        let type = notificationType ?? data["event_type"]
+        let entityType = data["entity_type"]
+        let isBill = type.map(utilityBillTypes.contains) == true || entityType == "utility_bill"
+        let isInbox = type == "utility_upload_other" || entityType == "document_extraction"
+        guard isBill || isInbox else { return nil }
+        if isBill {
+            let billId = data["bill_id"] ?? (entityType == "utility_bill" ? data["entity_id"] : nil)
+            if let billId, !billId.isEmpty {
+                let propertyId = data["property_id"].flatMap { $0.isEmpty ? nil : $0 }
+                return .utilityBill(billId: billId, propertyId: propertyId)
+            }
+        }
+        return .utilitiesInbox
+    }
+
     init(notificationType: String?, data: [String: String]) {
         let entityType = data["entity_type"]
         let entityId = data["entity_id"]
         let propertyId = data["property_id"]
         let transactionId = data["transaction_id"]
         let taskId = data["task_id"]
+
+        if let utility = Self.utilityKind(notificationType: notificationType, data: data) {
+            self.init(kind: utility)
+            return
+        }
 
         if let transactionId, !transactionId.isEmpty {
             self.init(kind: .transaction(transactionId))

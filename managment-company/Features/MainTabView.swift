@@ -10,6 +10,7 @@ enum AppTab: Hashable {
     case tenants
     case tasks
     case settings
+    case utilities
 }
 
 struct MainTabView: View {
@@ -22,6 +23,7 @@ struct MainTabView: View {
     @State private var showDashboard = false
     @State private var showTasks = false
     @State private var showSettings = false
+    @State private var showUtilities = false
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -55,7 +57,7 @@ struct MainTabView: View {
         .tint(AppTheme.Colors.accent)
         .environmentObject(quickActions)
         // Secondary routes outside the primary bar: Dashboard (GAP-037), Tasks (moved out for the
-        // «Арендаторы» tab, L13) and Settings stay reachable from the «Ещё» menu on «Сегодня».
+        // «Арендаторы» tab, L13), Utilities (U9) and Settings stay reachable from the «Ещё» menu on «Сегодня».
         .sheet(isPresented: $showDashboard) {
             DashboardView().environmentObject(authManager)
         }
@@ -66,6 +68,11 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView().environmentObject(authManager)
+        }
+        .sheet(isPresented: $showUtilities) {
+            UtilitiesOverviewView(authManager: authManager)
+                .environmentObject(authManager)
+                .environmentObject(notificationRouter)
         }
 
             QuickActionLauncher()
@@ -100,6 +107,7 @@ struct MainTabView: View {
             case .dashboardSheet: showDashboard = true
             case .tasksSheet: showTasks = true
             case .settingsSheet: showSettings = true
+            case .utilitiesSheet: showUtilities = true
             }
             notificationRouter.clearTabSelection()
         }
@@ -113,6 +121,7 @@ struct MainTabView: View {
         case .dashboard: return .dashboardSheet
         case .tasks: return .tasksSheet
         case .settings: return .settingsSheet
+        case .utilities: return .utilitiesSheet
         case .transactions, .payments: return .tab(.money)
         case .today, .money, .properties, .tenants: return .tab(tab)
         }
@@ -125,6 +134,7 @@ enum AppNavigationTarget: Equatable {
     case dashboardSheet
     case tasksSheet
     case settingsSheet
+    case utilitiesSheet
 }
 
 struct SettingsView: View {
@@ -241,6 +251,8 @@ struct SettingsView: View {
                         expenseReminderSettings
 
                         ContractSettingsSection()
+
+                        UtilitiesSettingsSection()
 
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {

@@ -12,6 +12,9 @@ struct PropertyFormView: View {
     @State private var status = "vacant"
     @State private var address = ""
     @State private var city = ""
+    /// The payer, the default account and the expected months (U9); the account number is also
+    /// written to the property record, where the welcome text and the old matching read it.
+    @StateObject private var utilityModel = UtilityPropertySettingsModel()
     @State private var utilityAccountNumber = ""
     @State private var wifiLogin = ""
     @State private var wifiPassword = ""
@@ -80,16 +83,7 @@ struct PropertyFormView: View {
                         .font(.caption)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
-                Section("Коммунальные платежи (OCR)") {
-                    AppTextField(
-                        title: "Лицевой счёт",
-                        text: $utilityAccountNumber,
-                        placeholder: "Как на квитанции, для автопривязки"
-                    )
-                    Text("Если указать номер совпадающий с квитанцией, объект подставится при загрузке квитанции на вкладке «Операции».")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                }
+                UtilityPropertySettingsSection(model: utilityModel, isNewProperty: property == nil)
                 Section("Wi-Fi для арендатора") {
                     AppTextField(
                         title: "Логин / сеть Wi-Fi",
@@ -150,6 +144,13 @@ struct PropertyFormView: View {
             }
             .onAppear { populateFromProperty() }
             .task(id: purchaseRateKey) { await loadPurchaseUSDEquivalent() }
+            .task {
+                guard let property else { return }
+                await utilityModel.load(
+                    property: property,
+                    service: UtilityBillsServiceProvider.makeService(authManager: authManager)
+                )
+            }
         }
     }
 
@@ -277,7 +278,10 @@ struct PropertyFormView: View {
         errorMessage = nil
         defer { isLoading = false }
         
-        let trimmedAccount = utilityAccountNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelAccount = utilityModel.accountNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAccount = utilityModel.isLoaded
+            ? modelAccount
+            : utilityAccountNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedWifiLogin = wifiLogin.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedWifiPassword = wifiPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         let price = parsedPurchasePrice
@@ -306,7 +310,8 @@ struct PropertyFormView: View {
             notes: property?.notes,
             tags: property?.tags,
             // PUT: absent keeps the stored value, an empty string clears it. A new object has nothing to clear.
-            ownershipDocument: property == nil && trimmedOwnership.isEmpty ? nil : trimmedOwnership
+            ownershipDocument: property == nil && trimmedOwnership.isEmpty ? nil : trimmedOwnership,
+            utilityPayer: utilityModel.payer.rawValue
         )
         
         do {
@@ -327,11 +332,25 @@ struct PropertyFormView: View {
                     refreshAndRetry: { await authManager.refreshToken() }
                 )
             }
-            await onSave()
-            dismiss()
         } catch {
             errorMessage = "Не удалось сохранить объект"
+            return
         }
+
+        // The property is saved; the account and the expectation rule have their own endpoints.
+        do {
+            try await utilityModel.apply()
+        } catch let error as UtilityBillsError {
+            await onSave()
+            errorMessage = "Объект сохранён, но коммунальные настройки нет. " + error.userMessage
+            return
+        } catch {
+            await onSave()
+            errorMessage = "Объект сохранён, но коммунальные настройки нет. Повторите."
+            return
+        }
+        await onSave()
+        dismiss()
     }
 
     private func loadPurchaseUSDEquivalent() async {
@@ -404,6 +423,7 @@ private struct PropertyInput: Encodable {
     let notes: String?
     let tags: [String]?
     let ownershipDocument: String?
+    let utilityPayer: String?
 
     enum CodingKeys: String, CodingKey {
         case name, status, address, city, country, district, rooms, floor, notes, tags
@@ -418,6 +438,7 @@ private struct PropertyInput: Encodable {
         case wifiLogin = "wifi_login"
         case wifiPassword = "wifi_password"
         case ownershipDocument = "ownership_document"
+        case utilityPayer = "utility_payer"
     }
 }
 

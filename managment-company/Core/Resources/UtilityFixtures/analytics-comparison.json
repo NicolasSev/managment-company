@@ -1,0 +1,185 @@
+{
+  "data": {
+    "base_currency": "KZT",
+    "year": 2025,
+    "compare_year": 2024,
+    "group_by": "type",
+    "metric": "amount",
+    "per_sqm": false,
+    "totals": {
+      "current": 3000,
+      "previous": 1650,
+      "delta_abs": 1350,
+      "delta_pct": 81.8
+    },
+    "rows": [
+      {
+        "key": "electricity",
+        "current": 1200,
+        "previous": 1100,
+        "delta_abs": 100,
+        "delta_pct": 9.1
+      },
+      {
+        "key": "waste",
+        "current": 1000,
+        "previous": 0,
+        "delta_abs": 1000,
+        "delta_pct": null
+      },
+      {
+        "key": "gas",
+        "current": 500,
+        "previous": 550,
+        "delta_abs": -50,
+        "delta_pct": -9.1
+      },
+      {
+        "key": "internet",
+        "current": 300,
+        "previous": 0,
+        "delta_abs": 300,
+        "delta_pct": null
+      }
+    ],
+    "type_rows": [
+      {
+        "key": "electricity",
+        "current": 1200,
+        "previous": 1100,
+        "delta_abs": 100,
+        "delta_pct": 9.1
+      },
+      {
+        "key": "waste",
+        "current": 1000,
+        "previous": 0,
+        "delta_abs": 1000,
+        "delta_pct": null
+      },
+      {
+        "key": "gas",
+        "current": 500,
+        "previous": 550,
+        "delta_abs": -50,
+        "delta_pct": -9.1
+      },
+      {
+        "key": "internet",
+        "current": 300,
+        "previous": 0,
+        "delta_abs": 300,
+        "delta_pct": null
+      }
+    ],
+    "coverage": {
+      "months_with_bill": 10,
+      "missing_months": [
+        "2024-03",
+        "2025-04",
+        "2025-05"
+      ]
+    },
+    "by_property": [
+      {
+        "property_id": "7c1e0000-0000-0000-0000-000000000001",
+        "property_name": "Примерная 1, кв. 1",
+        "area_sqm": 50,
+        "totals": {
+          "current": 2000,
+          "previous": 1650,
+          "delta_abs": 350,
+          "delta_pct": 21.2
+        },
+        "rows": [
+          {
+            "key": "electricity",
+            "current": 1200,
+            "previous": 1100,
+            "delta_abs": 100,
+            "delta_pct": 9.1
+          },
+          {
+            "key": "gas",
+            "current": 500,
+            "previous": 550,
+            "delta_abs": -50,
+            "delta_pct": -9.1
+          },
+          {
+            "key": "internet",
+            "current": 300,
+            "previous": 0,
+            "delta_abs": 300,
+            "delta_pct": null
+          }
+        ],
+        "type_rows": [
+          {
+            "key": "electricity",
+            "current": 1200,
+            "previous": 1100,
+            "delta_abs": 100,
+            "delta_pct": 9.1
+          },
+          {
+            "key": "gas",
+            "current": 500,
+            "previous": 550,
+            "delta_abs": -50,
+            "delta_pct": -9.1
+          },
+          {
+            "key": "internet",
+            "current": 300,
+            "previous": 0,
+            "delta_abs": 300,
+            "delta_pct": null
+          }
+        ],
+        "coverage": {
+          "months_with_bill": 10,
+          "missing_months": [
+            "2024-03",
+            "2025-04",
+            "2025-05"
+          ]
+        }
+      },
+      {
+        "property_id": "7c1e0000-0000-0000-0000-000000000002",
+        "property_name": "Примерная 2, кв. 7",
+        "area_sqm": null,
+        "totals": {
+          "current": 1000,
+          "previous": 0,
+          "delta_abs": 1000,
+          "delta_pct": null
+        },
+        "rows": [
+          {
+            "key": "waste",
+            "current": 1000,
+            "previous": 0,
+            "delta_abs": 1000,
+            "delta_pct": null
+          }
+        ],
+        "type_rows": [
+          {
+            "key": "waste",
+            "current": 1000,
+            "previous": 0,
+            "delta_abs": 1000,
+            "delta_pct": null
+          }
+        ],
+        "coverage": {
+          "months_with_bill": 1,
+          "missing_months": []
+        }
+      }
+    ],
+    "unconverted_lines": 0
+  }
+}

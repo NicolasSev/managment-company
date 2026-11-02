@@ -41,6 +41,10 @@ struct TodayView: View {
                             Label("Задачи", systemImage: "checklist")
                         }
                         .accessibilityIdentifier("today.more.tasks")
+                        Button { notificationRouter.selectTab = .utilities } label: {
+                            Label("Коммуналка", systemImage: "bolt.horizontal")
+                        }
+                        .accessibilityIdentifier("today.more.utilities")
                         Button { notificationRouter.selectTab = .settings } label: {
                             Label("Настройки", systemImage: "gearshape")
                         }

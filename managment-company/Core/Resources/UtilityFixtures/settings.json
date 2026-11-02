@@ -1,0 +1,17 @@
+{
+  "data": {
+    "channels": [
+      { "event_type": "utility_bill_missing", "channel": "push", "enabled": true },
+      { "event_type": "utility_bill_missing", "channel": "telegram", "enabled": true },
+      { "event_type": "utility_bill_needs_review", "channel": "push", "enabled": true },
+      { "event_type": "utility_bill_needs_review", "channel": "telegram", "enabled": false },
+      { "event_type": "utility_upload_other", "channel": "push", "enabled": true },
+      { "event_type": "utility_upload_other", "channel": "telegram", "enabled": false }
+    ],
+    "quiet_from": "22:00",
+    "quiet_to": "08:00",
+    "utility_reminder_day": 10,
+    "utility_reminder_repeat_days": 3,
+    "telegram": { "linked": true, "verified_at": "2026-11-02T09:41:07Z" }
+  }
+}

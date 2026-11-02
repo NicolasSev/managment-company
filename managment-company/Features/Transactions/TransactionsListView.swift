@@ -230,8 +230,8 @@ struct TransactionsListView: View {
                 await loadPortfolioTransactions()
             }
             .sheet(isPresented: $showReceiptSheet) {
-                UtilityReceiptUploadSheet {
-                    Task { await loadPortfolioTransactions() }
+                UtilityQuickUploadSheet(authManager: authManager) {
+                    await loadPortfolioTransactions()
                 }
                 .environmentObject(authManager)
             }
@@ -522,7 +522,7 @@ struct TransactionsListView: View {
                     .font(.headline)
                     .foregroundStyle(AppTheme.Colors.textPrimary)
 
-                Text("Загрузите PDF или фото — суммы попадут в коммунальные платежи выбранного объекта после подтверждения.")
+                Text("Загрузите PDF или фото: суммы попадут в счета объекта после вашего подтверждения.")
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
 

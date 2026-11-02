@@ -27,6 +27,8 @@ struct Property: Identifiable, Codable, Hashable {
     /// Правоустанавливающий документ собственника; печатается в п. 1.1 договора аренды.
     var ownershipDocument: String? = nil
     var archivedAt: String? = nil
+    /// Who pays utilities: a property attribute (`tenant` by default). Absent in older answers.
+    var utilityPayer: UtilityPayer? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name, status, notes, tags
@@ -44,6 +46,7 @@ struct Property: Identifiable, Codable, Hashable {
         case wifiPassword = "wifi_password"
         case ownershipDocument = "ownership_document"
         case archivedAt = "archived_at"
+        case utilityPayer = "utility_payer"
     }
     
     var displayAddress: String? {

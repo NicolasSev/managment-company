@@ -8,9 +8,6 @@ struct PropertyDetailView: View {
     @State private var transactions: [Transaction] = []
     @State private var tenants: [Tenant] = []
     @State private var leases: [Lease] = []
-    @State private var utilities: [PropertyUtility] = []
-    @State private var utilitiesHistoryExtra: [PropertyUtility] = []
-    @State private var utilityReceipts: [UtilityReceiptPayload] = []
     @State private var maintenanceRequests: [MaintenanceRequest] = []
     @State private var leaseSchedulesByLeaseId: [String: [LeasePaymentSchedule]] = [:]
     @State private var scheduleForMarkPaidSheet: LeasePaymentSchedule?
@@ -18,18 +15,12 @@ struct PropertyDetailView: View {
     @State private var errorMessage: String?
     @State private var showTransactionSheet = false
     @State private var showEditForm = false
-    @State private var showUtilityForm = false
-    @State private var editingUtility: PropertyUtility?
-    @State private var selectedUtility: PropertyUtility?
-    @State private var selectedUtilityReceipt: UtilityReceiptRoute?
     @State private var showMaintenanceForm = false
     @State private var editingMaintenance: MaintenanceRequest?
     @State private var maintenanceToDelete: MaintenanceRequest?
     @State private var updatingMaintenanceId: String?
     @State private var editingTransaction: Transaction?
     @State private var transactionToDelete: Transaction?
-    @State private var utilityToDelete: PropertyUtility?
-    @State private var receiptToDelete: UtilityReceiptPayload?
     @State private var settleContext: SettleWizardContext?
     @State private var editingLease: Lease?
     @State private var leaseToTerminate: Lease?
@@ -41,35 +32,6 @@ struct PropertyDetailView: View {
     @State private var welcomeCopyMessage: String?
     @State private var showArchiveConfirmation = false
     @State private var isUpdatingArchive = false
-
-    /// Merges paginated property utilities with portfolio history (longer horizon) for this object.
-    private var utilitiesForDisplay: [PropertyUtility] {
-        var merged: [String: PropertyUtility] = Dictionary(uniqueKeysWithValues: utilities.map { ($0.id, $0) })
-        for extra in utilitiesHistoryExtra where extra.propertyId == property.id {
-            merged[extra.id] = merged[extra.id] ?? extra
-        }
-        return Array(merged.values).sorted {
-            if $0.periodYear == $1.periodYear {
-                return $0.periodMonth > $1.periodMonth
-            }
-            return $0.periodYear > $1.periodYear
-        }
-    }
-
-    private var utilityReceiptsForDisplay: [UtilityReceiptPayload] {
-        utilityReceipts.sorted { left, right in
-            let leftPeriod = UtilityReceiptDisplay.receiptPeriodSortKey(left)
-            let rightPeriod = UtilityReceiptDisplay.receiptPeriodSortKey(right)
-            if leftPeriod == rightPeriod {
-                return UtilityReceiptDisplay.receiptDateSortKey(left) > UtilityReceiptDisplay.receiptDateSortKey(right)
-            }
-            return leftPeriod > rightPeriod
-        }
-    }
-
-    private var utilityReceiptById: [String: UtilityReceiptPayload] {
-        Dictionary(uniqueKeysWithValues: utilityReceipts.map { ($0.id, $0) })
-    }
 
     private var purchasePriceText: String {
         guard let price = property.purchasePrice else { return "Не указано" }
@@ -148,25 +110,6 @@ struct PropertyDetailView: View {
                 property: property,
                 onSave: { await loadData() },
                 onDelete: { dismiss() }
-            )
-            .environmentObject(authManager)
-        }
-        .sheet(isPresented: $showUtilityForm) {
-            UtilityFormView(propertyId: property.id, utility: editingUtility) {
-                await loadUtilities()
-                await loadUtilitiesHistoryExtra()
-                await loadUtilityReceipts()
-            }
-            .environmentObject(authManager)
-        }
-        .sheet(item: $selectedUtility) { utility in
-            UtilityDetailSheet(utility: utility)
-                .environmentObject(authManager)
-        }
-        .sheet(item: $selectedUtilityReceipt) { route in
-            UtilityReceiptDetailSheet(
-                receiptId: route.id,
-                initialReceipt: utilityReceiptById[route.id]
             )
             .environmentObject(authManager)
         }
@@ -261,44 +204,6 @@ struct PropertyDetailView: View {
         } message: {
             Text("Заявка будет скрыта из списка обслуживания объекта.")
         }
-        .confirmationDialog(
-            "Удалить начисление коммуналки?",
-            isPresented: Binding(
-                get: { utilityToDelete != nil },
-                set: { if !$0 { utilityToDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Удалить", role: .destructive) {
-                if let utility = utilityToDelete {
-                    Task { await deleteUtility(utility) }
-                }
-            }
-            Button("Отмена", role: .cancel) {
-                utilityToDelete = nil
-            }
-        } message: {
-            Text("Начисление будет удалено из истории коммунальных платежей объекта.")
-        }
-        .confirmationDialog(
-            "Удалить квитанцию?",
-            isPresented: Binding(
-                get: { receiptToDelete != nil },
-                set: { if !$0 { receiptToDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Удалить", role: .destructive) {
-                if let receipt = receiptToDelete {
-                    Task { await deleteReceipt(receipt) }
-                }
-            }
-            Button("Отмена", role: .cancel) {
-                receiptToDelete = nil
-            }
-        } message: {
-            Text("Распознанная квитанция будет удалена. Подтверждённые квитанции удалить нельзя — удалите материализованные начисления.")
-        }
         .sheet(item: $scheduleForMarkPaidSheet) { schedule in
             MarkSchedulePaidSheet(schedule: schedule) {
                 await refreshSchedule(leaseID: schedule.leaseId)
@@ -314,7 +219,7 @@ struct PropertyDetailView: View {
         if isLoading {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let errorMessage, transactions.isEmpty, leases.isEmpty, utilitiesForDisplay.isEmpty, maintenanceRequests.isEmpty {
+        } else if let errorMessage, transactions.isEmpty, leases.isEmpty, maintenanceRequests.isEmpty {
             EmptyStateView(
                 title: "Не удалось загрузить активность объекта",
                 message: errorMessage,
@@ -685,48 +590,9 @@ struct PropertyDetailView: View {
         }
     }
 
+    /// The twelve months of the utility bills (U9); the v1 list of rows and receipts is gone.
     private var utilitiesSection: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                HStack(alignment: .top) {
-                    sectionHeader(
-                        title: "Коммуналка",
-                        subtitle: "Ежемесячные коммунальные расходы и квитанции по объекту."
-                    )
-
-                    Spacer()
-
-                    Button {
-                        editingUtility = nil
-                        showUtilityForm = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.headline)
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(AppTheme.Colors.accent)
-                    .accessibilityLabel("Добавить коммуналку")
-                }
-
-                if utilitiesForDisplay.isEmpty && utilityReceiptsForDisplay.isEmpty {
-                    sectionPlaceholder(
-                        title: "Коммуналка пока не добавлена",
-                        message: "Добавляйте ежемесячную коммуналку здесь; для старых периодов данные подтягиваются из истории портфеля (до 36 мес.).",
-                        icon: "receipt"
-                    )
-                } else {
-                    if !utilitiesForDisplay.isEmpty {
-                        ForEach(utilitiesForDisplay.prefix(36)) { utility in
-                            utilityListRow(utility)
-                        }
-                    }
-
-                    if !utilityReceiptsForDisplay.isEmpty {
-                        utilityReceiptsHistorySection(Array(utilityReceiptsForDisplay.prefix(8)))
-                    }
-                }
-            }
-        }
+        UtilitiesGridView(propertyId: property.id, propertyName: property.name, authManager: authManager)
     }
 
     private var maintenanceSection: some View {
@@ -877,55 +743,6 @@ struct PropertyDetailView: View {
             .clipShape(Capsule())
     }
 
-    private func utilityListRow(_ utility: PropertyUtility) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-            Button {
-                selectedUtility = utility
-            } label: {
-                utilityRow(utility)
-            }
-            .buttonStyle(.plain)
-
-            HStack(spacing: AppTheme.Spacing.sm) {
-                utilityActionButton(
-                    title: "Детали",
-                    icon: "info.circle",
-                    color: AppTheme.Colors.accent
-                ) {
-                    selectedUtility = utility
-                }
-
-                utilityActionButton(
-                    title: "Изменить",
-                    icon: "pencil",
-                    color: AppTheme.Colors.textSecondary
-                ) {
-                    editingUtility = utility
-                    showUtilityForm = true
-                }
-
-                if let receiptId = utility.sourceReceiptId?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !receiptId.isEmpty {
-                    utilityActionButton(
-                        title: "Квитанция",
-                        icon: "doc.text.magnifyingglass",
-                        color: AppTheme.Colors.info
-                    ) {
-                        selectedUtilityReceipt = UtilityReceiptRoute(id: receiptId)
-                    }
-                }
-
-                utilityActionButton(
-                    title: "Удалить",
-                    icon: "trash",
-                    color: AppTheme.Colors.danger
-                ) {
-                    utilityToDelete = utility
-                }
-            }
-        }
-    }
-
     private func utilityActionButton(
         title: String,
         icon: String,
@@ -945,95 +762,6 @@ struct PropertyDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    private func utilityReceiptsHistorySection(_ receipts: [UtilityReceiptPayload]) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-            Divider()
-                .padding(.vertical, AppTheme.Spacing.xs)
-
-            HStack(alignment: .firstTextBaseline) {
-                Text("Распознанные квитанции")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                Spacer()
-
-                Text("\(utilityReceiptsForDisplay.count)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.accent)
-            }
-
-            ForEach(receipts, id: \.id) { receipt in
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                    Button {
-                        selectedUtilityReceipt = UtilityReceiptRoute(id: receipt.id)
-                    } label: {
-                        utilityReceiptRow(receipt)
-                    }
-                    .buttonStyle(.plain)
-
-                    if receipt.status.lowercased() != "confirmed" {
-                        utilityActionButton(
-                            title: "Удалить квитанцию",
-                            icon: "trash",
-                            color: AppTheme.Colors.danger
-                        ) {
-                            receiptToDelete = receipt
-                        }
-                    }
-                }
-            }
-
-            if utilityReceiptsForDisplay.count > receipts.count {
-                Text("Еще квитанций: \(utilityReceiptsForDisplay.count - receipts.count).")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-            }
-        }
-        .padding(.top, AppTheme.Spacing.sm)
-    }
-
-    private func utilityReceiptRow(_ receipt: UtilityReceiptPayload) -> some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(UtilityReceiptDisplay.receiptPeriodLabel(receipt))
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                Text(receipt.provider?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? receipt.provider! : "Поставщик не распознан")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                    .lineLimit(2)
-
-                if let account = receipt.accountNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !account.isEmpty {
-                    Text("Л/с \(account)")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                }
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(receipt.totalAmount.map { AppFormatting.compactAmount($0, currency: receipt.currency ?? "KZT") } ?? "Сумма не распознана")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                StatusBadge(status: UtilityReceiptDisplay.receiptStatusLabel(receipt.status))
-
-                if let paymentDate = receipt.paymentDate,
-                   let formatted = AppFormatting.dateString(from: paymentDate) {
-                    Text(formatted)
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                }
-            }
-        }
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.65))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func leaseScheduleSection(rows: [LeasePaymentSchedule]) -> some View {
@@ -1196,50 +924,6 @@ struct PropertyDetailView: View {
         .padding(.vertical, AppTheme.Spacing.sm)
     }
 
-    private func utilityRow(_ utility: PropertyUtility) -> some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(utilityPeriodLabel(utility))
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                Text(utilityTypeLabel(utility.utilityType))
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                Text(utility.provider?.isEmpty == false ? utility.provider! : "Поставщик не указан")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                if utility.sourceReceiptId?.isEmpty == false {
-                    Label("Из распознанной квитанции", systemImage: "doc.text.magnifyingglass")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.Colors.info)
-                }
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(AppFormatting.compactAmount(utility.amount, currency: utility.currency))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                StatusBadge(status: utility.status)
-
-                if let due = utility.dueDate {
-                    Text("Срок: \(AppFormatting.dateString(from: due) ?? due)")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                }
-            }
-        }
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private func statusBanner(_ message: String, color: Color) -> some View {
         Text(message)
             .font(.footnote.weight(.medium))
@@ -1259,14 +943,11 @@ struct PropertyDetailView: View {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await loadTransactions() }
             group.addTask { await loadLeases() }
-            group.addTask { await loadUtilities() }
-            group.addTask { await loadUtilityReceipts() }
             group.addTask { await loadMaintenance() }
         }
 
         await loadTenants()
         await loadLeaseSchedules()
-        await loadUtilitiesHistoryExtra()
         await loadPurchaseUSDEquivalent()
     }
 
@@ -1387,34 +1068,6 @@ struct PropertyDetailView: View {
         }
     }
 
-    private func loadUtilitiesHistoryExtra() async {
-        do {
-            let data = try await APIClient.shared.requestData(
-                "/v1/analytics/utilities-history?months=36",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            let env = try JSONDecoder().decode(APIListEnvelope<PropertyUtility>.self, from: data)
-            utilitiesHistoryExtra = env.data.filter { $0.propertyId == property.id }
-        } catch {
-            utilitiesHistoryExtra = []
-        }
-    }
-
-    private func loadUtilityReceipts() async {
-        do {
-            let data = try await APIClient.shared.requestData(
-                "/v1/properties/\(property.id)/utility-receipts?per_page=100",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            let env = try JSONDecoder().decode(APIListEnvelope<UtilityReceiptPayload>.self, from: data)
-            utilityReceipts = env.data
-        } catch {
-            utilityReceipts = []
-        }
-    }
-
     private func loadMaintenance() async {
         do {
             let data = try await APIClient.shared.requestData(
@@ -1504,42 +1157,6 @@ struct PropertyDetailView: View {
         }
     }
 
-    private func deleteUtility(_ utility: PropertyUtility) async {
-        do {
-            _ = try await APIClient.shared.requestData(
-                "/v1/utilities/\(utility.id)",
-                method: "DELETE",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            utilityToDelete = nil
-            AppHaptics.success()
-            await loadUtilities()
-            await loadUtilitiesHistoryExtra()
-            await loadUtilityReceipts()
-        } catch {
-            AppHaptics.warning()
-            errorMessage = "Не удалось удалить начисление коммуналки."
-        }
-    }
-
-    private func deleteReceipt(_ receipt: UtilityReceiptPayload) async {
-        do {
-            _ = try await APIClient.shared.requestData(
-                "/v1/utility-receipts/\(receipt.id)",
-                method: "DELETE",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            receiptToDelete = nil
-            AppHaptics.success()
-            await loadUtilityReceipts()
-        } catch {
-            AppHaptics.warning()
-            errorMessage = "Не удалось удалить квитанцию. Подтверждённые квитанции удалить нельзя."
-        }
-    }
-
     private func copyTenantWelcomeText() {
         UIPasteboard.general.string = tenantWelcomeText
         welcomeCopyMessage = "Памятка для арендатора скопирована."
@@ -1575,26 +1192,6 @@ struct PropertyDetailView: View {
         }
     }
 
-    private func loadUtilities() async {
-        do {
-            let data = try await APIClient.shared.requestData(
-                "/v1/properties/\(property.id)/utilities?per_page=60",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            let decoded = try JSONDecoder().decode(APIListEnvelope<PropertyUtility>.self, from: data)
-            utilities = decoded.data.sorted {
-                if $0.periodYear == $1.periodYear {
-                    return $0.periodMonth > $1.periodMonth
-                }
-                return $0.periodYear > $1.periodYear
-            }
-        } catch {
-            utilities = []
-            errorMessage = "История коммуналки не загрузилась. Потяните для обновления и попробуйте еще раз."
-        }
-    }
-
     private func leasePaymentWindow(_ lease: Lease) -> String {
         let start = lease.paymentWindowStartDay ?? lease.paymentDay ?? 1
         let end = lease.paymentWindowEndDay ?? lease.paymentDueDay ?? lease.paymentDay ?? start
@@ -1612,14 +1209,6 @@ struct PropertyDetailView: View {
         return terminatedAt < endDate
     }
 
-    private func utilityPeriodLabel(_ utility: PropertyUtility) -> String {
-        UtilityReceiptDisplay.utilityPeriodLabel(year: utility.periodYear, month: utility.periodMonth)
-    }
-
-    private func utilityTypeLabel(_ value: String) -> String {
-        UtilityReceiptDisplay.utilityTypeLabel(value)
-    }
-
     private func propertyTypeLabel(_ value: String) -> String {
         switch value {
         case "apartment": return "Квартира"
@@ -1635,10 +1224,6 @@ struct PropertyDetailView: View {
 private struct GenerateScheduleBody: Encodable {}
 
 private struct LinkedTransactionRoute: Identifiable {
-    let id: String
-}
-
-private struct UtilityReceiptRoute: Identifiable {
     let id: String
 }
 
@@ -2036,449 +1621,6 @@ private struct MaintenanceFormSheet: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
-    }
-}
-
-private enum UtilityReceiptDisplay {
-    static func utilityTypeLabel(_ value: String) -> String {
-        switch value {
-        case "utilities": return "Коммунальные услуги"
-        case "electricity": return "Электричество"
-        case "cold_water": return "Холодная вода"
-        case "hot_water": return "Горячая вода"
-        case "water": return "Вода"
-        case "water_disposal": return "Водоотведение"
-        case "gas": return "Газ"
-        case "heating": return "Отопление"
-        case "common_area": return "МОП"
-        case "waste": return "Вывоз отходов"
-        case "elevator": return "Лифт"
-        case "intercom": return "Домофон"
-        case "internet": return "Интернет"
-        case "tv": return "ТВ"
-        case "capital_repair": return "Капремонт"
-        case "maintenance": return "Обслуживание"
-        case "other": return "Другое"
-        default: return value.replacingOccurrences(of: "_", with: " ").capitalized
-        }
-    }
-
-    static func utilityPeriodLabel(year: Int, month: Int) -> String {
-        monthYearLabel(year: year, month: month) ?? "\(month)/\(year)"
-    }
-
-    static func receiptPeriodLabel(_ receipt: UtilityReceiptPayload) -> String {
-        if let year = receipt.periodYear, let month = receipt.periodMonth,
-           let label = monthYearLabel(year: year, month: month) {
-            return label
-        }
-        if let paymentDate = receipt.paymentDate,
-           let formatted = AppFormatting.dateString(from: paymentDate, dateStyle: .long) {
-            return formatted
-        }
-        return "Период не распознан"
-    }
-
-    static func receiptStatusLabel(_ status: String) -> String {
-        switch status {
-        case "queued": return "В очереди"
-        case "processing": return "Распознается"
-        case "parsed": return "Распознана"
-        case "confirmed": return "Сохранена"
-        case "failed": return "Ошибка"
-        default: return status
-        }
-    }
-
-    static func receiptPeriodSortKey(_ receipt: UtilityReceiptPayload) -> String {
-        let year = receipt.periodYear ?? 0
-        let month = receipt.periodMonth ?? 0
-        return "\(year)-\(String(format: "%02d", month))"
-    }
-
-    static func receiptDateSortKey(_ receipt: UtilityReceiptPayload) -> String {
-        receipt.paymentDate ?? receipt.confirmedAt ?? receipt.createdAt ?? receipt.updatedAt ?? ""
-    }
-
-    static func decimalText(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 3
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
-
-    private static func monthYearLabel(year: Int, month: Int) -> String? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "MMMM yyyy"
-        let components = DateComponents(year: year, month: month, day: 1)
-        guard let date = Calendar.current.date(from: components) else { return nil }
-        return formatter.string(from: date)
-    }
-}
-
-private struct UtilityDetailSheet: View {
-    let utility: PropertyUtility
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                    SurfaceCard {
-                        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(UtilityReceiptDisplay.utilityPeriodLabel(year: utility.periodYear, month: utility.periodMonth))
-                                        .font(.caption)
-                                        .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                                    Text(UtilityReceiptDisplay.utilityTypeLabel(utility.utilityType))
-                                        .font(.title3.weight(.semibold))
-                                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                                }
-
-                                Spacer()
-
-                                StatusBadge(status: utility.status)
-                            }
-
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppTheme.Spacing.sm) {
-                                detailCell(
-                                    title: "Сумма",
-                                    value: AppFormatting.compactAmount(utility.amount, currency: utility.currency)
-                                )
-                                detailCell(
-                                    title: "Поставщик",
-                                    value: utility.provider?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? utility.provider! : "Не указан"
-                                )
-                                detailCell(
-                                    title: "Срок оплаты",
-                                    value: AppFormatting.dateString(from: utility.dueDate) ?? "Не указан"
-                                )
-                                detailCell(
-                                    title: "Оплачено",
-                                    value: AppFormatting.dateString(from: utility.paidAt) ?? "Не оплачено"
-                                )
-                            }
-
-                            if let notes = utility.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
-                                detailRow("Заметки", value: notes)
-                            }
-
-                            if let receiptId = utility.sourceReceiptId?.trimmingCharacters(in: .whitespacesAndNewlines), !receiptId.isEmpty {
-                                detailRow("Квитанция", value: receiptId)
-                            }
-
-                            if let confidence = utility.ocrConfidence {
-                                detailRow("OCR", value: "\(Int((confidence * 100).rounded()))%")
-                            }
-
-                            if let processedAt = utility.ocrProcessedAt {
-                                detailRow("Обработано", value: AppFormatting.dateString(from: processedAt) ?? processedAt)
-                            }
-                        }
-                    }
-
-                    SurfaceCard {
-                        EntityFilesSection(
-                            entityType: "utility",
-                            entityId: utility.id,
-                            title: "Файлы начисления",
-                            isEmbedded: true,
-                            fileTypes: [
-                                EntityFileType(value: "receipt", label: "Квитанция"),
-                                EntityFileType(value: "document", label: "Документ"),
-                                EntityFileType(value: "photo", label: "Фото")
-                            ]
-                        )
-                    }
-                }
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
-            }
-            .background(AppScreenBackground())
-            .navigationTitle("Коммуналка")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Готово") { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func detailCell(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func detailRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-                .frame(width: 92, alignment: .leading)
-
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
-struct UtilityReceiptDetailSheet: View {
-    let receiptId: String
-
-    @EnvironmentObject private var authManager: AuthManager
-    @Environment(\.dismiss) private var dismiss
-    @State private var receipt: UtilityReceiptPayload?
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-
-    init(receiptId: String, initialReceipt: UtilityReceiptPayload? = nil) {
-        self.receiptId = receiptId
-        _receipt = State(initialValue: initialReceipt)
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                    if isLoading && receipt == nil {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, minHeight: 160)
-                    } else if let receipt {
-                        receiptSummary(receipt)
-                        receiptItems(receipt.items ?? [], currency: receipt.currency ?? "KZT")
-
-                        if !receipt.fileId.isEmpty {
-                            SurfaceCard {
-                                Label("Файл квитанции сохранён в системе.", systemImage: "doc.text")
-                                    .font(.subheadline)
-                                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                            }
-                        }
-                    } else {
-                        sectionPlaceholder
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(AppTheme.Colors.warning)
-                    }
-                }
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
-            }
-            .background(AppScreenBackground())
-            .navigationTitle("Квитанция")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Готово") { dismiss() }
-                }
-            }
-            .task(id: receiptId) { await loadReceipt() }
-        }
-    }
-
-    private func receiptSummary(_ receipt: UtilityReceiptPayload) -> some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(UtilityReceiptDisplay.receiptPeriodLabel(receipt))
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                        Text(receipt.totalAmount.map { AppFormatting.currency($0, currency: receipt.currency ?? "KZT") } ?? "Сумма не распознана")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                    }
-
-                    Spacer()
-
-                    StatusBadge(status: UtilityReceiptDisplay.receiptStatusLabel(receipt.status))
-                }
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppTheme.Spacing.sm) {
-                    detailCell("Поставщик", receipt.provider ?? "Не распознан")
-                    detailCell("Лицевой счёт", receipt.accountNumber ?? "Не распознан")
-                    detailCell("Дата квитанции", AppFormatting.dateString(from: receipt.paymentDate) ?? "Не распознана")
-                    detailCell("Уверенность", receipt.extractionConfidence.map { "\(Int(($0 * 100).rounded()))%" } ?? "Нет данных")
-                }
-
-                if let failure = receipt.failureReason?.trimmingCharacters(in: .whitespacesAndNewlines), !failure.isEmpty {
-                    detailRow("Ошибка", value: failure)
-                }
-            }
-        }
-    }
-
-    private func receiptItems(_ items: [UtilityReceiptItemPayload], currency: String) -> some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("Строки квитанции")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                if items.isEmpty {
-                    Text("Детали начислений не распознаны или ещё не загружены.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, AppTheme.Spacing.sm)
-                } else {
-                    ForEach(items) { item in
-                        receiptItemRow(item, currency: currency)
-                    }
-                }
-            }
-        }
-    }
-
-    private func receiptItemRow(_ item: UtilityReceiptItemPayload, currency: String) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-            HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(UtilityReceiptDisplay.utilityTypeLabel(item.utilityType))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                    if let label = item.labelRaw?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
-                        Text(label)
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-                }
-
-                Spacer()
-
-                Text(AppFormatting.compactAmount(item.amount, currency: currency))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-            }
-
-            HStack(spacing: AppTheme.Spacing.sm) {
-                if let tariff = item.tariff {
-                    infoPill("Тариф \(UtilityReceiptDisplay.decimalText(tariff))")
-                }
-                if let consumption = item.consumption {
-                    infoPill("Расход \(UtilityReceiptDisplay.decimalText(consumption))\(item.unit.map { " \($0)" } ?? "")")
-                }
-                if item.materializedUtilityId != nil {
-                    infoPill("Сохранено")
-                }
-            }
-
-            if item.previousReading != nil || item.currentReading != nil {
-                Text("Показания: \(item.previousReading.map { UtilityReceiptDisplay.decimalText($0) } ?? "-") → \(item.currentReading.map { UtilityReceiptDisplay.decimalText($0) } ?? "-")")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-            }
-        }
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func infoPill(_ text: String) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(AppTheme.Colors.accent.opacity(0.1))
-            .foregroundStyle(AppTheme.Colors.accent)
-            .clipShape(Capsule())
-    }
-
-    private func detailCell(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func detailRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-                .frame(width: 92, alignment: .leading)
-
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var sectionPlaceholder: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.title2)
-                    .foregroundStyle(AppTheme.Colors.accent)
-
-                Text("Квитанция недоступна")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                Text("Не удалось загрузить детали квитанции. Потяните экран объекта для обновления и попробуйте снова.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-            }
-        }
-    }
-
-    private func loadReceipt() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
-        do {
-            let data = try await APIClient.shared.requestData(
-                "/v1/utility-receipts/\(receiptId)",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            let decoded = try JSONDecoder().decode(APIResponse<UtilityReceiptPayload>.self, from: data)
-            receipt = decoded.data
-        } catch {
-            errorMessage = "Не удалось загрузить детали квитанции."
-        }
     }
 }
 

@@ -106,8 +106,13 @@ struct PropertiesListView: View {
                 .environmentObject(authManager)
             }
             .sheet(item: $selectedReceipt) { route in
-                UtilityReceiptDetailSheet(receiptId: route.id)
-                    .environmentObject(authManager)
+                // The id of a v1 receipt is the id of its bill: the review sheet of U9 opens it.
+                UtilityBillReviewSheet(
+                    billId: route.id,
+                    service: UtilityBillsServiceProvider.makeService(authManager: authManager),
+                    timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty"
+                )
+                .environmentObject(authManager)
             }
         }
     }

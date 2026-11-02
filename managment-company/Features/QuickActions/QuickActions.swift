@@ -174,7 +174,7 @@ struct QuickActionLauncher: View {
             )
             .environmentObject(authManager)
         case .receipt:
-            UtilityReceiptUploadSheet { Task { await reload() } }
+            UtilityQuickUploadSheet(authManager: authManager) { await reload() }
                 .environmentObject(authManager)
         case .task:
             TaskFormView(properties: properties) {
