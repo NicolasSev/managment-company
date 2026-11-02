@@ -13,6 +13,7 @@
         "total_income": 900,
         "total_expense": 400,
         "utility_expense": 50,
+        "tenant_utilities": 120,
         "operating_cost": 350,
         "net_cashflow": 500,
         "profit_margin_pct": 55.5

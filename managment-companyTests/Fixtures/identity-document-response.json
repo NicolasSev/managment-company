@@ -1,0 +1,42 @@
+{
+  "data": {
+    "extraction_id": "3f1c0a52-7d6e-4b18-9a35-c8e1b4f20d97",
+    "file_id": "2a6e91c4-5b03-4f7d-8e12-a0d93c7b6f48",
+    "status": "needs_review",
+    "document_kind": "id_card",
+    "fields": {
+      "last_name": "Ахметов",
+      "first_name": "Ерлан",
+      "middle_name": "Серикович",
+      "iin": "900722304561",
+      "document_type": "id_card",
+      "document_number": "052318774",
+      "document_issued_by": "МВД РК",
+      "document_issued_at": "2019-08-14",
+      "expires_at": "2029-08-13",
+      "birth_date": "1990-07-22",
+      "sex": "male",
+      "nationality": "Казахстан",
+      "registration_address": null
+    },
+    "field_confidence": {
+      "last_name": 0.99,
+      "first_name": 0.99,
+      "middle_name": 0.97,
+      "iin": 0.98,
+      "document_number": 0.95,
+      "document_issued_by": 0.9,
+      "document_issued_at": 0.93,
+      "expires_at": 0.93,
+      "birth_date": 0.98,
+      "registration_address": 0
+    },
+    "overall_confidence": 0.94,
+    "review_reasons": [
+      "missing:registration_address"
+    ],
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "duration_ms": 6400
+  }
+}

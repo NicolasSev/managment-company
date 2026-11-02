@@ -1861,6 +1861,9 @@
           "utility_expense": {
             "$ref": "#/components/schemas/MoneyAmount"
           },
+          "tenant_utilities": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
           "operating_cost": {
             "$ref": "#/components/schemas/MoneyAmount"
           },
@@ -5456,6 +5459,131 @@
           }
         }
       },
+      "NotificationChannelSetting": {
+        "type": "object",
+        "required": [
+          "channel",
+          "enabled",
+          "event_type"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "push",
+              "telegram"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "utility_bill_missing",
+              "utility_bill_needs_review",
+              "utility_upload_other"
+            ]
+          }
+        }
+      },
+      "NotificationSettingsEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationSettingsResponse"
+          }
+        }
+      },
+      "NotificationSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannelSetting"
+            }
+          },
+          "quiet_from": {
+            "type": "string",
+            "example": "22:00"
+          },
+          "quiet_to": {
+            "type": "string",
+            "example": "08:00"
+          },
+          "utility_reminder_day": {
+            "type": "integer",
+            "maximum": 28,
+            "minimum": 1
+          },
+          "utility_reminder_repeat_days": {
+            "type": "integer",
+            "maximum": 30,
+            "minimum": 1
+          }
+        }
+      },
+      "NotificationSettingsResponse": {
+        "type": "object",
+        "required": [
+          "channels",
+          "quiet_from",
+          "quiet_to",
+          "telegram",
+          "utility_reminder_day",
+          "utility_reminder_repeat_days"
+        ],
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannelSetting"
+            }
+          },
+          "quiet_from": {
+            "description": "QuietFrom and QuietTo are \"HH:MM\" in the owner's time zone; null = no quiet hours.",
+            "type": "string",
+            "nullable": true
+          },
+          "quiet_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "telegram": {
+            "$ref": "#/components/schemas/NotificationTelegramStatus"
+          },
+          "utility_reminder_day": {
+            "type": "integer",
+            "maximum": 28,
+            "minimum": 1
+          },
+          "utility_reminder_repeat_days": {
+            "type": "integer",
+            "maximum": 30,
+            "minimum": 1
+          }
+        }
+      },
+      "NotificationTelegramStatus": {
+        "type": "object",
+        "required": [
+          "linked",
+          "verified_at"
+        ],
+        "properties": {
+          "linked": {
+            "type": "boolean"
+          },
+          "verified_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "PaymentCommandEnvelope": {
         "type": "object",
         "required": [
@@ -5509,6 +5637,275 @@
           },
           "total": {
             "type": "integer"
+          }
+        }
+      },
+      "PropertyPatchRequest": {
+        "type": "object",
+        "required": [
+          "utility_payer"
+        ],
+        "properties": {
+          "utility_payer": {
+            "description": "UtilityPayer is who pays utilities of the property: tenant or owner.",
+            "type": "string",
+            "enum": [
+              "tenant",
+              "owner"
+            ]
+          }
+        }
+      },
+      "RecognitionFieldConfidence": {
+        "type": "object",
+        "required": [
+          "birth_date",
+          "document_issued_at",
+          "document_issued_by",
+          "document_number",
+          "expires_at",
+          "first_name",
+          "iin",
+          "last_name",
+          "middle_name",
+          "registration_address"
+        ],
+        "properties": {
+          "birth_date": {
+            "type": "number"
+          },
+          "document_issued_at": {
+            "type": "number"
+          },
+          "document_issued_by": {
+            "type": "number"
+          },
+          "document_number": {
+            "type": "number"
+          },
+          "expires_at": {
+            "type": "number"
+          },
+          "first_name": {
+            "type": "number"
+          },
+          "iin": {
+            "type": "number"
+          },
+          "last_name": {
+            "type": "number"
+          },
+          "middle_name": {
+            "type": "number"
+          },
+          "registration_address": {
+            "type": "number"
+          }
+        }
+      },
+      "RecognitionIdentityDocumentEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecognitionIdentityDocumentResult"
+          }
+        }
+      },
+      "RecognitionIdentityDocumentResult": {
+        "type": "object",
+        "required": [
+          "document_kind",
+          "duration_ms",
+          "extraction_id",
+          "field_confidence",
+          "fields",
+          "file_id",
+          "model",
+          "overall_confidence",
+          "provider",
+          "review_reasons",
+          "status"
+        ],
+        "properties": {
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "id_card",
+              "passport",
+              "other"
+            ]
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "extraction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_confidence": {
+            "$ref": "#/components/schemas/RecognitionFieldConfidence"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/RecognitionIdentityFields"
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string"
+          },
+          "overall_confidence": {
+            "type": "number"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "needs_review"
+            ]
+          }
+        }
+      },
+      "RecognitionIdentityFields": {
+        "type": "object",
+        "required": [
+          "birth_date",
+          "document_issued_at",
+          "document_issued_by",
+          "document_number",
+          "document_type",
+          "expires_at",
+          "first_name",
+          "iin",
+          "last_name",
+          "middle_name",
+          "nationality",
+          "registration_address",
+          "sex"
+        ],
+        "properties": {
+          "birth_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "document_issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "document_issued_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_type": {
+            "type": "string",
+            "enum": [
+              "id_card",
+              "passport",
+              "other"
+            ],
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "nationality": {
+            "type": "string",
+            "nullable": true
+          },
+          "registration_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "RecognitionUnavailableDetails": {
+        "type": "object",
+        "required": [
+          "extraction_id",
+          "file_id"
+        ],
+        "properties": {
+          "extraction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RecognitionUnavailableEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/RecognitionUnavailableError"
+          }
+        }
+      },
+      "RecognitionUnavailableError": {
+        "type": "object",
+        "required": [
+          "code",
+          "details",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/RecognitionUnavailableDetails"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -5749,6 +6146,116 @@
           "registration_address": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "TelegramLinkCompleteEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TelegramLinkCompleteResponse"
+          }
+        }
+      },
+      "TelegramLinkCompleteRequest": {
+        "type": "object",
+        "required": [
+          "chat_id",
+          "chat_type",
+          "code"
+        ],
+        "properties": {
+          "chat_id": {
+            "description": "ChatID is the Telegram chat id: negative for groups and supergroups.",
+            "type": "integer"
+          },
+          "chat_title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "chat_type": {
+            "type": "string",
+            "enum": [
+              "private",
+              "group",
+              "supergroup"
+            ]
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "TelegramLinkCompleteResponse": {
+        "type": "object",
+        "required": [
+          "chat_id",
+          "chat_type",
+          "linked",
+          "verified_at"
+        ],
+        "properties": {
+          "chat_id": {
+            "type": "integer"
+          },
+          "chat_type": {
+            "type": "string"
+          },
+          "linked": {
+            "type": "boolean"
+          },
+          "verified_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TelegramLinkEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TelegramLinkResponse"
+          }
+        }
+      },
+      "TelegramLinkResponse": {
+        "type": "object",
+        "required": [
+          "bot_username",
+          "code",
+          "deep_link",
+          "expires_at",
+          "group_deep_link",
+          "ttl_seconds"
+        ],
+        "properties": {
+          "bot_username": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "description": "Code is shown once; the owner sends it to the bot as /start <code>.",
+            "type": "string"
+          },
+          "deep_link": {
+            "description": "DeepLink opens a private chat with the bot; GroupDeepLink lets the owner pick a group to\nadd the bot to. Both are null when TELEGRAM_BOT_USERNAME is not configured.",
+            "type": "string",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "group_deep_link": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttl_seconds": {
+            "type": "integer"
           }
         }
       },
@@ -6273,6 +6780,2187 @@
           "registration_address": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "UtilityAccount": {
+        "type": "object",
+        "required": [
+          "account_number",
+          "created_at",
+          "id",
+          "is_active",
+          "is_default",
+          "property_id",
+          "updated_at"
+        ],
+        "properties": {
+          "account_number": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "UtilityAccountCreateRequest": {
+        "type": "object",
+        "required": [
+          "account_number"
+        ],
+        "properties": {
+          "account_number": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityAccountEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityAccount"
+          }
+        }
+      },
+      "UtilityAccountListEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityAccount"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityAccountPatchRequest": {
+        "type": "object",
+        "properties": {
+          "account_number": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityAssistantEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityAssistantResult"
+          }
+        }
+      },
+      "UtilityAssistantItem": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "consumption": {
+            "type": "number",
+            "nullable": true
+          },
+          "label_raw": {
+            "type": "string",
+            "nullable": true
+          },
+          "meter_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "reading_curr": {
+            "type": "number",
+            "nullable": true
+          },
+          "reading_prev": {
+            "type": "number",
+            "nullable": true
+          },
+          "service_type": {
+            "type": "string",
+            "enum": [
+              "electricity",
+              "heating",
+              "hot_water",
+              "cold_water",
+              "sewage",
+              "gas",
+              "gas_service",
+              "waste",
+              "intercom",
+              "internet",
+              "other"
+            ]
+          },
+          "tariff": {
+            "type": "number",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "kWh",
+              "m3",
+              "Gcal",
+              "m2",
+              "person"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "UtilityAssistantPayment": {
+        "type": "object",
+        "properties": {
+          "bank": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "evidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "partial",
+              "unpaid"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "UtilityAssistantPeriod": {
+        "type": "object",
+        "properties": {
+          "evidence": {
+            "type": "string",
+            "enum": [
+              "printed",
+              "inferred"
+            ]
+          },
+          "month": {
+            "type": "integer",
+            "maximum": 12,
+            "minimum": 1
+          },
+          "year": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityAssistantProvider": {
+        "type": "object",
+        "properties": {
+          "evidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityAssistantRequest": {
+        "type": "object",
+        "required": [
+          "document_kind",
+          "items"
+        ],
+        "properties": {
+          "account_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "address_raw": {
+            "type": "string",
+            "nullable": true
+          },
+          "balance_carry": {
+            "type": "number",
+            "nullable": true
+          },
+          "bill_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chat_id": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "KZT",
+              "RUB",
+              "USD",
+              "EUR"
+            ],
+            "nullable": true
+          },
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "utility_bill",
+              "payment_proof",
+              "other"
+            ]
+          },
+          "field_confidence": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "nullable": true
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityAssistantItem"
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "overall_confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "payer_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "payment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityAssistantPayment"
+              }
+            ],
+            "nullable": true
+          },
+          "period": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityAssistantPeriod"
+              }
+            ],
+            "nullable": true
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityAssistantProvider"
+              }
+            ],
+            "nullable": true
+          },
+          "telegram_file_id": {
+            "type": "string"
+          },
+          "total_due": {
+            "type": "number",
+            "nullable": true
+          },
+          "total_paid": {
+            "type": "number",
+            "nullable": true
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UtilityAssistantResult": {
+        "type": "object",
+        "required": [
+          "document_kind",
+          "extraction_id",
+          "review_reasons"
+        ],
+        "properties": {
+          "bill": {
+            "$ref": "#/components/schemas/UtilityBillBrief"
+          },
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "utility_bill",
+              "payment_proof",
+              "other"
+            ]
+          },
+          "extraction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UtilityBill": {
+        "type": "object",
+        "required": [
+          "available_actions",
+          "created_at",
+          "files",
+          "id",
+          "items",
+          "no_receipt",
+          "paid_on_confirm",
+          "period",
+          "review_reasons",
+          "source",
+          "status",
+          "updated_at"
+        ],
+        "properties": {
+          "account_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount_base": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "available_actions": {
+            "description": "AvailableActions: edit, confirm, mark_paid, unmark_paid, reextract, tenant_message, delete.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "balance_carry": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "base_currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmed_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "current_extraction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "payment_proof",
+              "both"
+            ],
+            "nullable": true
+          },
+          "extraction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityExtraction"
+              }
+            ],
+            "nullable": true
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityBillFile"
+            }
+          },
+          "fx_rate": {
+            "type": "number",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityBillItem"
+            }
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "no_receipt": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "paid_by": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "owner"
+            ],
+            "nullable": true
+          },
+          "paid_on_confirm": {
+            "description": "PaidOnConfirm: the bill carries a payment date, so confirm moves it straight to paid.",
+            "type": "boolean"
+          },
+          "period": {
+            "description": "Period is the month, YYYY-MM.",
+            "type": "string"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "property_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "review_reasons": {
+            "description": "ReviewReasons are hints for the reviewer (codes of GET /v1/utility-bills/meta).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "telegram",
+              "assistant",
+              "manual",
+              "expected",
+              "migrated"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "expected",
+              "missing",
+              "uploaded",
+              "needs_review",
+              "confirmed",
+              "paid"
+            ]
+          },
+          "total": {
+            "description": "Total is computed by the server: the sum of the items, else total_due, else total_paid.",
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "total_due": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "total_paid": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "utility_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityBillBrief": {
+        "type": "object",
+        "required": [
+          "id",
+          "period",
+          "review_reasons",
+          "status"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "payment_proof",
+              "both"
+            ],
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "period": {
+            "type": "string",
+            "example": "2025-11"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "expected",
+              "missing",
+              "uploaded",
+              "needs_review",
+              "confirmed",
+              "paid"
+            ]
+          },
+          "total_due": {
+            "type": "number",
+            "nullable": true
+          },
+          "total_paid": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityBillCreateRequest": {
+        "type": "object",
+        "required": [
+          "period",
+          "property_id"
+        ],
+        "properties": {
+          "account_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "KZT",
+              "RUB",
+              "USD",
+              "EUR"
+            ]
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityBillItemInput"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-03"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "UtilityBillEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityBill"
+          }
+        }
+      },
+      "UtilityBillFile": {
+        "type": "object",
+        "required": [
+          "created_at",
+          "file_id",
+          "id",
+          "role"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "download_expires_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "download_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mime_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "original_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "payment_proof"
+            ]
+          },
+          "size_bytes": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityBillItem": {
+        "type": "object",
+        "required": [
+          "amount",
+          "id",
+          "position",
+          "service_type"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "consumption": {
+            "type": "number",
+            "nullable": true
+          },
+          "extraction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label_raw": {
+            "type": "string",
+            "nullable": true
+          },
+          "meter_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "type": "integer"
+          },
+          "reading_curr": {
+            "type": "number",
+            "nullable": true
+          },
+          "reading_prev": {
+            "type": "number",
+            "nullable": true
+          },
+          "service_type": {
+            "type": "string"
+          },
+          "tariff": {
+            "type": "number",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityBillItemInput": {
+        "type": "object",
+        "required": [
+          "amount",
+          "service_type"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "consumption": {
+            "type": "number",
+            "nullable": true
+          },
+          "label_raw": {
+            "type": "string",
+            "nullable": true
+          },
+          "meter_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "reading_curr": {
+            "type": "number",
+            "nullable": true
+          },
+          "reading_prev": {
+            "type": "number",
+            "nullable": true
+          },
+          "service_type": {
+            "type": "string"
+          },
+          "tariff": {
+            "type": "number",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityBillListEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityBillSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityBillMarkPaidRequest": {
+        "type": "object",
+        "required": [
+          "paid_at"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "no_receipt": {
+            "type": "boolean"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date"
+          },
+          "payment_proof_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityBillPatchRequest": {
+        "type": "object",
+        "properties": {
+          "account_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "balance_carry": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "KZT",
+              "RUB",
+              "USD",
+              "EUR"
+            ],
+            "nullable": true
+          },
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "payment_proof",
+              "both"
+            ],
+            "nullable": true
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityBillItemInput"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-03",
+            "nullable": true
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "total_due": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "total_paid": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "UtilityBillSummary": {
+        "type": "object",
+        "required": [
+          "created_at",
+          "has_file",
+          "id",
+          "no_receipt",
+          "period",
+          "review_reasons",
+          "source",
+          "status",
+          "updated_at"
+        ],
+        "properties": {
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "has_file": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "no_receipt": {
+            "type": "boolean"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "period": {
+            "type": "string"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "property_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "UtilityCodeLabel": {
+        "type": "object",
+        "required": [
+          "code",
+          "labels"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "labels": {
+            "$ref": "#/components/schemas/UtilityLabel"
+          }
+        }
+      },
+      "UtilityComparison": {
+        "type": "object",
+        "properties": {
+          "base_currency": {
+            "type": "string"
+          },
+          "by_property": {
+            "description": "ByProperty is present for the portfolio call (no property_id) only.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityComparisonProperty"
+            }
+          },
+          "compare_year": {
+            "type": "integer"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/UtilityComparisonCoverage"
+          },
+          "group_by": {
+            "type": "string"
+          },
+          "metric": {
+            "type": "string"
+          },
+          "per_sqm": {
+            "type": "boolean"
+          },
+          "rows": {
+            "description": "Rows follow group_by: one per service type or per month \"01\"..\"12\".",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityComparisonRow"
+            }
+          },
+          "skipped_property_ids": {
+            "description": "SkippedPropertyIDs are properties left out of a per_sqm portfolio call because they have no area.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UtilityComparisonTotals"
+          },
+          "type_rows": {
+            "description": "TypeRows are the rows by service type whatever group_by is (the same as Rows for group_by=type), so\nthe total and the breakdown by service are always there.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityComparisonRow"
+            }
+          },
+          "unconverted_lines": {
+            "description": "UnconvertedLines counts bill lines without a base-currency amount (no exchange rate); they are\nmissing from the amounts.",
+            "type": "integer"
+          },
+          "year": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityComparisonCoverage": {
+        "type": "object",
+        "properties": {
+          "missing_months": {
+            "description": "MissingMonths are the months (YYYY-MM) of year and compare_year, up to the current month, where a\nbill is expected (an expectation rule or a bill of any status exists) but none is confirmed or paid.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "months_with_bill": {
+            "description": "MonthsWithBill counts the months of `year` that have a confirmed or paid bill.",
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityComparisonEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityComparison"
+          }
+        }
+      },
+      "UtilityComparisonProperty": {
+        "type": "object",
+        "properties": {
+          "area_sqm": {
+            "type": "number",
+            "nullable": true
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/UtilityComparisonCoverage"
+          },
+          "property_id": {
+            "type": "string"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityComparisonRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UtilityComparisonTotals"
+          },
+          "type_rows": {
+            "description": "TypeRows are the rows by service type whatever group_by is.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityComparisonRow"
+            }
+          }
+        }
+      },
+      "UtilityComparisonRow": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "number"
+          },
+          "delta_abs": {
+            "type": "number"
+          },
+          "delta_pct": {
+            "type": "number",
+            "nullable": true
+          },
+          "key": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "number"
+          },
+          "unit": {
+            "description": "Unit is the consumption unit (metric=consumption only).",
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityComparisonTotals": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "number"
+          },
+          "delta_abs": {
+            "type": "number"
+          },
+          "delta_pct": {
+            "description": "DeltaPct is null when the previous value is 0.",
+            "type": "number",
+            "nullable": true
+          },
+          "mixed_units": {
+            "description": "MixedUnits is true when metric=consumption covers several units: such values are not added up\nand Current/Previous/DeltaAbs are 0.",
+            "type": "boolean"
+          },
+          "previous": {
+            "type": "number"
+          },
+          "unit": {
+            "description": "Unit of a consumption total; null for amounts and for consumption in mixed units.",
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityCounters": {
+        "type": "object",
+        "required": [
+          "missing",
+          "needs_review",
+          "other_uploads",
+          "unassigned"
+        ],
+        "properties": {
+          "missing": {
+            "type": "integer"
+          },
+          "needs_review": {
+            "type": "integer"
+          },
+          "other_uploads": {
+            "type": "integer"
+          },
+          "unassigned": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityExpectation": {
+        "type": "object",
+        "required": [
+          "active_from",
+          "created_at",
+          "id",
+          "months",
+          "property_id",
+          "updated_at"
+        ],
+        "properties": {
+          "active_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "active_to": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "UtilityExpectationCreateRequest": {
+        "type": "object",
+        "required": [
+          "active_from"
+        ],
+        "properties": {
+          "active_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "active_to": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "UtilityExpectationEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityExpectation"
+          }
+        }
+      },
+      "UtilityExpectationListEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityExpectation"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityExpectationPatchRequest": {
+        "type": "object",
+        "properties": {
+          "active_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "active_to": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "UtilityExtraction": {
+        "type": "object",
+        "required": [
+          "created_at",
+          "id",
+          "review_status",
+          "source",
+          "status"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "document_kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "field_confidence": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "overall_confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "review_status": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ]
+          }
+        }
+      },
+      "UtilityGrid": {
+        "type": "object",
+        "required": [
+          "base_currency",
+          "counters",
+          "properties",
+          "year"
+        ],
+        "properties": {
+          "base_currency": {
+            "type": "string"
+          },
+          "counters": {
+            "$ref": "#/components/schemas/UtilityCounters"
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityGridProperty"
+            }
+          },
+          "year": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityGridAccount": {
+        "type": "object",
+        "required": [
+          "account_number",
+          "utility_account_id"
+        ],
+        "properties": {
+          "account_number": {
+            "type": "string"
+          },
+          "provider_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "utility_account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UtilityGridEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityGrid"
+          }
+        }
+      },
+      "UtilityGridMonth": {
+        "type": "object",
+        "required": [
+          "bill_id",
+          "period",
+          "status"
+        ],
+        "properties": {
+          "bill_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "has_payment_proof": {
+            "type": "boolean"
+          },
+          "next_reminder_at": {
+            "type": "string",
+            "format": "date"
+          },
+          "no_receipt": {
+            "type": "boolean"
+          },
+          "period": {
+            "type": "string"
+          },
+          "reminders_sent": {
+            "type": "integer"
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "UtilityGridProperty": {
+        "type": "object",
+        "required": [
+          "months",
+          "property_id",
+          "property_name",
+          "utility_payer",
+          "year_total_base"
+        ],
+        "properties": {
+          "account": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityGridAccount"
+              }
+            ],
+            "nullable": true
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityGridMonth"
+            }
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "utility_payer": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "owner"
+            ]
+          },
+          "year_total_base": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "UtilityInboxEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityInboxItem"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityInboxItem": {
+        "type": "object",
+        "required": [
+          "at",
+          "id",
+          "kind"
+        ],
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "bill": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityBillSummary"
+              }
+            ],
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bill",
+              "upload"
+            ]
+          },
+          "upload": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityOtherUpload"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "UtilityLabel": {
+        "type": "object",
+        "required": [
+          "en",
+          "kk",
+          "ru"
+        ],
+        "properties": {
+          "en": {
+            "type": "string"
+          },
+          "kk": {
+            "type": "string"
+          },
+          "ru": {
+            "type": "string"
+          }
+        }
+      },
+      "UtilityLimits": {
+        "type": "object",
+        "required": [
+          "max_file_bytes",
+          "max_items",
+          "max_notes_len",
+          "max_pdf_pages",
+          "mime_types",
+          "period_min",
+          "reminder_day_max",
+          "reminder_day_min"
+        ],
+        "properties": {
+          "max_file_bytes": {
+            "type": "integer"
+          },
+          "max_items": {
+            "description": "MaxItems is the most line items a bill takes.",
+            "type": "integer"
+          },
+          "max_notes_len": {
+            "description": "MaxNotesLen is the longest notes text.",
+            "type": "integer"
+          },
+          "max_pdf_pages": {
+            "type": "integer"
+          },
+          "mime_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "period_min": {
+            "description": "PeriodMin is the earliest period, YYYY-MM.",
+            "type": "string"
+          },
+          "reminder_day_max": {
+            "type": "integer"
+          },
+          "reminder_day_min": {
+            "description": "ReminderDayMin / ReminderDayMax bound users.utility_reminder_day.",
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityMeta": {
+        "type": "object",
+        "required": [
+          "currencies",
+          "document_kinds",
+          "file_roles",
+          "limits",
+          "payers",
+          "review_reasons",
+          "service_types",
+          "statuses"
+        ],
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "document_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "file_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limits": {
+            "$ref": "#/components/schemas/UtilityLimits"
+          },
+          "payers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityCodeLabel"
+            }
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityReasonInfo"
+            }
+          },
+          "service_types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityServiceType"
+            }
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityStatusInfo"
+            }
+          }
+        }
+      },
+      "UtilityMetaEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityMeta"
+          }
+        }
+      },
+      "UtilityOtherResult": {
+        "type": "object",
+        "required": [
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "attach_to_rent",
+                "reject"
+              ]
+            }
+          },
+          "amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "payment_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "UtilityOtherUpload": {
+        "type": "object",
+        "required": [
+          "actions",
+          "created_at",
+          "extraction_id"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "download_expires_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "download_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "extraction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "payment_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "total_paid": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "UtilityReasonInfo": {
+        "type": "object",
+        "required": [
+          "code",
+          "labels"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "labels": {
+            "$ref": "#/components/schemas/UtilityLabel"
+          }
+        }
+      },
+      "UtilityServiceType": {
+        "type": "object",
+        "required": [
+          "code",
+          "labels"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "default_unit": {
+            "description": "DefaultUnit is the unit a consumption of this type is usually printed in (\"\" = none).",
+            "type": "string"
+          },
+          "labels": {
+            "$ref": "#/components/schemas/UtilityLabel"
+          }
+        }
+      },
+      "UtilityStatusInfo": {
+        "type": "object",
+        "required": [
+          "code",
+          "labels",
+          "order"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "labels": {
+            "$ref": "#/components/schemas/UtilityLabel"
+          },
+          "order": {
+            "description": "Order is the position in the lifecycle (1 = expected).",
+            "type": "integer"
+          }
+        }
+      },
+      "UtilityTenantMessage": {
+        "type": "object",
+        "required": [
+          "lang",
+          "period",
+          "property_id",
+          "text",
+          "utility_payer"
+        ],
+        "properties": {
+          "lang": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "kk",
+              "en"
+            ]
+          },
+          "period": {
+            "type": "string"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          },
+          "utility_payer": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "owner"
+            ]
+          }
+        }
+      },
+      "UtilityTenantMessageEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityTenantMessage"
+          }
+        }
+      },
+      "UtilityUploadEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityUploadResult"
+          }
+        }
+      },
+      "UtilityUploadResult": {
+        "type": "object",
+        "properties": {
+          "bill": {
+            "$ref": "#/components/schemas/UtilityBillBrief"
+          },
+          "duplicate_of": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UtilityUploadState": {
+        "type": "object",
+        "required": [
+          "attempts",
+          "created_at",
+          "review_reasons",
+          "review_status",
+          "status",
+          "upload_id"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "bill": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityBillBrief"
+              }
+            ],
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "document_kind": {
+            "type": "string",
+            "enum": [
+              "utility_bill",
+              "payment_proof",
+              "other"
+            ],
+            "nullable": true
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "next_attempt_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "other": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UtilityOtherResult"
+              }
+            ],
+            "nullable": true
+          },
+          "overall_confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
+              "needs_review",
+              "confirmed",
+              "rejected"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UtilityUploadStateEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UtilityUploadState"
           }
         }
       }

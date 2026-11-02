@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "RECOGNITION_QUOTA_EXCEEDED",
+    "message": "the daily recognition limit is reached",
+    "details": {
+      "limit": 50
+    }
+  }
+}

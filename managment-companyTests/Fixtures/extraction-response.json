@@ -1,0 +1,21 @@
+{
+  "data": {
+    "extraction_id": "3f8a9c10-5b2d-4e7a-9a61-0d4c8b7e2f15",
+    "document_kind": "utility_bill",
+    "bill": {
+      "id": "b0a1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+      "property_id": "7c1e5b2a-9d34-4f1a-8e6b-2a3c4d5e6f70",
+      "period": "2025-11",
+      "status": "needs_review",
+      "document_kind": "both",
+      "currency": "KZT",
+      "total_due": 12057.5,
+      "total_paid": 12057.5,
+      "paid_at": "2025-11-22",
+      "review_reasons": []
+    },
+    "review_reasons": [
+      "sum_mismatch"
+    ]
+  }
+}

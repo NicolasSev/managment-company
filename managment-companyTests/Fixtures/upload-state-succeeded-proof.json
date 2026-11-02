@@ -1,0 +1,34 @@
+{
+  "data": {
+    "upload_id": "3f8a9c10-5b2d-4e7a-9a61-0d4c8b7e2f15",
+    "file_id": "a2c4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+    "review_status": "needs_review",
+    "attempts": 1,
+    "next_attempt_at": null,
+    "error_code": null,
+    "created_at": "2026-11-02T14:05:21.318+05:00",
+    "other": null,
+    "status": "succeeded",
+    "document_kind": "payment_proof",
+    "bill": {
+      "id": "b0a1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+      "property_id": "7c1e5b2a-9d34-4f1a-8e6b-2a3c4d5e6f70",
+      "period": "2026-05",
+      "status": "needs_review",
+      "document_kind": "payment_proof",
+      "currency": "KZT",
+      "total_due": null,
+      "total_paid": 15252.87,
+      "paid_at": "2026-06-09",
+      "review_reasons": [
+        "period_inferred",
+        "payment_proof_pending"
+      ]
+    },
+    "review_reasons": [
+      "period_inferred",
+      "payment_proof_pending"
+    ],
+    "overall_confidence": 0.9
+  }
+}

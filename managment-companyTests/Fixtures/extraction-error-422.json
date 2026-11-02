@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "the document fields are not valid",
+    "details": [
+      {
+        "field": "document",
+        "message": "invalid_output"
+      }
+    ]
+  }
+}

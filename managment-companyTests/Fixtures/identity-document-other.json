@@ -1,0 +1,42 @@
+{
+  "data": {
+    "extraction_id": "9c0b7e34-1a52-4d86-b7f9-3e6a2d8c5014",
+    "file_id": "6d4f2a81-0c97-4e3b-a5d8-71b9e0c3f2a6",
+    "status": "needs_review",
+    "document_kind": "other",
+    "fields": {
+      "last_name": null,
+      "first_name": null,
+      "middle_name": null,
+      "iin": null,
+      "document_type": null,
+      "document_number": null,
+      "document_issued_by": null,
+      "document_issued_at": null,
+      "expires_at": null,
+      "birth_date": null,
+      "sex": null,
+      "nationality": null,
+      "registration_address": null
+    },
+    "field_confidence": {
+      "last_name": 0,
+      "first_name": 0,
+      "middle_name": 0,
+      "iin": 0,
+      "document_number": 0,
+      "document_issued_by": 0,
+      "document_issued_at": 0,
+      "expires_at": 0,
+      "birth_date": 0,
+      "registration_address": 0
+    },
+    "overall_confidence": 0,
+    "review_reasons": [
+      "not_identity_document"
+    ],
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "duration_ms": 3900
+  }
+}

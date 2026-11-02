@@ -1,0 +1,59 @@
+{
+  "document_kind": "utility_bill",
+  "provider": null,
+  "account_number": "1194968",
+  "address_raw": null,
+  "payer_name": null,
+  "period": {
+    "year": 2025,
+    "month": 11,
+    "evidence": "printed"
+  },
+  "issued_at": "2025-11-14",
+  "currency": "KZT",
+  "total_due": 12057.5,
+  "total_paid": 12057.5,
+  "balance_carry": 0,
+  "payment": {
+    "status": "paid",
+    "date": "2025-11-22",
+    "bank": null,
+    "reference": null,
+    "evidence": "column Paid"
+  },
+  "items": [
+    {
+      "service_type": "electricity",
+      "label_raw": "Electricity",
+      "amount": 1092.68,
+      "tariff": null,
+      "consumption": null,
+      "unit": "kWh",
+      "reading_prev": 16968,
+      "reading_curr": null,
+      "meter_no": null
+    },
+    {
+      "service_type": "heating",
+      "label_raw": "Heating",
+      "amount": 821.96,
+      "tariff": null,
+      "consumption": null,
+      "unit": null,
+      "reading_prev": null,
+      "reading_curr": null,
+      "meter_no": null
+    }
+  ],
+  "field_confidence": {
+    "account_number": 0.97,
+    "period": 0.95,
+    "total_due": 0.99
+  },
+  "overall_confidence": 0.93,
+  "user_id": "5d2e8f41-6a37-4c90-b1e5-7f3a9c0d2b84",
+  "telegram_file_id": "AgACAgIAAxkBAAIB",
+  "chat_id": -1001234567890,
+  "property_id": "7c1e5b2a-9d34-4f1a-8e6b-2a3c4d5e6f70",
+  "model": "claude-assistant"
+}

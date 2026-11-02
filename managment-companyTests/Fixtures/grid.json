@@ -1,0 +1,220 @@
+{
+  "data": {
+    "year": 2026,
+    "base_currency": "KZT",
+    "properties": [
+      {
+        "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b01",
+        "property_name": "Примерная 1, кв. 1",
+        "utility_payer": "tenant",
+        "account": {
+          "utility_account_id": "a91f3c0e-5d7b-4e0a-8c11-2f4d9b6a7e10",
+          "provider_name": "АлСеКо",
+          "account_number": "1100000"
+        },
+        "months": [
+          {
+            "period": "2026-01",
+            "status": "paid",
+            "bill_id": "b0000000-0000-4000-8000-000000000011",
+            "total": 41210,
+            "currency": "KZT",
+            "has_payment_proof": true,
+            "no_receipt": false
+          },
+          {
+            "period": "2026-02",
+            "status": "paid",
+            "bill_id": "b0000000-0000-4000-8000-000000000012",
+            "total": 38990.12,
+            "currency": "KZT",
+            "has_payment_proof": false,
+            "no_receipt": true
+          },
+          {
+            "period": "2026-03",
+            "status": "needs_review",
+            "bill_id": "b0000000-0000-4000-8000-000000000013",
+            "total": 34959.57,
+            "currency": "KZT",
+            "has_payment_proof": false,
+            "no_receipt": false,
+            "confidence": 0.93,
+            "review_reasons": [
+              "sum_mismatch"
+            ]
+          },
+          {
+            "period": "2026-04",
+            "status": "missing",
+            "bill_id": "b0000000-0000-4000-8000-000000000014",
+            "total": null,
+            "currency": null,
+            "has_payment_proof": false,
+            "no_receipt": false,
+            "reminders_sent": 2,
+            "next_reminder_at": "2026-05-16"
+          },
+          {
+            "period": "2026-05",
+            "status": "expected",
+            "bill_id": "b0000000-0000-4000-8000-000000000015",
+            "total": null,
+            "currency": null,
+            "has_payment_proof": false,
+            "no_receipt": false
+          },
+          {
+            "period": "2026-06",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-07",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-08",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-09",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-10",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-11",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-12",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          }
+        ],
+        "year_total_base": 115159.69
+      },
+      {
+        "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b02",
+        "property_name": "Сатпаева 10, кв. 4",
+        "utility_payer": "owner",
+        "account": null,
+        "months": [
+          {
+            "period": "2026-01",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-02",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-03",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-04",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-05",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-06",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-07",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-08",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-09",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-10",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-11",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          },
+          {
+            "period": "2026-12",
+            "status": null,
+            "bill_id": null,
+            "total": null,
+            "currency": null
+          }
+        ],
+        "year_total_base": 0
+      }
+    ],
+    "counters": {
+      "missing": 1,
+      "needs_review": 1,
+      "unassigned": 0,
+      "other_uploads": 0
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "data": {
+    "id": "b0000000-0000-4000-8000-000000000003",
+    "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b01",
+    "property_name": "Примерная 1, кв. 1",
+    "lease_id": null,
+    "utility_account_id": "a91f3c0e-5d7b-4e0a-8c11-2f4d9b6a7e10",
+    "period": "2026-04",
+    "provider_name": null,
+    "account_number": null,
+    "document_kind": null,
+    "issued_at": null,
+    "total_due": null,
+    "total_paid": null,
+    "balance_carry": null,
+    "total": null,
+    "currency": null,
+    "amount_base": null,
+    "base_currency": null,
+    "fx_rate": null,
+    "status": "missing",
+    "review_reasons": [],
+    "paid_at": null,
+    "paid_by": null,
+    "no_receipt": false,
+    "paid_on_confirm": false,
+    "source": "expected",
+    "current_extraction_id": null,
+    "confirmed_at": null,
+    "notes": null,
+    "items": [],
+    "files": [],
+    "extraction": null,
+    "available_actions": [
+      "edit",
+      "mark_paid",
+      "tenant_message",
+      "delete"
+    ],
+    "created_at": "2026-11-02T06:58:12Z",
+    "updated_at": "2026-11-02T06:58:20Z"
+  }
+}

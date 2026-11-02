@@ -1,0 +1,25 @@
+{
+  "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b01",
+  "period": "2026-03",
+  "currency": "KZT",
+  "provider_name": "АлСеКо",
+  "account_number": "1100000",
+  "issued_at": "2026-04-02",
+  "notes": null,
+  "items": [
+    {
+      "service_type": "electricity",
+      "label_raw": "Электроэнергия",
+      "amount": 1092.68,
+      "tariff": 8.5,
+      "consumption": 128.55,
+      "unit": "kWh",
+      "reading_prev": 16968,
+      "reading_curr": 17096.55
+    },
+    {
+      "service_type": "heating",
+      "amount": 821.96
+    }
+  ]
+}

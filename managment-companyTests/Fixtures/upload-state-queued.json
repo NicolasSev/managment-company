@@ -1,0 +1,17 @@
+{
+  "data": {
+    "upload_id": "3f8a9c10-5b2d-4e7a-9a61-0d4c8b7e2f15",
+    "file_id": "a2c4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+    "review_status": "needs_review",
+    "attempts": 0,
+    "next_attempt_at": "2026-11-02T14:05:31+05:00",
+    "error_code": null,
+    "created_at": "2026-11-02T14:05:21.318+05:00",
+    "other": null,
+    "status": "queued",
+    "document_kind": null,
+    "bill": null,
+    "review_reasons": [],
+    "overall_confidence": null
+  }
+}

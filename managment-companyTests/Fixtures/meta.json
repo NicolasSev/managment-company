@@ -1,0 +1,334 @@
+{
+  "data": {
+    "service_types": [
+      {
+        "code": "electricity",
+        "labels": {
+          "ru": "Электроэнергия",
+          "kk": "Электр қуаты",
+          "en": "Electricity"
+        },
+        "default_unit": "kWh"
+      },
+      {
+        "code": "heating",
+        "labels": {
+          "ru": "Отопление",
+          "kk": "Жылыту",
+          "en": "Heating"
+        },
+        "default_unit": "Gcal"
+      },
+      {
+        "code": "hot_water",
+        "labels": {
+          "ru": "Горячая вода",
+          "kk": "Ыстық су",
+          "en": "Hot water"
+        },
+        "default_unit": "m3"
+      },
+      {
+        "code": "cold_water",
+        "labels": {
+          "ru": "Холодная вода",
+          "kk": "Суық су",
+          "en": "Cold water"
+        },
+        "default_unit": "m3"
+      },
+      {
+        "code": "sewage",
+        "labels": {
+          "ru": "Канализация",
+          "kk": "Кәріз",
+          "en": "Sewage"
+        },
+        "default_unit": "m3"
+      },
+      {
+        "code": "gas",
+        "labels": {
+          "ru": "Газ",
+          "kk": "Газ",
+          "en": "Gas"
+        },
+        "default_unit": "m3"
+      },
+      {
+        "code": "gas_service",
+        "labels": {
+          "ru": "ВДГО (обслуживание газа)",
+          "kk": "ВДГО (газ қызметі)",
+          "en": "Gas equipment service"
+        }
+      },
+      {
+        "code": "waste",
+        "labels": {
+          "ru": "Вывоз ТБО",
+          "kk": "Қатты тұрмыстық қалдықтарды шығару",
+          "en": "Waste collection"
+        }
+      },
+      {
+        "code": "intercom",
+        "labels": {
+          "ru": "Домофон",
+          "kk": "Домофон",
+          "en": "Intercom"
+        }
+      },
+      {
+        "code": "internet",
+        "labels": {
+          "ru": "Интернет",
+          "kk": "Интернет",
+          "en": "Internet"
+        }
+      },
+      {
+        "code": "other",
+        "labels": {
+          "ru": "Прочее",
+          "kk": "Басқа",
+          "en": "Other"
+        }
+      }
+    ],
+    "statuses": [
+      {
+        "code": "expected",
+        "labels": {
+          "ru": "Ожидается",
+          "kk": "Күтілуде",
+          "en": "Expected"
+        },
+        "order": 1
+      },
+      {
+        "code": "missing",
+        "labels": {
+          "ru": "Нет квитанции",
+          "kk": "Түбіртек жоқ",
+          "en": "No receipt"
+        },
+        "order": 2
+      },
+      {
+        "code": "uploaded",
+        "labels": {
+          "ru": "Распознаётся",
+          "kk": "Танылуда",
+          "en": "Being read"
+        },
+        "order": 3
+      },
+      {
+        "code": "needs_review",
+        "labels": {
+          "ru": "Нужна проверка",
+          "kk": "Тексеру қажет",
+          "en": "Needs review"
+        },
+        "order": 4
+      },
+      {
+        "code": "confirmed",
+        "labels": {
+          "ru": "Подтверждено",
+          "kk": "Расталды",
+          "en": "Confirmed"
+        },
+        "order": 5
+      },
+      {
+        "code": "paid",
+        "labels": {
+          "ru": "Оплачено",
+          "kk": "Төленді",
+          "en": "Paid"
+        },
+        "order": 6
+      }
+    ],
+    "review_reasons": [
+      {
+        "code": "sum_mismatch",
+        "labels": {
+          "ru": "Сумма строк не сходится с итогом",
+          "kk": "Жолдар сомасы қорытындымен сәйкес емес",
+          "en": "Line items do not add up to the total"
+        }
+      },
+      {
+        "code": "period_missing",
+        "labels": {
+          "ru": "Не найден период",
+          "kk": "Кезең табылмады",
+          "en": "No period found"
+        }
+      },
+      {
+        "code": "period_inferred",
+        "labels": {
+          "ru": "Период предположен, проверьте",
+          "kk": "Кезең болжанды, тексеріңіз",
+          "en": "Period is a guess, please check"
+        }
+      },
+      {
+        "code": "period_out_of_range",
+        "labels": {
+          "ru": "Период вне допустимого диапазона",
+          "kk": "Кезең рұқсат етілген аралықтан тыс",
+          "en": "Period is out of range"
+        }
+      },
+      {
+        "code": "property_unresolved",
+        "labels": {
+          "ru": "Объект не определён",
+          "kk": "Объект анықталмады",
+          "en": "Property not identified"
+        }
+      },
+      {
+        "code": "account_ambiguous",
+        "labels": {
+          "ru": "Лицевой счёт подходит к другому объекту",
+          "kk": "Жеке шот басқа объектіге сәйкес келеді",
+          "en": "Account matches another property"
+        }
+      },
+      {
+        "code": "conflict",
+        "labels": {
+          "ru": "За этот месяц уже есть подтверждённый счёт",
+          "kk": "Осы ай үшін расталған шот бар",
+          "en": "A confirmed bill exists for this month"
+        }
+      },
+      {
+        "code": "low_confidence",
+        "labels": {
+          "ru": "Низкая уверенность распознавания",
+          "kk": "Тану сенімділігі төмен",
+          "en": "Low recognition confidence"
+        }
+      },
+      {
+        "code": "currency_missing",
+        "labels": {
+          "ru": "Не найдена валюта",
+          "kk": "Валюта табылмады",
+          "en": "No currency found"
+        }
+      },
+      {
+        "code": "currency_unknown",
+        "labels": {
+          "ru": "Валюта не поддерживается",
+          "kk": "Валюта қолдау таппайды",
+          "en": "Unsupported currency"
+        }
+      },
+      {
+        "code": "extraction_failed",
+        "labels": {
+          "ru": "Не удалось распознать, введите вручную",
+          "kk": "Тану мүмкін болмады, қолмен енгізіңіз",
+          "en": "Could not be read, enter by hand"
+        }
+      },
+      {
+        "code": "amount_changed",
+        "labels": {
+          "ru": "Сумма изменилась после повторного распознавания",
+          "kk": "Қайта танудан кейін сома өзгерді",
+          "en": "Total changed after re-reading"
+        }
+      },
+      {
+        "code": "payment_proof_pending",
+        "labels": {
+          "ru": "Ждёт сопоставления подтверждение оплаты",
+          "kk": "Төлем растауы сәйкестендіруді күтеді",
+          "en": "A payment proof is waiting to be matched"
+        }
+      },
+      {
+        "code": "item_invalid",
+        "labels": {
+          "ru": "Строка без суммы пропущена",
+          "kk": "Сомасыз жол өткізілді",
+          "en": "A line without an amount was skipped"
+        }
+      },
+      {
+        "code": "missing",
+        "labels": {
+          "ru": "Поле не найдено в документе",
+          "kk": "Өріс құжатта табылмады",
+          "en": "Field not found in the document"
+        }
+      },
+      {
+        "code": "migrated_unconfirmed",
+        "labels": {
+          "ru": "Перенесено из старой версии, не подтверждено",
+          "kk": "Ескі нұсқадан көшірілді, расталмаған",
+          "en": "Moved from the old version, not confirmed"
+        }
+      }
+    ],
+    "document_kinds": [
+      "invoice",
+      "payment_proof",
+      "both"
+    ],
+    "file_roles": [
+      "invoice",
+      "payment_proof"
+    ],
+    "payers": [
+      {
+        "code": "tenant",
+        "labels": {
+          "ru": "Арендатор",
+          "kk": "Жалға алушы",
+          "en": "Tenant"
+        }
+      },
+      {
+        "code": "owner",
+        "labels": {
+          "ru": "Владелец",
+          "kk": "Меншік иесі",
+          "en": "Owner"
+        }
+      }
+    ],
+    "currencies": [
+      "KZT",
+      "RUB",
+      "USD",
+      "EUR"
+    ],
+    "limits": {
+      "max_file_bytes": 10485760,
+      "max_pdf_pages": 5,
+      "mime_types": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/heic"
+      ],
+      "max_items": 60,
+      "max_notes_len": 2000,
+      "period_min": "2015-01",
+      "reminder_day_min": 1,
+      "reminder_day_max": 28
+    }
+  }
+}

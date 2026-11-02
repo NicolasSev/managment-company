@@ -1,0 +1,12 @@
+{
+  "provider_name": "АлСеКо",
+  "notes": null,
+  "total_due": 1914.64,
+  "items": [
+    {
+      "service_type": "gas",
+      "label_raw": "Газ",
+      "amount": 439.93
+    }
+  ]
+}

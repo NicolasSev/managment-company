@@ -1,0 +1,63 @@
+{
+  "data": [
+    {
+      "id": "b0000000-0000-4000-8000-000000000011",
+      "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b01",
+      "property_name": "Примерная 1, кв. 1",
+      "period": "2026-01",
+      "status": "paid",
+      "total": 41210,
+      "currency": "KZT",
+      "provider_name": "АлСеКо",
+      "review_reasons": [],
+      "paid_at": "2026-02-05",
+      "no_receipt": false,
+      "has_file": true,
+      "source": "upload",
+      "confidence": null,
+      "created_at": "2026-04-02T06:00:00Z",
+      "updated_at": "2026-04-02T06:00:30Z"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-000000000012",
+      "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b01",
+      "property_name": "Примерная 1, кв. 1",
+      "period": "2026-02",
+      "status": "paid",
+      "total": 38990.12,
+      "currency": "KZT",
+      "provider_name": "АлСеКо",
+      "review_reasons": [],
+      "paid_at": "2026-03-10",
+      "no_receipt": true,
+      "has_file": false,
+      "source": "manual",
+      "confidence": null,
+      "created_at": "2026-04-02T06:00:00Z",
+      "updated_at": "2026-04-02T06:00:30Z"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-000000000013",
+      "property_id": "7c1e4a52-3b1f-4d1c-9a55-0a1f6c1d2b01",
+      "property_name": "Примерная 1, кв. 1",
+      "period": "2026-03",
+      "status": "needs_review",
+      "total": 34959.57,
+      "currency": "KZT",
+      "provider_name": "АлСеКо",
+      "review_reasons": [
+        "sum_mismatch"
+      ],
+      "paid_at": null,
+      "no_receipt": false,
+      "has_file": true,
+      "source": "upload",
+      "confidence": 0.93,
+      "created_at": "2026-04-02T06:00:00Z",
+      "updated_at": "2026-04-02T06:00:30Z"
+    }
+  ],
+  "page": 1,
+  "per_page": 3,
+  "total": 3
+}

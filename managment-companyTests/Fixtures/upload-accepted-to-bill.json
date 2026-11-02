@@ -1,0 +1,17 @@
+{
+  "data": {
+    "upload_id": "3f8a9c10-5b2d-4e7a-9a61-0d4c8b7e2f15",
+    "bill": {
+      "id": "b0a1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+      "property_id": "7c1e5b2a-9d34-4f1a-8e6b-2a3c4d5e6f70",
+      "period": "2026-04",
+      "status": "uploaded",
+      "document_kind": null,
+      "currency": null,
+      "total_due": null,
+      "total_paid": null,
+      "paid_at": null,
+      "review_reasons": []
+    }
+  }
+}
