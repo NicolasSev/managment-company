@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "00000000-0000-4000-8000-0000000c0001",
+      "kind": "rent_contract",
+      "name": "Договор аренды жилого помещения (РК, русский) + акт приема-передачи",
+      "version": 1,
+      "is_system": true,
+      "is_default": false,
+      "size_bytes": null,
+      "created_at": "2026-11-01T12:00:00Z",
+      "sha256": null
+    },
+    {
+      "id": "5d0c7e91-3f28-4b6a-a1d4-8e2f9c3b7a05",
+      "kind": "rent_contract",
+      "name": "Мой шаблон (с банковскими реквизитами)",
+      "version": 1,
+      "is_system": false,
+      "is_default": true,
+      "size_bytes": 18045,
+      "created_at": "2026-11-01T16:30:00Z",
+      "sha256": "d746eeb4c1f70070ffc24a39bd217a76fd5e43f2e66ed648c90cc6ff1a20a5c1"
+    }
+  ]
+}

@@ -1,5 +1,25 @@
 {
   "data": {
-    "overdue_count": 3
+    "overdue_count": 3,
+    "items": [
+      {
+        "property_name": "Sunrise Loft",
+        "period_year": 2026,
+        "period_month": 3,
+        "due_date": "2026-03-01"
+      },
+      {
+        "property_name": "Park View",
+        "period_year": 2026,
+        "period_month": 2,
+        "due_date": "2026-02-15"
+      },
+      {
+        "property_name": "Central Studio",
+        "period_year": 2026,
+        "period_month": 1,
+        "due_date": "2026-01-10"
+      }
+    ]
   }
 }

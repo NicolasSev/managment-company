@@ -87,6 +87,8 @@ struct LeaseCard: Decodable, Hashable, Identifiable {
     var id: String
     var status: LeaseStatus
     var property: LeaseProperty
+    /// Present on `GET /v1/leases` summaries (spec §9.4); the tenant overview omits it.
+    var tenant: LeaseTenantCard?
     var startDate: String
     var endDate: String?
     var activationDate: String?
@@ -101,7 +103,7 @@ struct LeaseCard: Decodable, Hashable, Identifiable {
     var availableActions: [LeaseAction]
 
     enum CodingKeys: String, CodingKey {
-        case id, status, property, balance, deposit
+        case id, status, property, tenant, balance, deposit
         case startDate = "start_date"
         case endDate = "end_date"
         case activationDate = "activation_date"
@@ -131,6 +133,7 @@ struct LeaseCard: Decodable, Hashable, Identifiable {
         id = try c.decode(String.self, forKey: .id)
         status = try c.decode(LeaseStatus.self, forKey: .status)
         property = try c.decode(LeaseProperty.self, forKey: .property)
+        tenant = try c.decodeIfPresent(LeaseTenantCard.self, forKey: .tenant)
         startDate = try c.decode(String.self, forKey: .startDate)
         endDate = try c.decodeIfPresent(String.self, forKey: .endDate)
         activationDate = try c.decodeIfPresent(String.self, forKey: .activationDate)

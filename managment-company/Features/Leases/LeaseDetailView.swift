@@ -124,12 +124,13 @@ struct LeaseDetailView: View {
     @ViewBuilder
     private var actionsCard: some View {
         let buttons = viewModel.actionButtons.filter { $0.action != .returnDeposit }
-        if !buttons.isEmpty {
+        if case .loaded(let lease) = viewModel.state {
             LeaseSectionCard(title: "Действия", identifier: "lease.detail.actions") {
                 VStack(spacing: AppTheme.Spacing.sm) {
                     ForEach(buttons) { button in
                         actionButton(button)
                     }
+                    ContractLeaseButton(lease: lease)
                 }
             }
         }

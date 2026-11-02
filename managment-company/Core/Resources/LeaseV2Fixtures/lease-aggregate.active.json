@@ -601,7 +601,7 @@
           "entry_type": "received",
           "amount": 350000,
           "entry_date": "2026-03-15",
-          "reason": "Депозит при заселении",
+          "reason": null,
           "transaction_id": "9e4b7c2a-1d8f-4a6e-b3c5-020260315099",
           "lease_payment_id": "b5d2f8a1-6c3e-4f9b-8d27-020260315001",
           "reverses_entry_id": null,

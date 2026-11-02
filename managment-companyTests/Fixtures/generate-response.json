@@ -1,0 +1,321 @@
+{
+  "data": {
+    "files": [
+      {
+        "id": "b3a8d1f0-6c52-4e97-9d14-0a7e5c2f8b61",
+        "file_type": "contract_pdf",
+        "filename": "Договор аренды — Ахметов — 2026-11-01.pdf",
+        "mime_type": "application/pdf",
+        "size_bytes": 72939,
+        "download_url": "/v1/files/b3a8d1f0-6c52-4e97-9d14-0a7e5c2f8b61/download?expires=1793553245&signature=db37ea9eb7337f9723bc83d5900d49f033be01d72ce8a038d15472977df44f06&user=0994091d-3806-4ee3-b449-052ec9f120aa",
+        "download_url_expires_at": "2026-11-01T22:14:05+05:00"
+      },
+      {
+        "id": "c4b9e2a1-7d63-4fa8-8e25-1b8f6d3a9c72",
+        "file_type": "contract_docx",
+        "filename": "Договор аренды — Ахметов — 2026-11-01.docx",
+        "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "size_bytes": 18109,
+        "download_url": "/v1/files/c4b9e2a1-7d63-4fa8-8e25-1b8f6d3a9c72/download?expires=1793553245&signature=db37ea9eb7337f9723bc83d5900d49f033be01d72ce8a038d15472977df44f06&user=0994091d-3806-4ee3-b449-052ec9f120aa",
+        "download_url_expires_at": "2026-11-01T22:14:05+05:00"
+      }
+    ],
+    "lease": {
+      "id": "2d9f6b14-8a3c-4e71-b5d0-6c1e9a7f3b02",
+      "status": "pending_signature",
+      "version": 4,
+      "origin": "v2",
+      "property_id": "5b8e0f37-2c19-4d7a-b6e4-1f3a9c7d2e50",
+      "tenant_id": "c3f8a1d6-7e25-4b90-a4c2-8d6e1b3f5a72",
+      "renewed_from_lease_id": null,
+      "replaced_by_lease_id": null,
+      "start_date": "2026-11-15",
+      "end_date": "2027-11-14",
+      "activation_date": null,
+      "move_out_date": null,
+      "rent_amount": 280000,
+      "rent_currency": "KZT",
+      "current_rent_amount": 280000,
+      "deposit_amount": 280000,
+      "deposit_currency": "KZT",
+      "due_day": 31,
+      "remind_days_before": 2,
+      "utilities_paid_by": "tenant",
+      "renewal_reminder_days": 30,
+      "prolongation_count": 0,
+      "next_period_start": null,
+      "ends_in_days": 378,
+      "is_ending_soon": false,
+      "notes": "Без животных, курение запрещено",
+      "termination_reason": null,
+      "property_name": "ул. Байзакова, 280, кв. 12",
+      "move_in_date": null,
+      "payment_day": 31,
+      "payment_due_day": 31,
+      "payment_window_start_day": null,
+      "payment_window_end_day": null,
+      "terminated_at": null,
+      "auto_renew": true,
+      "property": {
+        "id": "5b8e0f37-2c19-4d7a-b6e4-1f3a9c7d2e50",
+        "name": "ул. Байзакова, 280, кв. 12",
+        "address": "г. Алматы, ул. Байзакова, 280, кв. 12"
+      },
+      "tenant": {
+        "id": "c3f8a1d6-7e25-4b90-a4c2-8d6e1b3f5a72",
+        "first_name": "Ерлан",
+        "last_name": "Ахметов",
+        "middle_name": "Серикович",
+        "full_name": "Ахметов Ерлан Серикович",
+        "phone": "+7 707 410 22 91",
+        "email": "erlan.akhmetov@example.kz",
+        "iin": "900722304561"
+      },
+      "tenant_snapshot": {
+        "first_name": "Ерлан",
+        "last_name": "Ахметов",
+        "middle_name": "Серикович",
+        "full_name": "Ахметов Ерлан Серикович",
+        "iin": "900722304561",
+        "document_type": "id_card",
+        "document_number": "052318774",
+        "document_issued_by": "МВД РК",
+        "document_issued_at": "2019-08-14",
+        "birth_date": "1990-07-22",
+        "registration_address": "г. Алматы, ул. Розыбакиева, 247, кв. 15",
+        "phone": "+7 707 410 22 91",
+        "email": "erlan.akhmetov@example.kz",
+        "captured_at": "2026-11-01T10:42:00+05:00"
+      },
+      "property_snapshot": {
+        "name": "ул. Байзакова, 280, кв. 12",
+        "address": "г. Алматы, ул. Байзакова, 280, кв. 12",
+        "captured_at": "2026-11-01T10:42:00+05:00"
+      },
+      "lifecycle": {
+        "created_at": "2026-11-01T10:40:15+05:00",
+        "sent_for_signature_at": "2026-11-01T10:42:30+05:00",
+        "signed_on": null,
+        "activated_at": null,
+        "terminated_at": null,
+        "ended_at": null,
+        "cancelled_at": null,
+        "cancel_reason": null,
+        "last_prolonged_at": null
+      },
+      "amendments": [],
+      "documents": {
+        "template_id": "00000000-0000-4000-8000-0000000c0001",
+        "contract_file": {
+          "id": "b3a8d1f0-6c52-4e97-9d14-0a7e5c2f8b61",
+          "filename": "Договор аренды — Ахметов — 2026-11-01.pdf",
+          "mime_type": "application/pdf",
+          "size_bytes": 72939,
+          "uploaded_at": "2026-11-01T21:59:05+05:00"
+        },
+        "signed_file": null,
+        "files": [
+          {
+            "id": "b3a8d1f0-6c52-4e97-9d14-0a7e5c2f8b61",
+            "filename": "Договор аренды — Ахметов — 2026-11-01.pdf",
+            "mime_type": "application/pdf",
+            "size_bytes": 72939,
+            "uploaded_at": "2026-11-01T21:59:05+05:00"
+          },
+          {
+            "id": "c4b9e2a1-7d63-4fa8-8e25-1b8f6d3a9c72",
+            "filename": "Договор аренды — Ахметов — 2026-11-01.docx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "size_bytes": 18109,
+            "uploaded_at": "2026-11-01T21:59:05+05:00"
+          }
+        ]
+      },
+      "balance": {
+        "currency": "KZT",
+        "as_of": "2026-11-01",
+        "charged_to_date": 0,
+        "waived_to_date": 0,
+        "paid_to_date": 0,
+        "outstanding": 0,
+        "overdue": 0,
+        "overdue_charges": 0,
+        "upcoming": 0,
+        "prepaid": 0,
+        "tenant_credit": 0,
+        "received_total": 0,
+        "next_charge": null
+      },
+      "charges": [],
+      "charges_preview": [
+        {
+          "id": null,
+          "kind": "deposit",
+          "period_start": "2026-11-15",
+          "period_end": "2026-11-15",
+          "due_date": "2026-11-15",
+          "amount": 280000,
+          "currency": "KZT",
+          "description": null,
+          "state": "open",
+          "waived_amount": 0,
+          "allocated": 0,
+          "outstanding": 280000,
+          "payment_status": "unpaid",
+          "is_overdue": false,
+          "days_overdue": 0,
+          "replaces_charge_id": null,
+          "can_pay": false,
+          "can_waive": false,
+          "can_unwaive": false
+        },
+        {
+          "id": null,
+          "kind": "rent",
+          "period_start": "2026-11-15",
+          "period_end": "2026-12-14",
+          "due_date": "2026-11-30",
+          "amount": 280000,
+          "currency": "KZT",
+          "description": null,
+          "state": "open",
+          "waived_amount": 0,
+          "allocated": 0,
+          "outstanding": 280000,
+          "payment_status": "unpaid",
+          "is_overdue": false,
+          "days_overdue": 0,
+          "replaces_charge_id": null,
+          "can_pay": false,
+          "can_waive": false,
+          "can_unwaive": false
+        },
+        {
+          "id": null,
+          "kind": "rent",
+          "period_start": "2026-12-15",
+          "period_end": "2027-01-14",
+          "due_date": "2026-12-31",
+          "amount": 280000,
+          "currency": "KZT",
+          "description": null,
+          "state": "open",
+          "waived_amount": 0,
+          "allocated": 0,
+          "outstanding": 280000,
+          "payment_status": "unpaid",
+          "is_overdue": false,
+          "days_overdue": 0,
+          "replaces_charge_id": null,
+          "can_pay": false,
+          "can_waive": false,
+          "can_unwaive": false
+        },
+        {
+          "id": null,
+          "kind": "rent",
+          "period_start": "2027-01-15",
+          "period_end": "2027-02-14",
+          "due_date": "2027-01-31",
+          "amount": 280000,
+          "currency": "KZT",
+          "description": null,
+          "state": "open",
+          "waived_amount": 0,
+          "allocated": 0,
+          "outstanding": 280000,
+          "payment_status": "unpaid",
+          "is_overdue": false,
+          "days_overdue": 0,
+          "replaces_charge_id": null,
+          "can_pay": false,
+          "can_waive": false,
+          "can_unwaive": false
+        },
+        {
+          "id": null,
+          "kind": "rent",
+          "period_start": "2027-02-15",
+          "period_end": "2027-03-14",
+          "due_date": "2027-02-28",
+          "amount": 280000,
+          "currency": "KZT",
+          "description": null,
+          "state": "open",
+          "waived_amount": 0,
+          "allocated": 0,
+          "outstanding": 280000,
+          "payment_status": "unpaid",
+          "is_overdue": false,
+          "days_overdue": 0,
+          "replaces_charge_id": null,
+          "can_pay": false,
+          "can_waive": false,
+          "can_unwaive": false
+        }
+      ],
+      "payments": [],
+      "deposit": {
+        "amount": 280000,
+        "currency": "KZT",
+        "charge_id": null,
+        "received": 0,
+        "returned": 0,
+        "forfeited": 0,
+        "applied_to_debt": 0,
+        "held": 0,
+        "outstanding": 280000,
+        "status": "expected",
+        "suggested_apply_to_debt": 0,
+        "ledger": []
+      },
+      "checklists": [],
+      "events": [
+        {
+          "id": "6f9d2b4a-8c3e-4f1b-9d7a-020261101103",
+          "at": "2026-11-01T10:42:30+05:00",
+          "type": "lease.sent_for_signature",
+          "actor": {
+            "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60",
+            "name": "Арман Сейткали"
+          },
+          "payload": {}
+        },
+        {
+          "id": "6f9d2b4a-8c3e-4f1b-9d7a-020261101102",
+          "at": "2026-11-01T10:42:00+05:00",
+          "type": "contract.generated",
+          "actor": {
+            "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60",
+            "name": "Арман Сейткали"
+          },
+          "payload": {
+            "file_id": "7f4c2a9d-1e63-4b8f-a0d7-5c3e9b1f6a84",
+            "template_id": "e1a4c7f2-9b36-4d58-8c0e-2f7b5a9d3c14"
+          }
+        },
+        {
+          "id": "6f9d2b4a-8c3e-4f1b-9d7a-020261101101",
+          "at": "2026-11-01T10:40:15+05:00",
+          "type": "lease.created",
+          "actor": {
+            "id": "0f6b2d9e-4a1c-4e7b-9d3a-5c8e1f2a7b60",
+            "name": "Арман Сейткали"
+          },
+          "payload": {
+            "via": "workflows.settle",
+            "tenant_created": true
+          }
+        }
+      ],
+      "available_actions": [
+        "update",
+        "mark_signed",
+        "activate",
+        "cancel",
+        "generate_contract",
+        "upload_signed_scan"
+      ]
+    }
+  }
+}

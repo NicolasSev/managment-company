@@ -123,17 +123,17 @@ final class PendingMutationQueue: ObservableObject {
                 save()
                 Self.notifyLeaseAffected(leaseId)
             } catch let api as APIError {
-                switch api {
-                case .httpStatus(409), .httpStatus(422):
+                switch (api.statusCode, api) {
+                case (409, _), (422, _):
                     let leaseId = first.leaseId
                     items.removeFirst()
                     save()
                     Self.notifyLeaseAffected(leaseId)
-                case .httpStatus(let code) where [502, 503, 504].contains(code):
+                case (let code?, _) where [502, 503, 504].contains(code):
                     bumpFirstAttempt()
                     save()
                     break processingLoop
-                case .unauthorized:
+                case (_, .unauthorized):
                     break processingLoop
                 default:
                     break processingLoop
@@ -175,8 +175,8 @@ final class PendingMutationQueue: ObservableObject {
                 return true
             }
         }
-        if let api = error as? APIError, case .httpStatus(let c) = api {
-            return [502, 503, 504].contains(c)
+        if let status = (error as? APIError)?.statusCode {
+            return [502, 503, 504].contains(status)
         }
         return false
     }

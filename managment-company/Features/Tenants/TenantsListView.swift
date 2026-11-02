@@ -84,6 +84,7 @@ struct TenantsListView: View {
                 content
             }
             .navigationTitle("Арендаторы")
+            .accessibilityIdentifier("tenants.list.screen")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -92,6 +93,7 @@ struct TenantsListView: View {
                         Image(systemName: "person.badge.plus")
                     }
                     .accessibilityLabel("Добавить арендатора")
+                    .accessibilityIdentifier("tenants.list.add")
                 }
             }
             .sheet(isPresented: $showCreateSheet) {
@@ -226,7 +228,7 @@ struct TenantsListView: View {
                 LazyVStack(spacing: AppTheme.Spacing.sm) {
                     ForEach(cards) { card in
                         NavigationLink {
-                            TenantDetailView(tenantId: card.tenant.id) {
+                            TenantDetailView(tenantId: card.tenant.id, authManager: authManager) {
                                 await loadData()
                             }
                             .environmentObject(authManager)
@@ -234,6 +236,7 @@ struct TenantsListView: View {
                             tenantCard(card)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("tenants.row.\(card.tenant.id)")
                     }
                 }
             }

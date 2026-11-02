@@ -1,0 +1,6281 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PropManager canonical DTOs (iOS codegen input)",
+    "version": "1.0.0",
+    "description": "Auto-generated from openapi.canonical.yaml and the named swag components. Regenerate via `npm run write:ios-yaml`."
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "ISO8601Date": {
+        "type": "string",
+        "format": "date",
+        "description": "Calendar date only (YYYY-MM-DD)."
+      },
+      "CurrencyCode": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 3,
+        "description": "ISO 4217 alpha code (wire may vary casing; upstream normalisation is server-side)."
+      },
+      "MoneyAmount": {
+        "type": "number",
+        "format": "double",
+        "description": "Monetary value in indicated currency field."
+      },
+      "ExchangeRateConversion": {
+        "type": "object",
+        "required": [
+          "base_currency",
+          "target_currency",
+          "amount",
+          "converted_amount",
+          "rate",
+          "rate_date",
+          "source"
+        ],
+        "properties": {
+          "base_currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "target_currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "converted_amount": {
+            "type": "number"
+          },
+          "rate": {
+            "type": "number"
+          },
+          "rate_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "DataEnvelopeAbstract": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "description": "Single-resource payload wrapped by `/v1` success envelope.",
+            "nullable": false
+          }
+        }
+      },
+      "PaginatedListEnvelope": {
+        "type": "object",
+        "description": "Unified list envelope (data + page/per_page/total).",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {}
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "APIError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {}
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "base_currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "mfa_enabled": {
+            "type": "boolean"
+          },
+          "theme": {
+            "type": "string",
+            "nullable": true
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PropertyStatus": {
+        "type": "string",
+        "enum": [
+          "vacant",
+          "occupied",
+          "renovation",
+          "for_sale",
+          "archived"
+        ],
+        "description": "Operational status. `archived` is legacy; new clients use `archived_at` and archive/restore endpoints."
+      },
+      "Property": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "property_type",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "property_type": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PropertyStatus"
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "area_sqm": {
+            "type": "number",
+            "nullable": true
+          },
+          "rooms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "floor": {
+            "type": "integer",
+            "nullable": true
+          },
+          "purchase_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "purchase_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "purchase_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "current_value": {
+            "type": "number",
+            "nullable": true
+          },
+          "current_value_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "utility_account_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "wifi_login": {
+            "type": "string",
+            "nullable": true
+          },
+          "wifi_password": {
+            "type": "string",
+            "nullable": true
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Non-null when the property is excluded from active portfolio lists and aggregate calculations."
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Tenant": {
+        "type": "object",
+        "required": [
+          "id",
+          "first_name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "cohabitants": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 12,
+            "maxLength": 12,
+            "pattern": "^[0-9]{12}$",
+            "description": "Kazakhstan individual identification number (ИИН); 12 digits with a valid check digit. Unique per owner among live tenants."
+          },
+          "document_type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "id_card",
+              "passport",
+              "other"
+            ]
+          },
+          "document_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_issued_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_issued_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "birth_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "registration_address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UtilitiesPaidBy": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "tenant",
+          "split"
+        ],
+        "description": "Who pays recurring utilities during the lease (CHECK on DB)."
+      },
+      "LeaseContract": {
+        "type": "object",
+        "description": "Lease as returned by API (POST/PUT/Get lease).",
+        "required": [
+          "id",
+          "property_id",
+          "tenant_id",
+          "start_date",
+          "rent_amount",
+          "rent_currency",
+          "status",
+          "renewal_reminder_days",
+          "auto_renew",
+          "utilities_paid_by"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "end_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "move_in_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "rent_amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "rent_currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "deposit_amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "deposit_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "payment_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_start_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_end_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Stored lease lifecycle (active, expired, terminated, ...)"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "terminated_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "termination_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "renewal_reminder_days": {
+            "type": "integer"
+          },
+          "auto_renew": {
+            "type": "boolean"
+          },
+          "utilities_paid_by": {
+            "$ref": "#/components/schemas/UtilitiesPaidBy"
+          }
+        }
+      },
+      "PaymentSchedule": {
+        "type": "object",
+        "description": "One expected rent instalment for a lease. DB stores status in Pending/Matched/Paid/Skipped. GET list may derive display status \"overdue\" when unpaid and past due (see docs/architecture/payments-and-analytics.md).\n",
+        "required": [
+          "id",
+          "lease_id",
+          "due_date",
+          "expected_amount",
+          "currency",
+          "paid_to_date",
+          "remaining_amount",
+          "allocation_count",
+          "status",
+          "is_overdue",
+          "days_overdue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "due_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "period_start_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "period_end_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "notification_due_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "notification_sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expected_amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "actual_payment_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "actual_amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "paid_to_date": {
+            "type": "number",
+            "minimum": 0
+          },
+          "remaining_amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "allocation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paid_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Derived or stored combined display (pending/overdue/paid/...)"
+          },
+          "is_overdue": {
+            "type": "boolean"
+          },
+          "days_overdue": {
+            "type": "integer"
+          }
+        }
+      },
+      "PaymentScheduleListEnvelope": {
+        "type": "object",
+        "description": "Root JSON for paginated lease payment schedule lists (e.g. GET /v1/leases/:id/payment-schedule): ADR-104 list shape with typed rows.\n",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentSchedule"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PaymentQueueItem": {
+        "type": "object",
+        "description": "One upcoming installment in the cross-portfolio payment queue (GET /v1/payment-queue), enriched with property and tenant context. Extends PaymentSchedule with the same fields plus locators.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaymentSchedule"
+          },
+          {
+            "type": "object",
+            "required": [
+              "property_id",
+              "property_name",
+              "tenant_id",
+              "tenant_name"
+            ],
+            "properties": {
+              "property_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "property_name": {
+                "type": "string"
+              },
+              "property_address": {
+                "type": "string",
+                "nullable": true
+              },
+              "tenant_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "tenant_name": {
+                "type": "string"
+              },
+              "tenant_phone": {
+                "type": "string",
+                "nullable": true
+              },
+              "tenant_email": {
+                "type": "string",
+                "format": "email",
+                "nullable": true
+              },
+              "payment_day": {
+                "type": "integer",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "PaymentQueueListEnvelope": {
+        "type": "object",
+        "description": "Root JSON for the cross-portfolio payment queue (GET /v1/payment-queue): ADR-104 list shape.\n",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentQueueItem"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PaymentScheduleUpdateRequest": {
+        "type": "object",
+        "description": "Body for PATCH /v1/payment-schedules/:id. Exactly one intent is applied per call: due_day rewrites the lease payment day and regenerates the schedule; expected_amount rewrites the lease rent and regenerates the schedule; action=\"skip\" drops a single installment from the queue; action=\"restore\" puts an installment back into the queue as pending — undoing a skip, or reverting a recorded payment (which deletes the linked rent income transaction and tenant payment).\n",
+        "properties": {
+          "due_day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "nullable": true
+          },
+          "expected_amount": {
+            "$ref": "#/components/schemas/MoneyAmount",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "restore"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "TenantPayment": {
+        "type": "object",
+        "required": [
+          "id",
+          "lease_id",
+          "amount",
+          "currency",
+          "payment_date",
+          "period_year",
+          "period_month",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "schedule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "payment_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentScheduleAllocation": {
+        "type": "object",
+        "description": "One payment applied to a single schedule row (GET /v1/payment-schedules/:id/allocations), oldest first. Reversing an allocation is DELETE /v1/payments/:id, which soft-deletes the linked income transaction and recalculates the schedule's pending/partial/paid status without unwinding the whole schedule (GAP-048).\n",
+        "required": [
+          "id",
+          "amount",
+          "currency",
+          "payment_date",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "payment_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentScheduleAllocationListEnvelope": {
+        "type": "object",
+        "description": "Root JSON for GET /v1/payment-schedules/:id/allocations: ADR-104 list shape.\n",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentScheduleAllocation"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "TransactionType": {
+        "type": "string",
+        "enum": [
+          "income",
+          "expense"
+        ]
+      },
+      "Transaction": {
+        "type": "object",
+        "required": [
+          "id",
+          "property_id",
+          "type",
+          "category_id",
+          "amount",
+          "currency",
+          "amount_base",
+          "transaction_date",
+          "period_year",
+          "period_month"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TransactionType"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved category name (read-only, joined server-side)."
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "amount_base": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "exchange_rate": {
+            "type": "number",
+            "nullable": true
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "RecurringExpenseTemplate": {
+        "type": "object",
+        "required": [
+          "id",
+          "property_id",
+          "property_name",
+          "category_id",
+          "category_name",
+          "amount",
+          "currency",
+          "cadence",
+          "timezone",
+          "next_occurrence",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category_name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "payee": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ]
+          },
+          "day_of_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "nullable": true
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "next_occurrence": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          }
+        }
+      },
+      "RecurringExpenseTemplateRequest": {
+        "type": "object",
+        "required": [
+          "property_id",
+          "category_id",
+          "amount",
+          "currency",
+          "cadence",
+          "timezone",
+          "next_occurrence",
+          "status"
+        ],
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "payee": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "next_occurrence": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          }
+        }
+      },
+      "RecurringExpenseOccurrence": {
+        "type": "object",
+        "required": [
+          "id",
+          "template_id",
+          "occurrence_date",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurrence_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "posted",
+              "skipped"
+            ]
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseDepositEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "lease_id",
+          "event_type",
+          "amount",
+          "currency",
+          "event_date"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "received",
+              "deduction",
+              "refunded"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "event_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reversed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseDepositSummary": {
+        "type": "object",
+        "required": [
+          "lease_id",
+          "expected",
+          "received",
+          "deductions",
+          "refunded",
+          "held",
+          "outstanding",
+          "currency",
+          "status",
+          "events"
+        ],
+        "properties": {
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "received": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "deductions": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "refunded": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "held": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "outstanding": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "expected",
+              "held",
+              "partially_refunded",
+              "refunded"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseDepositEvent"
+            }
+          }
+        }
+      },
+      "LeaseDepositEventRequest": {
+        "type": "object",
+        "required": [
+          "event_type",
+          "amount",
+          "currency",
+          "event_date"
+        ],
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "received",
+              "deduction",
+              "refunded"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "event_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BankStatementRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "import_id",
+          "row_index",
+          "fingerprint",
+          "transaction_date",
+          "amount",
+          "currency",
+          "description",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "import_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "row_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "ignored"
+            ]
+          },
+          "suggested_property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "suggested_category_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "suggested_schedule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "suggested_transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "decision_note": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BankImportRequest": {
+        "type": "object",
+        "required": [
+          "filename",
+          "rows"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "transaction_date",
+                "amount",
+                "currency",
+                "description"
+              ],
+              "properties": {
+                "transaction_date": {
+                  "$ref": "#/components/schemas/ISO8601Date"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "$ref": "#/components/schemas/CurrencyCode"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "BankImportResult": {
+        "type": "object",
+        "required": [
+          "import_id",
+          "inserted_rows",
+          "duplicate_rows"
+        ],
+        "properties": {
+          "import_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inserted_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duplicate_rows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "BankRowDecisionRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "confirm",
+              "ignore"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "property_id",
+                "category_id",
+                "amount"
+              ],
+              "properties": {
+                "property_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "category_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": {
+                  "$ref": "#/components/schemas/TransactionType"
+                },
+                "amount": {
+                  "$ref": "#/components/schemas/MoneyAmount"
+                },
+                "description": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "LeaseChecklistItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "label",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "done"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "linked_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseChecklist": {
+        "type": "object",
+        "required": [
+          "id",
+          "lease_id",
+          "kind",
+          "status",
+          "items"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "move_in",
+              "move_out"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "due_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseChecklistItem"
+            }
+          }
+        }
+      },
+      "DuplicateExpenseCandidate": {
+        "type": "object",
+        "required": [
+          "id",
+          "property_id",
+          "property_name",
+          "category_name",
+          "amount",
+          "currency",
+          "transaction_date",
+          "score",
+          "reasons"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "category_name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "payee": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachment_hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ExpenseWorkflowRequest": {
+        "type": "object",
+        "required": [
+          "property_id",
+          "category_id",
+          "amount",
+          "currency",
+          "transaction_date"
+        ],
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "payee": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachment_hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "allow_duplicate": {
+            "type": "boolean"
+          },
+          "duplicate_candidate_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "UtilityBillStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "paid",
+          "cancelled"
+        ]
+      },
+      "PropertyUtility": {
+        "type": "object",
+        "required": [
+          "id",
+          "property_id",
+          "period_year",
+          "period_month",
+          "utility_type",
+          "amount",
+          "currency",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer"
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "utility_type": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "due_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "paid_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/UtilityBillStatus"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "receipt_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_receipt_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "ocr_status": {
+            "type": "string"
+          },
+          "ocr_confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "ocr_raw_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "ocr_processed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "FileAttachment": {
+        "type": "object",
+        "required": [
+          "id",
+          "entity_type",
+          "entity_id",
+          "file_type",
+          "download_url",
+          "download_url_expires_at",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "file_type": {
+            "type": "string"
+          },
+          "original_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "mime_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "size_bytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "context_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "property_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "download_url": {
+            "type": "string"
+          },
+          "download_url_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "description": "Response body inside `data` for GET /v1/analytics/dashboard",
+        "required": [
+          "total_income",
+          "total_expense",
+          "net_cashflow",
+          "expected_rent",
+          "rent_received",
+          "rent_outstanding",
+          "deposit_income",
+          "period_year",
+          "period_month",
+          "period",
+          "period_label"
+        ],
+        "properties": {
+          "total_income": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "total_expense": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "net_cashflow": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "expected_rent": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "rent_received": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "rent_outstanding": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "deposit_income": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer"
+          },
+          "period": {
+            "type": "string",
+            "description": "all | month | season | quarter | year"
+          },
+          "period_label": {
+            "type": "string"
+          },
+          "period_from": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "period_to": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          }
+        }
+      },
+      "ProfitabilityPoint": {
+        "type": "object",
+        "required": [
+          "period_key",
+          "period_label",
+          "period_year",
+          "total_income",
+          "total_expense",
+          "utility_expense",
+          "operating_cost",
+          "net_cashflow",
+          "profit_margin_pct"
+        ],
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "property_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "period_key": {
+            "type": "string"
+          },
+          "period_label": {
+            "type": "string"
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer",
+            "nullable": true
+          },
+          "period_quarter": {
+            "type": "integer",
+            "nullable": true
+          },
+          "period_season": {
+            "type": "string",
+            "nullable": true
+          },
+          "total_income": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "total_expense": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "utility_expense": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "operating_cost": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "net_cashflow": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "profit_margin_pct": {
+            "type": "number"
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "title",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NotificationsPageEnvelope": {
+        "type": "object",
+        "description": "Root JSON body of GET /v1/notifications (Fiber handler): data, page, per_page, total, unread_count.\n",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "unread_count",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "NotificationUnreadCountData": {
+        "type": "object",
+        "description": "Inner object inside the HTTP \"data\" field for GET /v1/notifications/unread-count\n(standard JSON helper wraps payload as { \"data\": { \"count\": … } }).\n",
+        "required": [
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "OccupancyResponse": {
+        "type": "object",
+        "description": "Body inside `data` for GET /v1/analytics/occupancy (server-derived counts).",
+        "required": [
+          "occupied",
+          "total",
+          "rate_pct"
+        ],
+        "properties": {
+          "occupied": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rate_pct": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "CashflowTrendMonth": {
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "total_income",
+          "total_expense",
+          "net_cashflow"
+        ],
+        "properties": {
+          "year": {
+            "type": "integer"
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "total_income": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "total_expense": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "net_cashflow": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          }
+        }
+      },
+      "CashflowTrendResponse": {
+        "type": "object",
+        "description": "Body inside `data` for GET /v1/analytics/cashflow-trend.",
+        "required": [
+          "months"
+        ],
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashflowTrendMonth"
+            }
+          }
+        }
+      },
+      "OverduePaymentItem": {
+        "type": "object",
+        "description": "One overdue rent installment in GET /v1/analytics/overdue-payments.",
+        "required": [
+          "property_name",
+          "period_year",
+          "period_month",
+          "due_date"
+        ],
+        "properties": {
+          "property_name": {
+            "type": "string"
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "OverduePaymentsResponse": {
+        "type": "object",
+        "description": "Body inside `data` for GET /v1/analytics/overdue-payments.",
+        "required": [
+          "overdue_count",
+          "items"
+        ],
+        "properties": {
+          "overdue_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverduePaymentItem"
+            }
+          }
+        }
+      },
+      "ProfitabilityGroupBy": {
+        "type": "string",
+        "enum": [
+          "month",
+          "quarter",
+          "season",
+          "year"
+        ]
+      },
+      "ProfitabilityReport": {
+        "type": "object",
+        "description": "Body inside `data` for GET /v1/analytics/profitability.",
+        "required": [
+          "group_by",
+          "from",
+          "to",
+          "points",
+          "totals"
+        ],
+        "properties": {
+          "group_by": {
+            "$ref": "#/components/schemas/ProfitabilityGroupBy"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitabilityPoint"
+            }
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitabilityPoint"
+            }
+          }
+        }
+      },
+      "PropertyUpsertRequest": {
+        "type": "object",
+        "description": "Create/update property JSON (handlers propertyRequest).",
+        "required": [
+          "name",
+          "property_type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "property_type": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "area_sqm": {
+            "type": "number",
+            "nullable": true
+          },
+          "rooms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "floor": {
+            "type": "integer",
+            "nullable": true
+          },
+          "purchase_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "purchase_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "purchase_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "current_value": {
+            "type": "number",
+            "nullable": true
+          },
+          "current_value_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "utility_account_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "wifi_login": {
+            "type": "string",
+            "nullable": true
+          },
+          "wifi_password": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TenantUpsertRequest": {
+        "type": "object",
+        "description": "Create/update tenant JSON (handlers tenantRequest).",
+        "required": [
+          "first_name"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "cohabitants": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 12,
+            "maxLength": 12,
+            "pattern": "^[0-9]{12}$",
+            "description": "Kazakhstan individual identification number (ИИН); 12 digits with a valid check digit. Unique per owner among live tenants."
+          },
+          "document_type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "id_card",
+              "passport",
+              "other"
+            ]
+          },
+          "document_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_issued_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_issued_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "birth_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "registration_address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseCreateRequest": {
+        "type": "object",
+        "description": "POST /v1/properties/:id/leases body (handlers createLeaseRequest).",
+        "required": [
+          "tenant_id",
+          "start_date"
+        ],
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "end_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "move_in_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "rent_amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "rent_currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "deposit_amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "deposit_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "payment_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_start_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_end_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "renewal_reminder_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "auto_renew": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "utilities_paid_by": {
+            "$ref": "#/components/schemas/UtilitiesPaidBy",
+            "nullable": true
+          },
+          "is_historical": {
+            "type": "boolean",
+            "description": "Create an ended historical occupancy record; requires end_date and does not create rent schedule."
+          }
+        }
+      },
+      "LeaseUpdateRequest": {
+        "type": "object",
+        "description": "PUT /v1/leases/:id body (handlers updateLeaseRequest). All optional for partial updates.",
+        "properties": {
+          "start_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "end_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "move_in_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "rent_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "deposit_amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "deposit_currency": {
+            "$ref": "#/components/schemas/CurrencyCode",
+            "nullable": true
+          },
+          "payment_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_start_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_end_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "terminated_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "termination_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "renewal_reminder_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "auto_renew": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "utilities_paid_by": {
+            "$ref": "#/components/schemas/UtilitiesPaidBy",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseTerminateRequest": {
+        "type": "object",
+        "required": [
+          "terminated_at"
+        ],
+        "properties": {
+          "terminated_at": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "termination_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TransactionCreateRequest": {
+        "type": "object",
+        "description": "POST /v1/properties/:id/transactions (handlers createTransactionRequest).",
+        "required": [
+          "type",
+          "category_id"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/TransactionType"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "MarkSchedulePaidRequest": {
+        "type": "object",
+        "description": "POST /v1/payment-schedules/:id/mark-paid (handlers markSchedulePaidRequest).",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "nullable": true
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "payment_date": {
+            "$ref": "#/components/schemas/ISO8601Date"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SchedulePaymentResult": {
+        "type": "object",
+        "description": "Wrapped in `data` after mark-paid; aligns with SchedulePaymentResponse.",
+        "required": [
+          "schedule",
+          "payment"
+        ],
+        "properties": {
+          "schedule": {
+            "$ref": "#/components/schemas/PaymentSchedule"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/TenantPayment"
+          }
+        }
+      },
+      "UtilityUpsertRequest": {
+        "type": "object",
+        "description": "POST/PUT utilities (handlers utilityRequest).",
+        "required": [
+          "period_year",
+          "period_month",
+          "utility_type",
+          "amount"
+        ],
+        "properties": {
+          "period_year": {
+            "type": "integer"
+          },
+          "period_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "utility_type": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "due_date": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "paid_at": {
+            "$ref": "#/components/schemas/ISO8601Date",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/UtilityBillStatus"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CategoryDTO": {
+        "type": "object",
+        "description": "Income/expense category row from GET /v1/categories.",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "is_system",
+          "sort_order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TransactionType"
+          },
+          "is_system": {
+            "type": "boolean"
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "sort_order": {
+            "type": "integer"
+          }
+        }
+      },
+      "UserProfileUpdateRequest": {
+        "type": "object",
+        "description": "PUT /v1/auth/me body (handlers UpdateProfileRequest).",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "timezone": {
+            "type": "string",
+            "nullable": true
+          },
+          "base_currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "theme": {
+            "type": "string",
+            "nullable": true
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ChargeCommandEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChargeCommandResult"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ChargeCommandResult": {
+        "type": "object",
+        "required": [
+          "charge",
+          "lease"
+        ],
+        "properties": {
+          "charge": {
+            "$ref": "#/components/schemas/LeaseCharge"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          }
+        }
+      },
+      "ContractActInput": {
+        "type": "object",
+        "properties": {
+          "inventory": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "keys_count": {
+            "type": "integer",
+            "nullable": true
+          },
+          "meter_electricity": {
+            "type": "string"
+          },
+          "meter_water": {
+            "type": "string"
+          }
+        }
+      },
+      "ContractError": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/ContractErrorDetails"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ContractErrorDetails": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractMissingField"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "split_placeholders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unknown_placeholders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ContractErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ContractError"
+          }
+        }
+      },
+      "ContractGenerateRequest": {
+        "type": "object",
+        "properties": {
+          "act": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContractActInput"
+              }
+            ],
+            "nullable": true
+          },
+          "contract_date": {
+            "description": "ContractDate (YYYY-MM-DD) overrides the date printed on the contract;\ndefault: signed_on, else start_date.",
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "formats": {
+            "description": "Formats is any of \"pdf\", \"docx\"; empty means both.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "pdf",
+                "docx"
+              ]
+            }
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "ContractGenerated": {
+        "type": "object",
+        "required": [
+          "files",
+          "lease"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractGeneratedFile"
+            }
+          },
+          "lease": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          }
+        }
+      },
+      "ContractGeneratedEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContractGenerated"
+          }
+        }
+      },
+      "ContractGeneratedFile": {
+        "type": "object",
+        "required": [
+          "file_type",
+          "filename",
+          "id",
+          "mime_type",
+          "size_bytes"
+        ],
+        "properties": {
+          "download_url": {
+            "description": "DownloadURL is a signed link, absent when the server could not sign one.",
+            "type": "string"
+          },
+          "download_url_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "file_type": {
+            "type": "string",
+            "enum": [
+              "contract_pdf",
+              "contract_docx"
+            ]
+          },
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          }
+        }
+      },
+      "ContractMissingField": {
+        "type": "object",
+        "required": [
+          "entity",
+          "field",
+          "message",
+          "placeholder"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": [
+              "landlord_profile",
+              "property",
+              "tenant",
+              "lease"
+            ]
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          }
+        }
+      },
+      "DepositEntryEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DepositEntryResult"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "DepositEntryResult": {
+        "type": "object",
+        "required": [
+          "entry",
+          "lease"
+        ],
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/DepositLedgerEntry"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          }
+        }
+      },
+      "DepositEntryType": {
+        "type": "string",
+        "enum": [
+          "received",
+          "returned",
+          "forfeited",
+          "applied_to_debt"
+        ],
+        "x-enum-varnames": [
+          "EntryReceived",
+          "EntryReturned",
+          "EntryForfeited",
+          "EntryAppliedToDebt"
+        ]
+      },
+      "DepositLedgerEntry": {
+        "type": "object",
+        "required": [
+          "amount",
+          "created_at",
+          "entry_date",
+          "entry_type",
+          "id",
+          "lease_payment_id",
+          "reason",
+          "reversed_by_entry_id",
+          "reverses_entry_id",
+          "transaction_id"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "entry_type": {
+            "$ref": "#/components/schemas/DepositEntryType"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lease_payment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversed_by_entry_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "reverses_entry_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "transaction_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "DepositReturnEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DepositReturnResult"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "DepositReturnResult": {
+        "type": "object",
+        "required": [
+          "entries",
+          "lease"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepositLedgerEntry"
+            }
+          },
+          "lease": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          }
+        }
+      },
+      "DocumentTemplate": {
+        "type": "object",
+        "required": [
+          "created_at",
+          "id",
+          "is_default",
+          "is_system",
+          "kind",
+          "name",
+          "sha256",
+          "size_bytes",
+          "version"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "is_system": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rent_contract"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "size_bytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          }
+        }
+      },
+      "DocumentTemplateEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DocumentTemplate"
+          }
+        }
+      },
+      "DocumentTemplateListEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentTemplate"
+            }
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/LeaseV2Error"
+          }
+        }
+      },
+      "LandlordProfile": {
+        "type": "object",
+        "required": [
+          "address",
+          "bank_details",
+          "document",
+          "full_name",
+          "full_name_short_gen",
+          "gender",
+          "iin",
+          "missing_fields",
+          "phone",
+          "phone2",
+          "updated_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "bank_details": {
+            "type": "string"
+          },
+          "document": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "full_name_short_gen": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male"
+            ],
+            "nullable": true
+          },
+          "iin": {
+            "type": "string"
+          },
+          "missing_fields": {
+            "description": "MissingFields lists what the contract still needs from the profile.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "phone": {
+            "type": "string"
+          },
+          "phone2": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "LandlordProfileEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LandlordProfile"
+          }
+        }
+      },
+      "LandlordProfileRequest": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "bank_details": {
+            "type": "string"
+          },
+          "document": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "full_name_short_gen": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male"
+            ],
+            "nullable": true
+          },
+          "iin": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "phone2": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseActivateRequest": {
+        "type": "object",
+        "properties": {
+          "activation_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "signed_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "signed_on": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseAggregate": {
+        "type": "object",
+        "required": [
+          "activation_date",
+          "amendments",
+          "auto_renew",
+          "available_actions",
+          "balance",
+          "charges",
+          "charges_preview",
+          "checklists",
+          "current_rent_amount",
+          "deposit",
+          "deposit_amount",
+          "deposit_currency",
+          "documents",
+          "due_day",
+          "end_date",
+          "ends_in_days",
+          "events",
+          "id",
+          "is_ending_soon",
+          "lifecycle",
+          "move_in_date",
+          "move_out_date",
+          "next_period_start",
+          "notes",
+          "origin",
+          "payment_day",
+          "payment_due_day",
+          "payment_window_end_day",
+          "payment_window_start_day",
+          "payments",
+          "prolongation_count",
+          "property",
+          "property_id",
+          "property_name",
+          "property_snapshot",
+          "remind_days_before",
+          "renewal_reminder_days",
+          "renewed_from_lease_id",
+          "rent_amount",
+          "rent_currency",
+          "replaced_by_lease_id",
+          "start_date",
+          "status",
+          "tenant",
+          "tenant_id",
+          "tenant_snapshot",
+          "terminated_at",
+          "termination_reason",
+          "utilities_paid_by",
+          "version"
+        ],
+        "properties": {
+          "activation_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "amendments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseAmendment"
+            }
+          },
+          "auto_renew": {
+            "type": "boolean"
+          },
+          "available_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "balance": {
+            "$ref": "#/components/schemas/LeaseBalance"
+          },
+          "charges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseCharge"
+            }
+          },
+          "charges_preview": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseCharge"
+            }
+          },
+          "checklists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseChecklistSummary"
+            }
+          },
+          "current_rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "deposit": {
+            "$ref": "#/components/schemas/LeaseDeposit"
+          },
+          "deposit_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "deposit_currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "documents": {
+            "$ref": "#/components/schemas/LeaseDocuments"
+          },
+          "due_day": {
+            "type": "integer"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ends_in_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseEvent"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_ending_soon": {
+            "type": "boolean"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/LeaseLifecycle"
+          },
+          "move_in_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "move_out_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "next_period_start": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "$ref": "#/components/schemas/LeaseOrigin"
+          },
+          "payment_day": {
+            "type": "integer"
+          },
+          "payment_due_day": {
+            "type": "integer"
+          },
+          "payment_window_end_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_start_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeasePayment"
+            }
+          },
+          "prolongation_count": {
+            "type": "integer"
+          },
+          "property": {
+            "$ref": "#/components/schemas/LeasePropertyCard"
+          },
+          "property_id": {
+            "type": "string"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "property_snapshot": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "remind_days_before": {
+            "type": "integer"
+          },
+          "renewal_reminder_days": {
+            "type": "integer"
+          },
+          "renewed_from_lease_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "rent_currency": {
+            "type": "string"
+          },
+          "replaced_by_lease_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LeaseStatus"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/LeaseTenantCard"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "tenant_snapshot": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "terminated_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "termination_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "utilities_paid_by": {
+            "$ref": "#/components/schemas/LeaseUtilitiesPaidBy"
+          },
+          "version": {
+            "type": "integer"
+          }
+        }
+      },
+      "LeaseAggregateEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "LeaseAmendment": {
+        "type": "object",
+        "required": [
+          "created_at",
+          "due_day",
+          "effective_from",
+          "id",
+          "note",
+          "rent_amount"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "id": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseAmendmentRequest": {
+        "type": "object",
+        "required": [
+          "effective_from"
+        ],
+        "properties": {
+          "due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseBalance": {
+        "type": "object",
+        "required": [
+          "as_of",
+          "charged_to_date",
+          "currency",
+          "next_charge",
+          "outstanding",
+          "overdue",
+          "overdue_charges",
+          "paid_to_date",
+          "prepaid",
+          "received_total",
+          "tenant_credit",
+          "upcoming",
+          "waived_to_date"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "charged_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "next_charge": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseNextCharge"
+              }
+            ],
+            "nullable": true
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "overdue": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "overdue_charges": {
+            "type": "integer"
+          },
+          "paid_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "prepaid": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "received_total": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "tenant_credit": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "upcoming": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "waived_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseCancelRequest": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseCharge": {
+        "type": "object",
+        "required": [
+          "allocated",
+          "amount",
+          "can_pay",
+          "can_unwaive",
+          "can_waive",
+          "currency",
+          "days_overdue",
+          "description",
+          "due_date",
+          "id",
+          "is_overdue",
+          "kind",
+          "outstanding",
+          "payment_status",
+          "period_end",
+          "period_start",
+          "replaces_charge_id",
+          "state",
+          "waived_amount"
+        ],
+        "properties": {
+          "allocated": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "can_pay": {
+            "type": "boolean"
+          },
+          "can_unwaive": {
+            "type": "boolean"
+          },
+          "can_waive": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "days_overdue": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_overdue": {
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LeaseChargeKind"
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "payment_status": {
+            "$ref": "#/components/schemas/LeaseChargePaymentStatus"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "replaces_charge_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "$ref": "#/components/schemas/LeaseChargeState"
+          },
+          "waived_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseChargeKind": {
+        "type": "string",
+        "enum": [
+          "rent",
+          "deposit",
+          "extra"
+        ],
+        "x-enum-varnames": [
+          "KindRent",
+          "KindDeposit",
+          "KindExtra"
+        ]
+      },
+      "LeaseChargePaymentRequest": {
+        "type": "object",
+        "required": [
+          "received_on"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "kaspi",
+              "card",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "received_on": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "LeaseChargePaymentStatus": {
+        "type": "string",
+        "enum": [
+          "void",
+          "waived",
+          "paid",
+          "partial",
+          "unpaid"
+        ],
+        "x-enum-varnames": [
+          "PayVoid",
+          "PayWaived",
+          "PayPaid",
+          "PayPartial",
+          "PayUnpaid"
+        ]
+      },
+      "LeaseChargeState": {
+        "type": "string",
+        "enum": [
+          "open",
+          "waived",
+          "void"
+        ],
+        "x-enum-varnames": [
+          "StateOpen",
+          "StateWaived",
+          "StateVoid"
+        ]
+      },
+      "LeaseChecklistSummary": {
+        "type": "object",
+        "required": [
+          "done",
+          "kind",
+          "status",
+          "total"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "LeaseDeposit": {
+        "type": "object",
+        "required": [
+          "amount",
+          "applied_to_debt",
+          "charge_id",
+          "currency",
+          "forfeited",
+          "held",
+          "ledger",
+          "outstanding",
+          "received",
+          "returned",
+          "status",
+          "suggested_apply_to_debt"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "applied_to_debt": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "charge_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "forfeited": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "held": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepositLedgerEntry"
+            }
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "received": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "returned": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "status": {
+            "$ref": "#/components/schemas/LeaseDepositStatus"
+          },
+          "suggested_apply_to_debt": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseDepositBrief": {
+        "type": "object",
+        "required": [
+          "amount",
+          "applied_to_debt",
+          "charge_id",
+          "currency",
+          "forfeited",
+          "held",
+          "outstanding",
+          "received",
+          "returned",
+          "status",
+          "suggested_apply_to_debt"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "applied_to_debt": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "charge_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "forfeited": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "held": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "received": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "returned": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "status": {
+            "$ref": "#/components/schemas/LeaseDepositStatus"
+          },
+          "suggested_apply_to_debt": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseDepositForfeitRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "confirm": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseDepositReturnRequest": {
+        "type": "object",
+        "required": [
+          "returned_on"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "apply_to_debt": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "confirm": {
+            "type": "boolean"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "kaspi",
+              "card",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "returned_on": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "LeaseDepositStatus": {
+        "type": "string",
+        "enum": [
+          "none",
+          "expected",
+          "held",
+          "partially_returned",
+          "returned",
+          "forfeited"
+        ],
+        "x-enum-varnames": [
+          "DepositNone",
+          "DepositExpected",
+          "DepositHeld",
+          "DepositPartiallyReturned",
+          "DepositReturned",
+          "DepositForfeited"
+        ]
+      },
+      "LeaseDocuments": {
+        "type": "object",
+        "required": [
+          "contract_file",
+          "files",
+          "signed_file",
+          "template_id"
+        ],
+        "properties": {
+          "contract_file": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseFileRef"
+              }
+            ],
+            "nullable": true
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseFileRef"
+            }
+          },
+          "signed_file": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseFileRef"
+              }
+            ],
+            "nullable": true
+          },
+          "template_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseEvent": {
+        "type": "object",
+        "required": [
+          "actor",
+          "at",
+          "id",
+          "payload",
+          "type"
+        ],
+        "properties": {
+          "actor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseEventActor"
+              }
+            ],
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseEventActor": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseEventsDetails": {
+        "type": "object",
+        "properties": {
+          "next_before": {
+            "description": "NextBefore is the cursor for the next (older) page; absent on the last page.",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LeaseEventsEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseEvent"
+            }
+          },
+          "details": {
+            "$ref": "#/components/schemas/LeaseEventsDetails"
+          }
+        }
+      },
+      "LeaseExtraChargeRequest": {
+        "type": "object",
+        "required": [
+          "amount",
+          "charged_on",
+          "description"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "charged_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseFileRef": {
+        "type": "object",
+        "required": [
+          "filename",
+          "id",
+          "mime_type",
+          "size_bytes",
+          "uploaded_at"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "size_bytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LeaseLifecycle": {
+        "type": "object",
+        "required": [
+          "activated_at",
+          "cancel_reason",
+          "cancelled_at",
+          "created_at",
+          "ended_at",
+          "last_prolonged_at",
+          "sent_for_signature_at",
+          "signed_on",
+          "terminated_at"
+        ],
+        "properties": {
+          "activated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancel_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_prolonged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sent_for_signature_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "signed_on": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "terminated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseListEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "LeaseMarkSignedRequest": {
+        "type": "object",
+        "required": [
+          "signed_on"
+        ],
+        "properties": {
+          "signed_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "signed_on": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "LeaseNextCharge": {
+        "type": "object",
+        "required": [
+          "amount",
+          "due_date",
+          "id",
+          "kind",
+          "outstanding"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LeaseChargeKind"
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseOrigin": {
+        "type": "string",
+        "enum": [
+          "v1",
+          "v2"
+        ],
+        "x-enum-varnames": [
+          "OriginV1",
+          "OriginV2"
+        ]
+      },
+      "LeasePayment": {
+        "type": "object",
+        "required": [
+          "allocations",
+          "amount",
+          "can_reverse",
+          "currency",
+          "deposit_part",
+          "direction",
+          "id",
+          "method",
+          "notes",
+          "received_on",
+          "reverse_reason",
+          "reversed_at",
+          "source",
+          "transaction_id",
+          "unallocated"
+        ],
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeasePaymentAllocation"
+            }
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "can_reverse": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "deposit_part": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/LeasePaymentDirection"
+          },
+          "id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "kaspi",
+              "card",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "received_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "reverse_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "bank",
+              "telegram",
+              "assistant",
+              "deposit",
+              "legacy",
+              "legacy_txn",
+              "legacy_untracked"
+            ]
+          },
+          "transaction_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "unallocated": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeasePaymentAllocation": {
+        "type": "object",
+        "required": [
+          "amount",
+          "charge_id",
+          "kind"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "charge_id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LeaseChargeKind"
+          }
+        }
+      },
+      "LeasePaymentDirection": {
+        "type": "string",
+        "enum": [
+          "in",
+          "out"
+        ],
+        "x-enum-varnames": [
+          "DirIn",
+          "DirOut"
+        ]
+      },
+      "LeasePaymentHistoryItem": {
+        "type": "object",
+        "required": [
+          "allocations",
+          "amount",
+          "can_reverse",
+          "currency",
+          "deposit_part",
+          "direction",
+          "id",
+          "lease_id",
+          "lease_status",
+          "method",
+          "notes",
+          "property",
+          "received_on",
+          "reverse_reason",
+          "reversed_at",
+          "source",
+          "tenant",
+          "transaction_id",
+          "unallocated"
+        ],
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeasePaymentAllocation"
+            }
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "can_reverse": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "deposit_part": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/LeasePaymentDirection"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "lease_status": {
+            "$ref": "#/components/schemas/LeaseStatus"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "kaspi",
+              "card",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "property": {
+            "$ref": "#/components/schemas/LeasePropertyCard"
+          },
+          "received_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "reverse_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "bank",
+              "telegram",
+              "assistant",
+              "deposit",
+              "legacy",
+              "legacy_txn",
+              "legacy_untracked"
+            ]
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/LeaseTenantCard"
+          },
+          "transaction_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "unallocated": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeasePaymentRequest": {
+        "type": "object",
+        "required": [
+          "amount",
+          "received_on"
+        ],
+        "properties": {
+          "allocate": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "kaspi",
+              "card",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "received_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "LeasePaymentsEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeasePaymentHistoryItem"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "LeasePropertyCard": {
+        "type": "object",
+        "required": [
+          "address",
+          "id",
+          "name"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseQueueItem": {
+        "type": "object",
+        "required": [
+          "actual_amount",
+          "actual_payment_id",
+          "allocated",
+          "allocation_count",
+          "amount",
+          "charge_id",
+          "currency",
+          "days_overdue",
+          "description",
+          "due_date",
+          "expected_amount",
+          "id",
+          "is_overdue",
+          "kind",
+          "lease_id",
+          "lease_status",
+          "notification_due_date",
+          "notification_sent_at",
+          "outstanding",
+          "paid_at",
+          "paid_to_date",
+          "payment_day",
+          "payment_status",
+          "period_end",
+          "period_end_date",
+          "period_start",
+          "period_start_date",
+          "property_address",
+          "property_id",
+          "property_name",
+          "remaining_amount",
+          "status",
+          "tenant_credit",
+          "tenant_email",
+          "tenant_id",
+          "tenant_name",
+          "tenant_phone",
+          "transaction_id",
+          "waived_amount"
+        ],
+        "properties": {
+          "actual_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "actual_payment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "allocated": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "allocation_count": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "charge_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "days_overdue": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "expected_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_overdue": {
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LeaseChargeKind"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "lease_status": {
+            "$ref": "#/components/schemas/LeaseStatus"
+          },
+          "notification_due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "notification_sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "paid_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "payment_day": {
+            "type": "integer"
+          },
+          "payment_status": {
+            "$ref": "#/components/schemas/LeaseChargePaymentStatus"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "property_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "property_id": {
+            "type": "string"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "remaining_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "skipped",
+              "paid",
+              "partial",
+              "overdue"
+            ]
+          },
+          "tenant_credit": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "tenant_email": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "tenant_name": {
+            "type": "string"
+          },
+          "tenant_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "transaction_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "waived_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "LeaseRefundRequest": {
+        "type": "object",
+        "required": [
+          "refunded_on"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "kaspi",
+              "card",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "refunded_on": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "LeaseReverseRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseSendForSignatureRequest": {
+        "type": "object",
+        "properties": {
+          "generate_contract": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LeaseStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "pending_signature",
+          "active",
+          "ended",
+          "terminated",
+          "cancelled"
+        ],
+        "x-enum-varnames": [
+          "StatusDraft",
+          "StatusPendingSignature",
+          "StatusActive",
+          "StatusEnded",
+          "StatusTerminated",
+          "StatusCancelled"
+        ]
+      },
+      "LeaseSummary": {
+        "type": "object",
+        "required": [
+          "activation_date",
+          "auto_renew",
+          "available_actions",
+          "balance",
+          "current_rent_amount",
+          "deposit",
+          "deposit_amount",
+          "deposit_currency",
+          "due_day",
+          "end_date",
+          "ends_in_days",
+          "id",
+          "is_ending_soon",
+          "lifecycle",
+          "move_in_date",
+          "move_out_date",
+          "next_period_start",
+          "notes",
+          "origin",
+          "payment_day",
+          "payment_due_day",
+          "payment_window_end_day",
+          "payment_window_start_day",
+          "prolongation_count",
+          "property",
+          "property_id",
+          "property_name",
+          "remind_days_before",
+          "renewal_reminder_days",
+          "renewed_from_lease_id",
+          "rent_amount",
+          "rent_currency",
+          "replaced_by_lease_id",
+          "start_date",
+          "status",
+          "tenant",
+          "tenant_id",
+          "terminated_at",
+          "termination_reason",
+          "utilities_paid_by",
+          "version"
+        ],
+        "properties": {
+          "activation_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "auto_renew": {
+            "type": "boolean"
+          },
+          "available_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "balance": {
+            "$ref": "#/components/schemas/LeaseBalance"
+          },
+          "current_rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "deposit": {
+            "$ref": "#/components/schemas/LeaseDepositBrief"
+          },
+          "deposit_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "deposit_currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_day": {
+            "type": "integer"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ends_in_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_ending_soon": {
+            "type": "boolean"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/LeaseLifecycle"
+          },
+          "move_in_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "move_out_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "next_period_start": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "$ref": "#/components/schemas/LeaseOrigin"
+          },
+          "payment_day": {
+            "type": "integer"
+          },
+          "payment_due_day": {
+            "type": "integer"
+          },
+          "payment_window_end_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_window_start_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "prolongation_count": {
+            "type": "integer"
+          },
+          "property": {
+            "$ref": "#/components/schemas/LeasePropertyCard"
+          },
+          "property_id": {
+            "type": "string"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "remind_days_before": {
+            "type": "integer"
+          },
+          "renewal_reminder_days": {
+            "type": "integer"
+          },
+          "renewed_from_lease_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "rent_currency": {
+            "type": "string"
+          },
+          "replaced_by_lease_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LeaseStatus"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/LeaseTenantCard"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "terminated_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "termination_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "utilities_paid_by": {
+            "$ref": "#/components/schemas/LeaseUtilitiesPaidBy"
+          },
+          "version": {
+            "type": "integer"
+          }
+        }
+      },
+      "LeaseTenantCard": {
+        "type": "object",
+        "required": [
+          "email",
+          "first_name",
+          "full_name",
+          "id",
+          "iin",
+          "last_name",
+          "middle_name",
+          "phone"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LeaseUtilitiesPaidBy": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "tenant",
+          "split"
+        ],
+        "x-enum-varnames": [
+          "UtilitiesOwner",
+          "UtilitiesTenant",
+          "UtilitiesSplit"
+        ]
+      },
+      "LeaseV2CreateRequest": {
+        "type": "object",
+        "required": [
+          "property_id",
+          "rent_amount",
+          "start_date",
+          "tenant_id"
+        ],
+        "properties": {
+          "deposit_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "deposit_currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "remind_days_before": {
+            "type": "integer",
+            "nullable": true
+          },
+          "renewal_reminder_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "rent_currency": {
+            "type": "string"
+          },
+          "replaces_lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "utilities_paid_by": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "tenant",
+              "split"
+            ]
+          }
+        }
+      },
+      "LeaseV2Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {},
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseV2TerminateRequest": {
+        "type": "object",
+        "required": [
+          "move_out_date"
+        ],
+        "properties": {
+          "confirm": {
+            "type": "boolean"
+          },
+          "forfeit_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "move_out_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "LeaseV2UpdateRequest": {
+        "type": "object",
+        "properties": {
+          "deposit_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "remind_days_before": {
+            "type": "integer",
+            "nullable": true
+          },
+          "renewal_reminder_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "rent_currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "utilities_paid_by": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "tenant",
+              "split"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "PaymentCommandEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PaymentCommandResult"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "PaymentCommandResult": {
+        "type": "object",
+        "required": [
+          "lease",
+          "payment"
+        ],
+        "properties": {
+          "lease": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/LeasePayment"
+          }
+        }
+      },
+      "PaymentQueueEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseQueueItem"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "SettleEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SettleResult"
+          }
+        }
+      },
+      "SettleLeaseRequest": {
+        "type": "object",
+        "required": [
+          "rent_amount",
+          "start_date"
+        ],
+        "properties": {
+          "deposit_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "due_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "remind_days_before": {
+            "type": "integer",
+            "nullable": true
+          },
+          "renewal_reminder_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true,
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "rent_currency": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "term_months": {
+            "type": "integer",
+            "nullable": true
+          },
+          "utilities_paid_by": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "tenant",
+              "split"
+            ]
+          }
+        }
+      },
+      "SettleRequest": {
+        "type": "object",
+        "required": [
+          "lease",
+          "property_id"
+        ],
+        "properties": {
+          "activate": {
+            "description": "Activate makes the lease active; signed_on defaults to today and\nactivation_date to start_date.",
+            "type": "boolean"
+          },
+          "activation_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "confirm": {
+            "description": "Confirm is required from an assistant token when replaces_lease_id is set.",
+            "type": "boolean"
+          },
+          "generate_contract": {
+            "description": "GenerateContract=true answers 501 CONTRACT_GENERATION_UNAVAILABLE: render the\ndocument with POST /v1/leases/{id}/contract after the settle.",
+            "type": "boolean"
+          },
+          "identity_document_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lease": {
+            "$ref": "#/components/schemas/SettleLeaseRequest"
+          },
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "replaces_lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "send_for_signature": {
+            "type": "boolean"
+          },
+          "signed_on": {
+            "description": "SignedOn marks the lease signed (status pending_signature, signed_on set).",
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "source": {
+            "description": "Source is the client: web or ios. An assistant token always records assistant.",
+            "type": "string",
+            "enum": [
+              "web",
+              "ios"
+            ]
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "tenant": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SettleTenantRequest"
+              }
+            ],
+            "nullable": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "SettleResult": {
+        "type": "object",
+        "required": [
+          "lease",
+          "tenant",
+          "tenant_created"
+        ],
+        "properties": {
+          "lease": {
+            "$ref": "#/components/schemas/LeaseAggregate"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantResponse"
+          },
+          "tenant_created": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SettleTenantRequest": {
+        "type": "object",
+        "properties": {
+          "birth_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "cohabitants": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "document_issued_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_type": {
+            "type": "string",
+            "enum": [
+              "id_card",
+              "passport",
+              "other"
+            ],
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "registration_address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TenantLeaseCard": {
+        "type": "object",
+        "required": [
+          "activation_date",
+          "available_actions",
+          "balance",
+          "current_rent_amount",
+          "deposit",
+          "due_day",
+          "end_date",
+          "ends_in_days",
+          "id",
+          "is_ending_soon",
+          "move_out_date",
+          "prolongation_count",
+          "property",
+          "rent_currency",
+          "start_date",
+          "status"
+        ],
+        "properties": {
+          "activation_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "available_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "balance": {
+            "$ref": "#/components/schemas/TenantLeaseCardBalance"
+          },
+          "current_rent_amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "deposit": {
+            "$ref": "#/components/schemas/TenantLeaseCardDeposit"
+          },
+          "due_day": {
+            "type": "integer"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ends_in_days": {
+            "type": "integer",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_ending_soon": {
+            "type": "boolean"
+          },
+          "move_out_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "prolongation_count": {
+            "type": "integer"
+          },
+          "property": {
+            "$ref": "#/components/schemas/LeasePropertyCard"
+          },
+          "rent_currency": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LeaseStatus"
+          }
+        }
+      },
+      "TenantLeaseCardBalance": {
+        "type": "object",
+        "required": [
+          "currency",
+          "next_charge",
+          "outstanding",
+          "overdue",
+          "tenant_credit"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "next_charge": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseNextCharge"
+              }
+            ],
+            "nullable": true
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "overdue": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "tenant_credit": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "TenantLeaseCardDeposit": {
+        "type": "object",
+        "required": [
+          "amount",
+          "held",
+          "status"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "held": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "status": {
+            "$ref": "#/components/schemas/LeaseDepositStatus"
+          }
+        }
+      },
+      "TenantOverview": {
+        "type": "object",
+        "required": [
+          "as_of",
+          "current_lease",
+          "leases",
+          "months",
+          "tenant",
+          "totals",
+          "window"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "current_lease": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TenantLeaseCard"
+              }
+            ],
+            "nullable": true
+          },
+          "leases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantLeaseCard"
+            }
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantOverviewMonth"
+            }
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantOverviewProfile"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantOverviewTotals"
+            }
+          },
+          "window": {
+            "$ref": "#/components/schemas/TenantOverviewWindow"
+          }
+        }
+      },
+      "TenantOverviewEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TenantOverview"
+          }
+        }
+      },
+      "TenantOverviewMonth": {
+        "type": "object",
+        "required": [
+          "charged",
+          "currency",
+          "due_date",
+          "kinds",
+          "lease_id",
+          "outstanding",
+          "paid",
+          "period",
+          "property_id",
+          "status",
+          "waived"
+        ],
+        "properties": {
+          "charged": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseChargeKind"
+            }
+          },
+          "lease_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "paid": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "period": {
+            "type": "string"
+          },
+          "property_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "waived",
+              "overdue",
+              "due",
+              "partial",
+              "upcoming",
+              "none"
+            ]
+          },
+          "waived": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "TenantOverviewProfile": {
+        "type": "object",
+        "required": [
+          "birth_date",
+          "cohabitants",
+          "document_number",
+          "document_type",
+          "email",
+          "first_name",
+          "full_name",
+          "id",
+          "iin",
+          "last_name",
+          "middle_name",
+          "notes",
+          "phone",
+          "registration_address"
+        ],
+        "properties": {
+          "birth_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "cohabitants": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "registration_address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TenantOverviewTotals": {
+        "type": "object",
+        "required": [
+          "charged_to_date",
+          "currency",
+          "deposit_held",
+          "outstanding",
+          "overdue",
+          "paid_to_date",
+          "prepaid",
+          "received_total",
+          "tenant_credit",
+          "upcoming",
+          "waived_to_date"
+        ],
+        "properties": {
+          "charged_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "deposit_held": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "outstanding": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "overdue": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "paid_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "prepaid": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "received_total": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "tenant_credit": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "upcoming": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          },
+          "waived_to_date": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Money in major units (e.g. 380000 or 1234.56), at most 2 decimal places."
+          }
+        }
+      },
+      "TenantOverviewWindow": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "TenantResponse": {
+        "type": "object",
+        "required": [
+          "birth_date",
+          "cohabitants",
+          "document_issued_at",
+          "document_issued_by",
+          "document_number",
+          "document_type",
+          "email",
+          "first_name",
+          "id",
+          "iin",
+          "last_name",
+          "middle_name",
+          "notes",
+          "phone",
+          "registration_address"
+        ],
+        "properties": {
+          "birth_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "cohabitants": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_issued_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "document_issued_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "iin": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "middle_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "registration_address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

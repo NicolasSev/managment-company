@@ -86,7 +86,7 @@ struct PropertiesListView: View {
             }
             .sheet(item: $selectedTenant) { route in
                 NavigationStack {
-                    TenantDetailView(tenantId: route.id) {
+                    TenantDetailView(tenantId: route.id, authManager: authManager) {
                         await loadProperties()
                     }
                     .environmentObject(authManager)

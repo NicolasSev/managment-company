@@ -6,6 +6,8 @@ struct AppTextField: View {
     var placeholder: String = ""
     var keyboardType: UIKeyboardType = .default
     var autocapitalization: TextInputAutocapitalization = .sentences
+    /// Accessibility identifier of the text field itself (not of the title and container).
+    var identifier: String?
     
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
@@ -21,6 +23,7 @@ struct AppTextField: View {
                 .tint(AppTheme.Colors.accent)
                 .keyboardType(keyboardType)
                 .textInputAutocapitalization(autocapitalization)
+                .optionalIdentifier(identifier)
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.md)
                 .background(Color.white.opacity(0.82))
@@ -30,6 +33,17 @@ struct AppTextField: View {
                         .stroke(AppTheme.Colors.border, lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.04), radius: 16, x: 0, y: 10)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func optionalIdentifier(_ identifier: String?) -> some View {
+        if let identifier {
+            accessibilityIdentifier(identifier)
+        } else {
+            self
         }
     }
 }

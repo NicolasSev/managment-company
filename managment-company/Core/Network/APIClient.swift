@@ -28,6 +28,7 @@ final class APIClient {
         body: Encodable? = nil,
         idempotencyKey: String? = nil,
         extraHeaders: [String: String] = [:],
+        typedErrors: Bool = false,
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> T {
@@ -37,6 +38,7 @@ final class APIClient {
             body: body,
             idempotencyKey: idempotencyKey,
             extraHeaders: extraHeaders,
+            typedErrors: typedErrors,
             tokenProvider: tokenProvider,
             refreshAndRetry: refreshAndRetry
         )
@@ -66,12 +68,18 @@ final class APIClient {
     }
     
     /// Performs an authorized request returning raw data.
+    ///
+    /// A non-2xx answer throws `APIError.httpStatus(status)`. With `typedErrors` and a body of the
+    /// shape `{"error":{"code","message","details?"}}` it throws `APIError.server` instead, so the
+    /// caller can branch on the machine-readable `code`. Opt-in: existing call sites match on
+    /// `.httpStatus` and keep working unchanged.
     func requestData(
         _ path: String,
         method: String = "GET",
         body: Encodable? = nil,
         idempotencyKey: String? = nil,
         extraHeaders: [String: String] = [:],
+        typedErrors: Bool = false,
         tokenProvider: () async -> String?,
         refreshAndRetry: () async -> Bool
     ) async throws -> Data {
@@ -96,7 +104,7 @@ final class APIClient {
             throw APIError.invalidResponse
         }
         guard (200...299).contains(status) else {
-            throw APIError.httpStatus(status)
+            throw APIError.make(status: status, body: data, typed: typedErrors)
         }
         return data
     }
@@ -266,6 +274,55 @@ enum APIError: Error {
     case unauthorized
     case invalidResponse
     case httpStatus(Int)
+    /// Non-2xx answer whose body carries the API error envelope (only with `typedErrors: true`).
+    case server(status: Int, error: APIErrorBody)
+
+    /// HTTP status of `.httpStatus` and `.server`.
+    var statusCode: Int? {
+        switch self {
+        case .httpStatus(let status): return status
+        case .server(let status, _): return status
+        case .unauthorized, .invalidResponse: return nil
+        }
+    }
+
+    /// Error to throw for a non-2xx answer: typed when asked for and the body parses.
+    static func make(status: Int, body: Data, typed: Bool) -> APIError {
+        guard typed, let parsed = APIErrorBody.parse(body) else { return .httpStatus(status) }
+        return .server(status: status, error: parsed)
+    }
+}
+
+/// `{"error": {"code", "message", "details?"}}` (lease-v2 spec, "Errors").
+struct APIErrorBody: Decodable, Equatable {
+    let code: String
+    let message: String?
+    let details: JSONValue?
+
+    private struct Envelope: Decodable {
+        let error: APIErrorBody
+    }
+
+    /// `nil` when the body is not the error envelope (HTML from a proxy, empty body, ...).
+    static func parse(_ data: Data) -> APIErrorBody? {
+        guard !data.isEmpty, let envelope = try? JSONDecoder().decode(Envelope.self, from: data) else { return nil }
+        return envelope.error
+    }
+
+    /// `details.<key>` when `details` is an object.
+    func detail(_ key: String) -> JSONValue? {
+        if case .object(let object) = details { return object[key] }
+        return nil
+    }
+
+    /// `details[0].message` of field validation errors (`[{field, message}]`).
+    var firstFieldError: (field: String?, message: String)? {
+        guard case .array(let items) = details, case .object(let first)? = items.first,
+              case .string(let message)? = first["message"] else { return nil }
+        var field: String?
+        if case .string(let name)? = first["field"] { field = name }
+        return (field, message)
+    }
 }
 
 private extension Data {

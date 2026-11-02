@@ -70,36 +70,27 @@ protocol LeaseV2Service {
     func returnDeposit(leaseId: String, version: Int, request: ReturnDepositRequest, idempotencyKey: String) async throws -> LeaseAggregate
 }
 
-/// Picks the service the lease screens use. Until L8 connects the real API the app runs on
-/// the fixture-backed mock; flipping `useLiveAPI` (or launching with
-/// `LEASE_V2_LIVE=1`) switches every lease screen to `LiveLeaseV2Service`.
+/// Picks the service the lease screens use: `LiveLeaseV2Service` by default. The fixture-backed
+/// `MockLeaseV2Service` is for previews and tests only; it is selected by `LEASE_V2_MOCKS=1`
+/// (environment) or the launch argument `-lease_v2_mocks 1`, or by setting `useMocks`.
 @MainActor
 enum LeaseV2ServiceProvider {
-    /// Switch for L8. `false` keeps the screens on `MockLeaseV2Service`.
-    static var useLiveAPI: Bool = ProcessInfo.processInfo.environment["LEASE_V2_LIVE"] == "1"
-
-    /// Temporary entry point (task L12) into the lease screen from the tenant card. Visible in
-    /// DEBUG builds and when launched with `LEASE_V2_MOCKS=1` or `-lease_v2_mocks 1`. The
-    /// final navigation (tenants tab, property card) replaces it in L13.
-    static var isMockEntryVisible: Bool {
-        #if DEBUG
-        return true
-        #else
-        return ProcessInfo.processInfo.environment["LEASE_V2_MOCKS"] == "1"
+    /// Forces the mock service. Off unless the environment or launch argument asks for it.
+    static var useMocks: Bool = {
+        ProcessInfo.processInfo.environment["LEASE_V2_MOCKS"] == "1"
             || UserDefaults.standard.bool(forKey: "lease_v2_mocks")
-        #endif
-    }
+    }()
 
     private static var sharedMock: MockLeaseV2Service?
 
-    /// Fixture lease ids that `MockLeaseV2Service` serves (for the temporary entry point).
+    /// Fixture lease ids that `MockLeaseV2Service` serves (previews and tests).
     static let mockLeaseIds = MockLeaseV2Service.fixtureLeaseIds
 
     static func makeService(authManager: AuthManager) -> LeaseV2Service {
-        if useLiveAPI {
-            return LiveLeaseV2Service(authManager: authManager)
+        if useMocks {
+            return mock()
         }
-        return mock()
+        return LiveLeaseV2Service(authManager: authManager)
     }
 
     /// One mock for the whole process, so edits made on the screen survive navigating away.

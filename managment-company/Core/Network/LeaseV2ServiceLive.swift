@@ -4,15 +4,14 @@ private struct UploadedFileRef: Decodable {
     let id: String
 }
 
-/// `LeaseV2Service` over the real `/v1` API (lease-v2 spec §9.1). Not used yet: the app runs on
-/// `MockLeaseV2Service` until `LeaseV2ServiceProvider.useLiveAPI` is switched on (task L8).
+/// `LeaseV2Service` over the real `/v1` API (lease-v2 spec §9.1). Default service of the app
+/// (`LeaseV2ServiceProvider`); the mock is for previews and tests only.
 ///
-/// Notes for L8:
-/// - `APIClient` throws `APIError.httpStatus(code)` and drops the body, so the v2 error `code`
-///   (spec §11) is not available yet; statuses map to the coarse `LeaseV2Error` cases below.
-///   Reading `{error:{code,details}}` from the failed response would let `USE_AMENDMENT`,
-///   `LEASE_OVERLAP`, `AMOUNT_EXCEEDS_OUTSTANDING` etc. produce precise messages.
-/// - `If-Match: "<version>"` goes out on every `/v1/leases/:id/*` command.
+/// - Requests are sent with `typedErrors`, so the v2 error `code` and `details` of spec §11 reach
+///   `map(_:)`: `USE_AMENDMENT`, `LEASE_OVERLAP`, `AMOUNT_EXCEEDS_OUTSTANDING`, ... produce precise
+///   `LeaseV2Error`s; unknown codes fall back to the HTTP status.
+/// - `If-Match: "<version>"` goes out on every `/v1/leases/:id/*` command; the version comes
+///   from the aggregate the user saw (`ETag` and `data.version` carry the same number).
 /// - `confirm: true` is for assistant-scope tokens only, so it is never sent from the app.
 final class LiveLeaseV2Service: LeaseV2Service {
     private let authManager: AuthManager
@@ -108,6 +107,7 @@ final class LiveLeaseV2Service: LeaseV2Service {
                 body: body,
                 idempotencyKey: idempotencyKey,
                 extraHeaders: version.map { ["If-Match": "\"\($0)\""] } ?? [:],
+                typedErrors: true,
                 tokenProvider: { await MainActor.run { auth.accessToken } },
                 refreshAndRetry: { await auth.refreshToken() }
             )
@@ -139,27 +139,80 @@ final class LiveLeaseV2Service: LeaseV2Service {
         }
     }
 
-    /// Coarse status mapping; see the class note about the missing error body.
+    /// Maps a transport or API failure to `LeaseV2Error`: by `error.code` when the body carried
+    /// one (spec §11), else by HTTP status.
     static func map(_ error: Error) -> LeaseV2Error {
         if let known = error as? LeaseV2Error { return known }
         if let api = error as? APIError {
             switch api {
             case .unauthorized: return .unauthorized
             case .invalidResponse: return .unknown
+            case .server(let status, let body):
+                return mapCode(body, status: status) ?? mapStatus(status)
             case .httpStatus(let code):
-                switch code {
-                case 400: return .validation(message: "Проверьте введённые данные.")
-                case 401: return .unauthorized
-                case 404: return .notFound
-                case 409: return .conflict(message: "Действие конфликтует с текущим состоянием договора.")
-                case 412: return .versionMismatch(currentVersion: nil)
-                case 422: return .validation(message: "Сервер отклонил действие: проверьте данные и статус договора.")
-                case 502, 503, 504: return .transport
-                default: return .unknown
-                }
+                return mapStatus(code)
             }
         }
         if PendingMutationQueue.isRetryableTransportError(error) { return .transport }
         return .unknown
+    }
+
+    static func mapCode(_ body: APIErrorBody, status: Int) -> LeaseV2Error? {
+        switch body.code {
+        case "VERSION_MISMATCH":
+            return .versionMismatch(currentVersion: intDetail(body, "current_version"))
+        case "INVALID_STATE_TRANSITION":
+            var command = ""
+            if case .string(let value)? = body.detail("command") { command = value }
+            return .invalidStateTransition(command: command)
+        case "VALIDATION_ERROR":
+            return .validation(message: "Проверьте введённые данные.")
+        case "USE_AMENDMENT":
+            return .validation(message: "Условия действующего договора меняются через допсоглашение.")
+        case "AMENDMENT_EFFECTIVE_FROM_INVALID":
+            return .validation(message: "Дата изменения раньше начала договора.")
+        case "LEASE_OVERLAP":
+            return .conflict(message: "Договор пересекается по датам с другим договором этого объекта.")
+        case "LEASE_HAS_MONEY":
+            return .conflict(message: "У договора есть платежи или депозит, его нельзя удалить.")
+        case "CONCURRENT_UPDATE":
+            return .conflict(message: "Договор обновляется одновременно. Повторите через секунду.")
+        case "AMOUNT_EXCEEDS_OUTSTANDING", "CHARGE_NOT_OPEN":
+            return .chargeNotPayable
+        case "CURRENCY_MISMATCH":
+            return .validation(message: "Валюта платежа не совпадает с валютой договора.")
+        case "CREDIT_EXCEEDED":
+            return .validation(message: "Сумма больше остатка переплаты арендатора.")
+        case "DEPOSIT_BALANCE_EXCEEDED":
+            return .depositBalanceExceeded(held: nil)
+        case "IDEMPOTENCY_KEY_REUSED":
+            return .idempotencyKeyReused
+        case "TENANT_IDENTITY_INCOMPLETE":
+            return .validation(message: "Заполните данные арендатора (ФИО, ИИН, документ, адрес).")
+        case "NOT_FOUND":
+            return .notFound
+        case "UNAUTHORIZED":
+            return .unauthorized
+        default:
+            return nil
+        }
+    }
+
+    private static func intDetail(_ body: APIErrorBody, _ key: String) -> Int? {
+        if case .number(let value)? = body.detail(key) { return Int(value) }
+        return nil
+    }
+
+    private static func mapStatus(_ code: Int) -> LeaseV2Error {
+        switch code {
+        case 400: return .validation(message: "Проверьте введённые данные.")
+        case 401: return .unauthorized
+        case 404: return .notFound
+        case 409: return .conflict(message: "Действие конфликтует с текущим состоянием договора.")
+        case 412: return .versionMismatch(currentVersion: nil)
+        case 422: return .validation(message: "Сервер отклонил действие: проверьте данные и статус договора.")
+        case 502, 503, 504: return .transport
+        default: return .unknown
+        }
     }
 }

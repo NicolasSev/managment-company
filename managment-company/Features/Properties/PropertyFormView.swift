@@ -15,6 +15,9 @@ struct PropertyFormView: View {
     @State private var utilityAccountNumber = ""
     @State private var wifiLogin = ""
     @State private var wifiPassword = ""
+    @State private var ownershipDocument = ""
+    @State private var areaSqm = ""
+    @State private var floor = ""
     @State private var purchaseDate = Date()
     @State private var purchasePrice = ""
     @State private var purchaseUSDEquivalent: ExchangeRateConversionDTO?
@@ -44,6 +47,38 @@ struct PropertyFormView: View {
                 Section("Адрес") {
                     AppTextField(title: "Адрес", text: $address, placeholder: "Улица, дом")
                     AppTextField(title: "Город", text: $city, placeholder: "Город")
+                }
+                Section("Параметры объекта") {
+                    AppTextField(
+                        title: "Площадь, м²",
+                        text: $areaSqm,
+                        placeholder: "54,5",
+                        keyboardType: .decimalPad,
+                        autocapitalization: .never
+                    )
+                    .accessibilityIdentifier("property.form.area_sqm")
+                    AppTextField(
+                        title: "Этаж",
+                        text: $floor,
+                        placeholder: "5",
+                        keyboardType: .numberPad,
+                        autocapitalization: .never
+                    )
+                    .accessibilityIdentifier("property.form.floor")
+                    Text("Площадь и этаж печатаются в договоре аренды.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+                Section("Документы на объект") {
+                    AppTextField(
+                        title: "Правоустанавливающий документ",
+                        text: $ownershipDocument,
+                        placeholder: "Договор купли-продажи от 12.03.2019, рег. № …"
+                    )
+                    .accessibilityIdentifier("property.form.ownership_document")
+                    Text("Печатается в договоре аренды (п. 1.1). Одной строкой: вид документа, дата, номер.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
                 Section("Коммунальные платежи (OCR)") {
                     AppTextField(
@@ -118,6 +153,22 @@ struct PropertyFormView: View {
         }
     }
 
+    private static func formatArea(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(value).replacingOccurrences(of: ".", with: ",")
+    }
+
+    private var parsedArea: Double? {
+        let normalized = areaSqm
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(normalized), value > 0 else { return nil }
+        return value
+    }
+
+    private var parsedFloor: Int? {
+        Int(floor.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
     private var parsedPurchasePrice: Double? {
         let normalized = purchasePrice
             .replacingOccurrences(of: " ", with: "")
@@ -147,6 +198,9 @@ struct PropertyFormView: View {
         utilityAccountNumber = p.utilityAccountNumber ?? ""
         wifiLogin = p.wifiLogin ?? ""
         wifiPassword = p.wifiPassword ?? ""
+        ownershipDocument = p.ownershipDocument ?? ""
+        areaSqm = p.areaSqm.map { Self.formatArea($0) } ?? ""
+        floor = p.floor.map(String.init) ?? ""
         if let date = p.purchaseDate, let parsed = AppFormatting.parsedDate(from: date) {
             purchaseDate = parsed
         }
@@ -227,6 +281,7 @@ struct PropertyFormView: View {
         let trimmedWifiLogin = wifiLogin.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedWifiPassword = wifiPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         let price = parsedPurchasePrice
+        let trimmedOwnership = ownershipDocument.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = PropertyInput(
             name: name,
             propertyType: propertyType,
@@ -238,7 +293,20 @@ struct PropertyFormView: View {
             purchaseCurrency: price == nil ? nil : "KZT",
             utilityAccountNumber: trimmedAccount.isEmpty ? nil : trimmedAccount,
             wifiLogin: trimmedWifiLogin.isEmpty ? nil : trimmedWifiLogin,
-            wifiPassword: trimmedWifiPassword.isEmpty ? nil : trimmedWifiPassword
+            wifiPassword: trimmedWifiPassword.isEmpty ? nil : trimmedWifiPassword,
+            // PUT replaces the record: what the form does not edit goes back unchanged, or the
+            // server clears it (area and floor are needed by the contract).
+            country: property?.country,
+            district: property?.district,
+            areaSqm: parsedArea,
+            rooms: property?.rooms,
+            floor: parsedFloor,
+            currentValue: property?.currentValue,
+            currentValueCurrency: property?.currentValueCurrency,
+            notes: property?.notes,
+            tags: property?.tags,
+            // PUT: absent keeps the stored value, an empty string clears it. A new object has nothing to clear.
+            ownershipDocument: property == nil && trimmedOwnership.isEmpty ? nil : trimmedOwnership
         )
         
         do {
@@ -326,9 +394,22 @@ private struct PropertyInput: Encodable {
     let utilityAccountNumber: String?
     let wifiLogin: String?
     let wifiPassword: String?
+    let country: String?
+    let district: String?
+    let areaSqm: Double?
+    let rooms: Int?
+    let floor: Int?
+    let currentValue: Double?
+    let currentValueCurrency: String?
+    let notes: String?
+    let tags: [String]?
+    let ownershipDocument: String?
 
     enum CodingKeys: String, CodingKey {
-        case name, status, address, city
+        case name, status, address, city, country, district, rooms, floor, notes, tags
+        case areaSqm = "area_sqm"
+        case currentValue = "current_value"
+        case currentValueCurrency = "current_value_currency"
         case propertyType = "property_type"
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
@@ -336,6 +417,7 @@ private struct PropertyInput: Encodable {
         case utilityAccountNumber = "utility_account_number"
         case wifiLogin = "wifi_login"
         case wifiPassword = "wifi_password"
+        case ownershipDocument = "ownership_document"
     }
 }
 

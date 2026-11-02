@@ -20,7 +20,7 @@ struct MainTabView: View {
     @StateObject private var quickActions = QuickActionsController()
     @State private var selectedTab: AppTab = .today
     @State private var showDashboard = false
-    @State private var showTenants = false
+    @State private var showTasks = false
     @State private var showSettings = false
     
     var body: some View {
@@ -44,21 +44,25 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Объекты", systemImage: "building.2")
                 }
-            TasksListView()
-                .tag(AppTab.tasks)
+            TenantsListView()
+                .environmentObject(authManager)
+                .tag(AppTab.tenants)
                 .tabItem {
-                    Label("Задачи", systemImage: "checklist")
+                    Label("Арендаторы", systemImage: "person.2")
+                        .accessibilityIdentifier("tab.tenants")
                 }
         }
         .tint(AppTheme.Colors.accent)
         .environmentObject(quickActions)
-        // Secondary routes moved out of the primary bar (GAP-037): Dashboard,
-        // Tenants, and Settings remain reachable without being primary tabs.
+        // Secondary routes outside the primary bar: Dashboard (GAP-037), Tasks (moved out for the
+        // «Арендаторы» tab, L13) and Settings stay reachable from the «Ещё» menu on «Сегодня».
         .sheet(isPresented: $showDashboard) {
             DashboardView().environmentObject(authManager)
         }
-        .sheet(isPresented: $showTenants) {
-            TenantsListView().environmentObject(authManager)
+        .sheet(isPresented: $showTasks) {
+            TasksListView(onClose: { showTasks = false })
+                .environmentObject(authManager)
+                .environmentObject(notificationRouter)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView().environmentObject(authManager)
@@ -94,32 +98,32 @@ struct MainTabView: View {
             switch MainTabView.target(for: tab) {
             case .tab(let resolved): selectedTab = resolved
             case .dashboardSheet: showDashboard = true
-            case .tenantsSheet: showTenants = true
+            case .tasksSheet: showTasks = true
             case .settingsSheet: showSettings = true
             }
             notificationRouter.clearTabSelection()
         }
     }
 
-    /// Resolves a requested `AppTab` to a destination after the GAP-037 nav
-    /// simplification: routes whose tab left the primary bar open as a secondary
-    /// sheet, and the two money routes land on the «Деньги» hub.
+    /// Resolves a requested `AppTab` to a destination: the four primary tabs (Сегодня,
+    /// Деньги, Объекты, Арендаторы) select themselves, routes outside the bar open as a
+    /// secondary sheet, and the two money routes land on the «Деньги» hub.
     static func target(for tab: AppTab) -> AppNavigationTarget {
         switch tab {
         case .dashboard: return .dashboardSheet
-        case .tenants: return .tenantsSheet
+        case .tasks: return .tasksSheet
         case .settings: return .settingsSheet
         case .transactions, .payments: return .tab(.money)
-        case .today, .money, .properties, .tasks: return .tab(tab)
+        case .today, .money, .properties, .tenants: return .tab(tab)
         }
     }
 }
 
-/// Where a requested route lands under the GAP-037 five-position navigation.
+/// Where a requested route lands: a primary tab or a secondary sheet.
 enum AppNavigationTarget: Equatable {
     case tab(AppTab)
     case dashboardSheet
-    case tenantsSheet
+    case tasksSheet
     case settingsSheet
 }
 
@@ -235,6 +239,8 @@ struct SettingsView: View {
                         mfaSection
 
                         expenseReminderSettings
+
+                        ContractSettingsSection()
 
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {

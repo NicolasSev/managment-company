@@ -20,6 +20,8 @@ struct TasksListView: View {
     @State private var selectedScope: TaskScope = .open
     @State private var actionMessage: String?
     @State private var navigationPath = NavigationPath()
+    /// Set when the screen is presented as a sheet: adds a «Закрыть» button to the toolbar.
+    var onClose: (() -> Void)?
 
     private var propertiesList: [Property] {
         Array(propertiesById.values).sorted { $0.name < $1.name }
@@ -35,6 +37,12 @@ struct TasksListView: View {
             .navigationTitle("Задачи")
             .searchable(text: $searchText, prompt: "Поиск задач")
             .toolbar {
+                if let onClose {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть", action: onClose)
+                            .accessibilityIdentifier("tasks.close")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showTaskForm = true

@@ -37,9 +37,10 @@ struct TodayView: View {
                         Button { notificationRouter.selectTab = .dashboard } label: {
                             Label("Дашборд", systemImage: "rectangle.grid.2x2")
                         }
-                        Button { notificationRouter.selectTab = .tenants } label: {
-                            Label("Арендаторы", systemImage: "person.2")
+                        Button { notificationRouter.selectTab = .tasks } label: {
+                            Label("Задачи", systemImage: "checklist")
                         }
+                        .accessibilityIdentifier("today.more.tasks")
                         Button { notificationRouter.selectTab = .settings } label: {
                             Label("Настройки", systemImage: "gearshape")
                         }
@@ -56,6 +57,7 @@ struct TodayView: View {
                         Image(systemName: "person.crop.circle")
                     }
                     .accessibilityLabel("Ещё")
+                    .accessibilityIdentifier("today.more")
                 }
             }
             .task { await viewModel.load() }

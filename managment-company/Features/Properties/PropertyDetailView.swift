@@ -331,6 +331,13 @@ struct PropertyDetailView: View {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
                     heroSection
 
+                    PropertyCurrentLeaseSection(
+                        propertyId: property.id,
+                        canSettle: !property.isArchived,
+                        authManager: authManager
+                    )
+                    .environmentObject(authManager)
+
                     if let errorMessage {
                         statusBanner(errorMessage, color: AppTheme.Colors.warning)
                     }

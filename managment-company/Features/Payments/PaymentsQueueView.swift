@@ -19,6 +19,9 @@ struct PaymentsQueueView: View {
     @State private var batchConfirmPresented = false
     /// Per-allocation history sheet (GAP-048).
     @State private var allocationItem: PaymentQueueItem?
+    /// Lease opened from a queue row («Договор»); the queue reloads when it comes back.
+    @State private var leaseRoute: QueueLeaseRoute?
+    @State private var reloadOnReturn = false
 
     /// When embedded inside another navigation container (the GAP-037 «Деньги»
     /// hub), the view skips its own `NavigationStack`.
@@ -67,6 +70,17 @@ struct PaymentsQueueView: View {
                 .environmentObject(authManager)
             }
             .sheet(item: $allocationItem, content: allocationSheet)
+            .navigationDestination(item: $leaseRoute) { route in
+                LeaseDetailView(
+                    leaseId: route.leaseId,
+                    service: LeaseV2ServiceProvider.makeService(authManager: authManager)
+                )
+            }
+            .onAppear {
+                guard reloadOnReturn else { return }
+                reloadOnReturn = false
+                Task { await viewModel.load() }
+            }
             .confirmationDialog(
                 "Пропустить этот платёж?",
                 isPresented: Binding(
@@ -432,10 +446,19 @@ struct PaymentsQueueView: View {
                       let mailURL = URL(string: "mailto:\(email)") {
                 rowActionButton(title: "Написать", systemImage: "envelope") { openURL(mailURL) }
             }
+            rowActionButton(title: "Договор", systemImage: "doc.text") {
+                openLease(item)
+            }
+            .accessibilityIdentifier("payments.row.\(item.id).lease")
             rowActionButton(title: "Открыть", systemImage: "arrow.up.right.square") {
                 notificationRouter.open(NotificationRoute(kind: .property(item.propertyId)))
             }
         }
+    }
+
+    private func openLease(_ item: PaymentQueueItem) {
+        reloadOnReturn = true
+        leaseRoute = QueueLeaseRoute(leaseId: item.leaseId)
     }
 
     private func pastRow(_ item: PaymentQueueItem) -> some View {
@@ -474,6 +497,10 @@ struct PaymentsQueueView: View {
                 rowActionButton(title: "Платежи", systemImage: "list.bullet.clipboard") {
                     allocationItem = item
                 }
+                rowActionButton(title: "Договор", systemImage: "doc.text") {
+                    openLease(item)
+                }
+                .accessibilityIdentifier("payments.row.\(item.id).lease")
                 if PaymentsQueueViewModel.restoreRequiresConfirmation(for: item) {
                     rowActionButton(
                         title: "Отменить оплату",
@@ -565,4 +592,10 @@ struct PaymentsQueueView: View {
             .background(AppTheme.Colors.danger.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
+}
+
+/// Navigation value of the «Договор» row action.
+private struct QueueLeaseRoute: Identifiable, Hashable {
+    let leaseId: String
+    var id: String { leaseId }
 }

@@ -2,9 +2,9 @@
 //  NavigationTests.swift
 //  managment-companyTests
 //
-//  Mirrored tests for GAP-037 (five-position navigation): routes moved out of
-//  the primary bar resolve to secondary sheets; money routes land on the hub;
-//  primary tabs resolve to themselves.
+//  Navigation after L13: four primary tabs (Сегодня, Деньги, Объекты, Арендаторы); Tasks,
+//  Dashboard and Settings open as secondary sheets from the «Ещё» menu; money routes land on
+//  the «Деньги» hub.
 //
 
 import Foundation
@@ -19,7 +19,7 @@ struct NavigationTests {
         #expect(MainTabView.target(for: .today) == .tab(.today))
         #expect(MainTabView.target(for: .money) == .tab(.money))
         #expect(MainTabView.target(for: .properties) == .tab(.properties))
-        #expect(MainTabView.target(for: .tasks) == .tab(.tasks))
+        #expect(MainTabView.target(for: .tenants) == .tab(.tenants))
     }
 
     @MainActor
@@ -31,7 +31,13 @@ struct NavigationTests {
     @MainActor
     @Test func secondaryRoutesOpenSheets() {
         #expect(MainTabView.target(for: .dashboard) == .dashboardSheet)
-        #expect(MainTabView.target(for: .tenants) == .tenantsSheet)
+        #expect(MainTabView.target(for: .tasks) == .tasksSheet)
         #expect(MainTabView.target(for: .settings) == .settingsSheet)
+    }
+
+    @MainActor
+    @Test func tenantNotificationRouteSelectsTheTab() {
+        #expect(NotificationRoute(kind: .tenants).tab == .tenants)
+        #expect(MainTabView.target(for: NotificationRoute(kind: .task("t1")).tab) == .tasksSheet)
     }
 }

@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Tenant screen on `GET /v1/tenants/:id/overview`: profile and identity, the current lease as a
+/// card that opens `LeaseDetailView`, balance and debt, months of the last year, lease history,
+/// documents. Accessibility identifiers `tenants.detail.*`.
 struct TenantDetailView: View {
     let tenantId: String
     let onChanged: () async -> Void
@@ -7,21 +10,18 @@ struct TenantDetailView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var tenant: Tenant?
-    @State private var leases: [Lease] = []
-    @State private var properties: [Property] = []
-    @State private var showEditSheet = false
+    @StateObject private var viewModel: TenantDetailViewModel
+    @State private var editingTenant: Tenant?
     @State private var showDeleteConfirmation = false
-    @State private var isLoading = true
-    @State private var isDeleting = false
-    @State private var errorMessage: String?
+    @State private var hasAppeared = false
 
-    private var activeLeaseCount: Int {
-        leases.filter { $0.status.lowercased() == "active" }.count
-    }
-
-    private var propertiesById: [String: Property] {
-        Dictionary(uniqueKeysWithValues: properties.map { ($0.id, $0) })
+    init(tenantId: String, authManager: AuthManager, onChanged: @escaping () async -> Void) {
+        self.tenantId = tenantId
+        self.onChanged = onChanged
+        _viewModel = StateObject(wrappedValue: TenantDetailViewModel(
+            tenantId: tenantId,
+            client: LiveTenantClient(authManager: authManager)
+        ))
     }
 
     var body: some View {
@@ -29,11 +29,16 @@ struct TenantDetailView: View {
             AppScreenBackground()
             content
         }
-        .navigationTitle(tenant?.displayName.isEmpty == false ? tenant!.displayName : "Арендатор")
+        .navigationTitle(viewModel.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("tenants.detail.screen")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Редактировать") { showEditSheet = true }
-                    .disabled(tenant == nil)
+                Button("Редактировать") {
+                    Task { editingTenant = await viewModel.tenantForEditing() }
+                }
+                .disabled(viewModel.overview == nil)
+                .accessibilityIdentifier("tenants.detail.edit")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(role: .destructive) {
@@ -41,18 +46,17 @@ struct TenantDetailView: View {
                 } label: {
                     Image(systemName: "trash")
                 }
-                .disabled(tenant == nil)
+                .disabled(viewModel.overview == nil)
                 .accessibilityLabel("Удалить арендатора")
+                .accessibilityIdentifier("tenants.detail.delete")
             }
         }
-        .sheet(isPresented: $showEditSheet) {
-            if let tenant {
-                TenantFormSheet(tenant: tenant) {
-                    await loadData()
-                    await onChanged()
-                }
-                .environmentObject(authManager)
+        .sheet(item: $editingTenant) { tenant in
+            TenantFormSheet(tenant: tenant) {
+                await viewModel.load()
+                await onChanged()
             }
+            .environmentObject(authManager)
         }
         .confirmationDialog(
             "Удалить арендатора?",
@@ -60,45 +64,63 @@ struct TenantDetailView: View {
             titleVisibility: .visible
         ) {
             Button("Удалить", role: .destructive) {
-                Task { await deleteTenant() }
+                Task {
+                    if await viewModel.delete() {
+                        await onChanged()
+                        dismiss()
+                    }
+                }
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            if activeLeaseCount > 0 {
-                Text("У арендатора есть активная аренда. Перед удалением лучше отметить выезд или прекратить договор.")
+            if viewModel.activeLeaseCount > 0 {
+                Text("У арендатора есть действующий договор. Перед удалением лучше расторгнуть договор.")
             } else {
                 Text("Карточка арендатора исчезнет из списка. История договоров и операций останется в системе.")
             }
         }
-        .task(id: tenantId) { await loadData() }
-        .refreshable { await loadData() }
+        .task(id: tenantId) { await viewModel.load() }
+        // Back from the lease screen (a payment changes balance and months): reload quietly.
+        .onAppear {
+            if hasAppeared { Task { await viewModel.load() } }
+            hasAppeared = true
+        }
+        .refreshable { await viewModel.load() }
     }
 
     @ViewBuilder
     private var content: some View {
-        if isLoading && tenant == nil {
+        switch viewModel.state {
+        case .loading:
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let errorMessage, tenant == nil {
+                .accessibilityIdentifier("tenants.detail.loading")
+        case .error(let message):
             EmptyStateView(
                 title: "Арендатор недоступен",
-                message: errorMessage,
+                message: message,
                 actionName: "Повторить",
-                action: { Task { await loadData() } },
+                action: { Task { await viewModel.load() } },
                 icon: "person.crop.circle.badge.exclamationmark"
             )
-        } else if let tenant {
+            .accessibilityIdentifier("tenants.detail.error")
+        case .loaded(let overview):
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
-                    if let errorMessage {
-                        statusBanner(errorMessage)
+                    if let banner = viewModel.banner {
+                        statusBanner(banner)
                     }
-
-                    profileSection(tenant)
+                    profileSection(overview.tenant)
+                    currentLeaseSection(overview)
+                    if let totals = viewModel.primaryTotals {
+                        balanceSection(totals)
+                    }
+                    monthsSection
+                    identitySection(overview.tenant)
 
                     EntityFilesSection(
                         entityType: "tenant",
-                        entityId: tenant.id,
+                        entityId: overview.tenant.id,
                         title: "Документы арендатора",
                         fileTypes: [
                             EntityFileType(value: "passport", label: "Паспорт"),
@@ -109,11 +131,7 @@ struct TenantDetailView: View {
                     )
                     .environmentObject(authManager)
 
-                    leaseHistorySection
-
-                    if LeaseV2ServiceProvider.isMockEntryVisible {
-                        leaseV2PreviewSection
-                    }
+                    historySection
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.lg)
@@ -121,41 +139,203 @@ struct TenantDetailView: View {
         }
     }
 
-    private func profileSection(_ tenant: Tenant) -> some View {
+    // MARK: Sections
+
+    private func profileSection(_ profile: TenantOverviewProfile) -> some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(tenant.displayName.isEmpty ? "Без имени" : tenant.displayName)
+                        Text(profile.fullName.isEmpty ? "Без имени" : profile.fullName)
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(AppTheme.Colors.textPrimary)
+                            .accessibilityIdentifier("tenants.detail.name")
 
-                        Text(tenant.notes?.isEmpty == false ? tenant.notes! : "Заметок пока нет.")
+                        Text(Self.nonEmpty(profile.notes) ?? "Заметок пока нет.")
                             .font(.subheadline)
                             .foregroundStyle(AppTheme.Colors.textSecondary)
                     }
 
                     Spacer()
 
-                    StatusBadge(status: activeLeaseCount > 0 ? "active" : "archived")
+                    StatusBadge(status: viewModel.activeLeaseCount > 0 ? "active" : "archived")
                 }
 
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                    contactRow(icon: "phone", title: "Телефон", value: tenant.phone)
-                    contactRow(icon: "envelope", title: "Почта", value: tenant.email)
-                    contactRow(icon: "person.2", title: "Проживают", value: tenant.cohabitants)
-                }
-
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    metricCard(title: "Договоров", value: "\(leases.count)")
-                    metricCard(title: "Активных", value: "\(activeLeaseCount)")
-                    metricCard(title: "Документы", value: "Ниже")
+                    infoRow(icon: "phone", title: "Телефон", value: profile.phone)
+                    infoRow(icon: "envelope", title: "Почта", value: profile.email)
+                    infoRow(icon: "person.2", title: "Проживают", value: profile.cohabitants)
                 }
             }
         }
     }
 
-    private var leaseHistorySection: some View {
+    @ViewBuilder
+    private func currentLeaseSection(_ overview: TenantOverview) -> some View {
+        if let lease = overview.currentLease {
+            LeaseNavigationLink(leaseId: lease.id, identifier: "tenants.detail.currentLease") {
+                CurrentLeaseCard(lease: lease, subject: .property, identifier: "tenants.detail.currentLease")
+            }
+        } else {
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                    Text("Текущий договор")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    Text("Сейчас у арендатора нет действующего договора.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("tenants.detail.noLease")
+        }
+    }
+
+    private func balanceSection(_ totals: TenantTotals) -> some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                Text("Баланс")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    LeaseMetricTile(
+                        title: "К оплате",
+                        value: totals.outstanding.formatted(),
+                        identifier: "tenants.detail.outstanding"
+                    )
+                    LeaseMetricTile(
+                        title: "Просрочено",
+                        value: totals.overdue.formatted(),
+                        color: totals.overdue.isPositive ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary,
+                        identifier: "tenants.detail.overdue"
+                    )
+                }
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    LeaseMetricTile(title: "Оплачено", value: totals.paidToDate.formatted())
+                    LeaseMetricTile(title: "Переплата", value: totals.tenantCredit.formatted())
+                    LeaseMetricTile(title: "Депозит", value: totals.depositHeld.formatted())
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("tenants.detail.balance")
+    }
+
+    @ViewBuilder
+    private var monthsSection: some View {
+        let rows = viewModel.monthRows
+        if !rows.isEmpty {
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                    Text("Месяцы")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    LazyVStack(spacing: AppTheme.Spacing.sm) {
+                        ForEach(rows) { row in
+                            monthRow(row.month)
+                        }
+                    }
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("tenants.detail.months")
+        }
+    }
+
+    @ViewBuilder
+    private func monthRow(_ month: TenantMonth) -> some View {
+        let line = HStack(spacing: AppTheme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.monthTitle(month.period))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                Text("Начислено \(month.charged.formatted()) · оплачено \(month.paid.formatted())")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+            Spacer(minLength: AppTheme.Spacing.sm)
+            VStack(alignment: .trailing, spacing: 4) {
+                monthStatusPill(month.status)
+                if month.outstanding.isPositive {
+                    Text(month.outstanding.formatted())
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                }
+            }
+        }
+        .padding(AppTheme.Spacing.md)
+        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+        if let leaseId = month.leaseId {
+            LeaseNavigationLink(leaseId: leaseId, identifier: "tenants.detail.month.\(month.period)") { line }
+        } else {
+            line
+        }
+    }
+
+    private func monthStatusPill(_ status: TenantMonthStatus) -> some View {
+        let (title, color) = Self.monthStatusStyle(status)
+        return Text(title)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.14))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+    }
+
+    private func identitySection(_ profile: TenantOverviewProfile) -> some View {
+        let issuedBy = viewModel.tenant?.documentIssuedBy
+        let issuedAt = viewModel.tenant?.documentIssuedAt
+        return SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack {
+                    Text("Удостоверение")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    Spacer()
+                    Button("Изменить") {
+                        Task { editingTenant = await viewModel.tenantForEditing() }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("tenants.detail.identity.edit")
+                }
+                infoRow(icon: "number", title: "ИИН", value: profile.iin, identifier: "tenants.detail.iin")
+                infoRow(
+                    icon: "doc.text",
+                    title: "Документ",
+                    value: Self.documentLine(
+                        type: profile.documentType,
+                        number: profile.documentNumber,
+                        issuedBy: issuedBy,
+                        issuedAt: issuedAt
+                    ),
+                    identifier: "tenants.detail.document"
+                )
+                infoRow(
+                    icon: "birthday.cake",
+                    title: "Дата рождения",
+                    value: profile.birthDate.map { LeaseDay.display($0) },
+                    identifier: "tenants.detail.birthDate"
+                )
+                infoRow(
+                    icon: "house",
+                    title: "Адрес регистрации",
+                    value: profile.registrationAddress,
+                    identifier: "tenants.detail.address"
+                )
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("tenants.detail.identity")
+    }
+
+    @ViewBuilder
+    private var historySection: some View {
+        let leases = viewModel.historyLeases
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 Text("История проживания")
@@ -163,118 +343,59 @@ struct TenantDetailView: View {
                     .foregroundStyle(AppTheme.Colors.textPrimary)
 
                 if leases.isEmpty {
-                    Text("Этот арендатор пока не привязан к объекту.")
+                    Text(viewModel.overview?.currentLease == nil
+                         ? "Этот арендатор пока не привязан к объекту."
+                         : "Других договоров нет.")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                 } else {
                     LazyVStack(spacing: AppTheme.Spacing.sm) {
-                        ForEach(sortedLeases) { lease in
-                            leaseHistoryRow(lease)
+                        ForEach(leases) { lease in
+                            LeaseNavigationLink(leaseId: lease.id, identifier: "tenants.detail.history.\(lease.id)") {
+                                historyRow(lease)
+                            }
                         }
                     }
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("tenants.detail.history")
     }
 
-    /// Temporary entry into `LeaseDetailView` on the lease-v2 fixtures (task L12). Final
-    /// navigation from the tenants tab and the property card is task L13.
-    private var leaseV2PreviewSection: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("Договор v2 (макет)")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                Text("Экран договора на тестовых данных, без обращения к серверу.")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                ForEach(Array(LeaseV2ServiceProvider.mockLeaseIds.enumerated()), id: \.element) { index, leaseId in
-                    NavigationLink {
-                        LeaseDetailView(
-                            leaseId: leaseId,
-                            service: LeaseV2ServiceProvider.makeService(authManager: authManager)
-                        )
-                    } label: {
-                        HStack {
-                            Label(index == 0 ? "Действующий договор" : "Ожидает подписи", systemImage: "doc.text")
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.caption)
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.accent)
-                    }
-                    .accessibilityIdentifier("tenant.detail.lease_v2.\(index == 0 ? "active" : "pending")")
-                }
-            }
-        }
-    }
-
-    private var sortedLeases: [Lease] {
-        leases.sorted {
-            let leftActive = $0.status.lowercased() == "active"
-            let rightActive = $1.status.lowercased() == "active"
-            if leftActive != rightActive { return leftActive }
-            return ($0.moveInDate ?? $0.startDate) > ($1.moveInDate ?? $1.startDate)
-        }
-    }
-
-    private func leaseHistoryRow(_ lease: Lease) -> some View {
-        let content = VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+    private func historyRow(_ lease: LeaseCard) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(lease.propertyName ?? propertiesById[lease.propertyId]?.name ?? "Объект")
+                    Text(lease.property.name)
                         .font(.headline)
                         .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                    Text("Заезд \(AppFormatting.dateString(from: lease.moveInDate ?? lease.startDate) ?? (lease.moveInDate ?? lease.startDate)) · договор \(leasePeriod(lease))")
+                    Text("Договор \(LeaseDay.display(lease.startDate)) - \(lease.endDate.map { LeaseDay.display($0) } ?? "без даты окончания")")
                         .font(.caption)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                         .lineLimit(2)
                 }
-
                 Spacer()
-
-                StatusBadge(status: lease.status)
+                LeaseStatusBadge(status: lease.status)
             }
-
             HStack(spacing: AppTheme.Spacing.sm) {
-                metricCard(title: "Аренда", value: AppFormatting.compactAmount(lease.rentAmount, currency: lease.rentCurrency))
-                metricCard(title: "Оплата", value: paymentWindow(lease))
-                metricCard(title: "Выезд", value: lease.terminatedAt.flatMap { AppFormatting.dateString(from: $0) } ?? "-")
-            }
-
-            if let reason = lease.terminationReason, !reason.isEmpty {
-                Text("Причина: \(reason)")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-            }
-
-            if isLeaseEarlyMoveOut(lease) {
-                Label("Выехал раньше срока", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.warning)
+                LeaseMetricTile(title: "Аренда", value: lease.currentRentAmount.formatted())
+                LeaseMetricTile(title: "Выезд", value: lease.moveOutDate.map { LeaseDay.display($0) } ?? "-")
+                LeaseMetricTile(
+                    title: "Долг",
+                    value: lease.balance.overdue.formatted(),
+                    color: lease.balance.overdue.isPositive ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary
+                )
             }
         }
         .padding(AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-        if let property = propertiesById[lease.propertyId] {
-            return AnyView(
-                NavigationLink {
-                    PropertyDetailView(property: property)
-                        .environmentObject(authManager)
-                } label: {
-                    content
-                }
-                .buttonStyle(.plain)
-            )
-        }
-
-        return AnyView(content)
     }
 
-    private func contactRow(icon: String, title: String, value: String?) -> some View {
+    // MARK: Pieces
+
+    private func infoRow(icon: String, title: String, value: String?, identifier: String? = nil) -> some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
             Image(systemName: icon)
                 .foregroundStyle(AppTheme.Colors.accent)
@@ -283,30 +404,13 @@ struct TenantDetailView: View {
                 Text(title)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppTheme.Colors.textSecondary)
-                Text(value?.isEmpty == false ? value! : "Не указано")
+                Text(Self.nonEmpty(value) ?? "Не указано")
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .leaseIdentifier(identifier)
             }
             Spacer()
         }
-    }
-
-    private func metricCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.sm)
-        .background(Color.white.opacity(0.58))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func statusBanner(_ message: String) -> some View {
@@ -319,78 +423,52 @@ struct TenantDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    @MainActor
-    private func loadData() async {
-        errorMessage = nil
-        if tenant == nil { isLoading = true }
-        defer { isLoading = false }
+    // MARK: Formatting
 
-        do {
-            async let tenantRequest: Tenant = APIClient.shared.request(
-                "/v1/tenants/\(tenantId)",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            async let leasesRequest: [Lease] = APIClient.shared.request(
-                "/v1/tenants/\(tenantId)/leases",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            async let propertiesRequest: [Property] = APIClient.shared.request(
-                "/v1/properties",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
+    /// The text when it has content, else `nil`.
+    private static func nonEmpty(_ text: String?) -> String? {
+        guard let text, !text.isEmpty else { return nil }
+        return text
+    }
 
-            let (loadedTenant, loadedLeases, loadedProperties) = try await (tenantRequest, leasesRequest, propertiesRequest)
-            tenant = loadedTenant
-            leases = loadedLeases
-            properties = loadedProperties
-        } catch {
-            errorMessage = "Не удалось загрузить арендатора."
+    private static let monthNames = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+    ]
+
+    /// `2026-10` -> `Октябрь 2026`.
+    static func monthTitle(_ period: String) -> String {
+        let parts = period.split(separator: "-").compactMap { Int($0) }
+        guard parts.count >= 2, (1...12).contains(parts[1]) else { return period }
+        return "\(monthNames[parts[1] - 1]) \(parts[0])"
+    }
+
+    static func monthStatusStyle(_ status: TenantMonthStatus) -> (String, Color) {
+        switch status {
+        case .paid: return ("Оплачено", AppTheme.Colors.success)
+        case .waived: return ("Прощено", AppTheme.Colors.textSecondary)
+        case .overdue: return ("Просрочено", AppTheme.Colors.danger)
+        case .due: return ("К оплате", AppTheme.Colors.warning)
+        case .partial: return ("Частично", AppTheme.Colors.warning)
+        case .upcoming: return ("Впереди", AppTheme.Colors.info)
+        case .noCharges: return ("Нет начислений", AppTheme.Colors.textSecondary)
+        case .unknown(let raw): return (raw, AppTheme.Colors.textSecondary)
         }
     }
 
-    private func deleteTenant() async {
-        guard !isDeleting else { return }
-        isDeleting = true
-        errorMessage = nil
-        defer { isDeleting = false }
-
-        do {
-            _ = try await APIClient.shared.requestData(
-                "/v1/tenants/\(tenantId)",
-                method: "DELETE",
-                tokenProvider: { await MainActor.run { authManager.accessToken } },
-                refreshAndRetry: { await authManager.refreshToken() }
-            )
-            await onChanged()
-            await MainActor.run { dismiss() }
-        } catch {
-            errorMessage = "Не удалось удалить арендатора."
+    /// `Паспорт N123456, выдан МВД, 10 янв. 2020`; `nil` when nothing is stored.
+    static func documentLine(type: String?, number: String?, issuedBy: String?, issuedAt: String?) -> String? {
+        var parts: [String] = []
+        let kind = TenantDocumentType.title(for: type)
+        let numberText = number.flatMap { $0.isEmpty ? nil : $0 }
+        switch (kind, numberText) {
+        case let (kind?, number?): parts.append("\(kind) \(number)")
+        case let (kind?, nil): parts.append(kind)
+        case let (nil, number?): parts.append("№ \(number)")
+        case (nil, nil): break
         }
-    }
-
-    private func leasePeriod(_ lease: Lease) -> String {
-        let from = AppFormatting.dateString(from: lease.startDate) ?? lease.startDate
-        let to = lease.endDate.flatMap { AppFormatting.dateString(from: $0) } ?? "без даты окончания"
-        return "\(from) - \(to)"
-    }
-
-    private func paymentWindow(_ lease: Lease) -> String {
-        let start = lease.paymentWindowStartDay ?? lease.paymentDay ?? 1
-        let end = lease.paymentWindowEndDay ?? lease.paymentDueDay ?? lease.paymentDay ?? start
-        return "\(start)-\(end)"
-    }
-
-    private func isLeaseEarlyMoveOut(_ lease: Lease) -> Bool {
-        if lease.terminationReason?.trimmingCharacters(in: .whitespacesAndNewlines) == "Выехал раньше срока" {
-            return true
-        }
-        guard let terminatedAt = lease.terminatedAt,
-              let endDate = lease.endDate else {
-            return false
-        }
-        return terminatedAt < endDate
+        if let issuedBy, !issuedBy.isEmpty { parts.append("выдан \(issuedBy)") }
+        if let issuedAt, !issuedAt.isEmpty { parts.append(LeaseDay.display(issuedAt)) }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 }

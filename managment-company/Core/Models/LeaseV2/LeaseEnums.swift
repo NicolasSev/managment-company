@@ -325,6 +325,8 @@ enum PaymentDirection: FallbackStringEnum {
 // MARK: - Deposit (spec §5)
 
 enum DepositStatus: FallbackStringEnum {
+    /// A lease without a deposit (contract value `none`).
+    case noDeposit
     case expected
     case held
     case partiallyReturned
@@ -334,6 +336,7 @@ enum DepositStatus: FallbackStringEnum {
 
     static var knownMapping: [(DepositStatus, String)] {
         [
+            (.noDeposit, "none"),
             (.expected, "expected"),
             (.held, "held"),
             (.partiallyReturned, "partially_returned"),
@@ -344,6 +347,7 @@ enum DepositStatus: FallbackStringEnum {
 
     var rawValue: String {
         switch self {
+        case .noDeposit: return "none"
         case .expected: return "expected"
         case .held: return "held"
         case .partiallyReturned: return "partially_returned"
@@ -362,6 +366,7 @@ enum DepositStatus: FallbackStringEnum {
 
     var title: String {
         switch self {
+        case .noDeposit: return "Депозита нет"
         case .expected: return "Ожидается"
         case .held: return "Удерживается"
         case .partiallyReturned: return "Возвращён частично"

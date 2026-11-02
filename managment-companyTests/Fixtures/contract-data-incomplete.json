@@ -1,0 +1,30 @@
+{
+  "error": {
+    "code": "CONTRACT_DATA_INCOMPLETE",
+    "message": "the contract needs data that is not filled in yet",
+    "details": {
+      "fields": [
+        {
+          "entity": "landlord_profile",
+          "field": "iin",
+          "placeholder": "landlord.iin",
+          "message": "укажите ИИН арендодателя"
+        },
+        {
+          "entity": "property",
+          "entity_id": "3f9a1c22-8e47-4b6d-a0f3-6c2e9d7b5a10",
+          "field": "ownership_document",
+          "placeholder": "property.ownership_document",
+          "message": "заполни правоустанавливающий документ объекта"
+        },
+        {
+          "entity": "tenant",
+          "entity_id": "a52d7e19-0c64-4f1b-8e3a-9b7f2c6d4e21",
+          "field": "birth_date",
+          "placeholder": "tenant.birth_date",
+          "message": "укажите дату рождения арендатора"
+        }
+      ]
+    }
+  }
+}
