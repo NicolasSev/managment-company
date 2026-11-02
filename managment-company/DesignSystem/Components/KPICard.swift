@@ -11,10 +11,9 @@ struct KPICard: View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 HStack {
-                    Text(title.uppercased())
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .tracking(1.2)
+                    Text(title)
+                        .font(.footnote)
+                        .fontWeight(.medium)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
 
                     Spacer()

@@ -24,23 +24,9 @@ struct PrimaryButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, AppTheme.Spacing.md)
-            .background(
-                LinearGradient(
-                    colors: [
-                        AppTheme.Colors.accent,
-                        AppTheme.Colors.accentSecondary
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .background(AppTheme.Colors.accent)
             .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-            )
-            .shadow(color: AppTheme.Colors.accent.opacity(0.28), radius: 22, x: 0, y: 12)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .disabled(isLoading || isDisabled)
         .opacity(isLoading || isDisabled ? 0.72 : 1)

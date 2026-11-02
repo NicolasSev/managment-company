@@ -106,7 +106,7 @@ struct QuickActionLauncher: View {
                 .frame(width: 56, height: 56)
                 .background(AppTheme.Colors.accent)
                 .clipShape(Circle())
-                .shadow(color: AppTheme.Colors.accent.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: Color.black.opacity(0.12), radius: 6, y: 2)
         }
         .accessibilityLabel("Быстрое действие")
         .accessibilityHint("Открывает меню быстрых действий")

@@ -1,13 +1,34 @@
 import Foundation
 
 enum AppFormatting {
+    /// Output locale for amounts and dates: the whole app is Russian-language, and the web
+    /// client formats the same way (`380 000 ₸`).
+    static let displayLocale = Locale(identifier: "ru_RU")
+
+    /// Whole units, grouped with non-breaking spaces, symbol after the number:
+    /// `380 000 ₸`. Output only; input parsing lives in `Money.parse`.
     static func currency(_ amount: Double, currency: String) -> String {
         let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
+        formatter.locale = displayLocale
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
         formatter.maximumFractionDigits = 0
+        formatter.roundingMode = .halfUp  // same rule as `Money.minorUnits`
 
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(amount) \(currency)"
+        let number = formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        return "\(number)\u{00A0}\(currencySymbol(for: currency))"
+    }
+
+    /// `₸` for KZT (the system data of older runtimes only knows the ISO code), the locale
+    /// symbol for other currencies, the code itself as a last resort.
+    static func currencySymbol(for code: String) -> String {
+        let code = code.uppercased()
+        if code == "KZT" { return "₸" }
+        let formatter = NumberFormatter()
+        formatter.locale = displayLocale
+        formatter.numberStyle = .currency
+        formatter.currencyCode = code
+        return formatter.currencySymbol ?? code
     }
 
     static func compactAmount(_ amount: Double, currency: String) -> String {

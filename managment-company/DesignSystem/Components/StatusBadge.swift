@@ -1,35 +1,78 @@
 import SwiftUI
 
-struct StatusBadge: View {
-    let status: String
-    
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
+/// Meaning of a status, shared by every badge. Colour alone is not enough (grayscale,
+/// Increase Contrast), so each tone also has its own symbol.
+enum StatusTone: Equatable {
+    case success
+    case warning
+    case danger
+    case info
+    case neutral
 
-            Text(statusDisplay)
+    var color: Color {
+        switch self {
+        case .success: return AppTheme.Colors.success
+        case .warning: return AppTheme.Colors.warning
+        case .danger: return AppTheme.Colors.danger
+        case .info: return AppTheme.Colors.info
+        case .neutral: return AppTheme.Colors.textSecondary
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .success: return "checkmark"
+        case .warning: return "clock"
+        case .danger: return "exclamationmark"
+        case .info: return "info"
+        case .neutral: return "minus"
+        }
+    }
+}
+
+struct StatusBadge: View {
+    private let label: String
+    private let tone: StatusTone
+
+    /// Badge for a raw status string (`occupied`, `overdue`, ...).
+    init(status: String) {
+        let normalized = Self.normalize(status)
+        self.label = Self.display(normalized)
+        self.tone = Self.tone(normalized)
+    }
+
+    /// Badge with an explicit label and tone (domain enums with their own titles).
+    init(label: String, tone: StatusTone) {
+        self.label = label
+        self.tone = tone
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: tone.systemImage)
+                .font(.system(size: 9, weight: .heavy))
+                .accessibilityHidden(true)
+
+            Text(label)
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .tracking(0.4)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(statusColor.opacity(0.14))
-        .foregroundStyle(statusColor)
+        .background(tone.color.opacity(0.14))
+        .foregroundStyle(tone.color)
         .overlay(
             Capsule()
-                .stroke(statusColor.opacity(0.16), lineWidth: 1)
+                .stroke(tone.color.opacity(0.16), lineWidth: 1)
         )
         .clipShape(Capsule())
     }
-    
-    private var normalizedStatus: String {
+
+    private static func normalize(_ status: String) -> String {
         status.lowercased().replacingOccurrences(of: " ", with: "_")
     }
-    
-    private var statusDisplay: String {
+
+    private static func display(_ normalizedStatus: String) -> String {
         switch normalizedStatus {
         case "occupied": return "Занято"
         case "vacant": return "Свободно"
@@ -62,18 +105,18 @@ struct StatusBadge: View {
         }
     }
     
-    private var statusColor: Color {
+    static func tone(_ normalizedStatus: String) -> StatusTone {
         switch normalizedStatus {
         case "occupied", "completed", "done", "income", "active", "paid":
-            return AppTheme.Colors.success
+            return .success
         case "vacant", "expense", "urgent", "cancelled", "terminated", "expired", "overdue":
-            return AppTheme.Colors.danger
+            return .danger
         case "renovation", "in_progress", "pending", "todo", "high":
-            return AppTheme.Colors.warning
+            return .warning
         case "medium":
-            return AppTheme.Colors.info
+            return .info
         default:
-            return AppTheme.Colors.textSecondary
+            return .neutral
         }
     }
 }

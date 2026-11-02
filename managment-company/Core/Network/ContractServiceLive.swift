@@ -96,6 +96,10 @@ final class LiveContractService: ContractService {
 
     // MARK: Transport
 
+    private func currentAccessToken() async -> String? {
+        await MainActor.run { authManager.accessToken }
+    }
+
     private func send(
         path: String,
         query: [URLQueryItem] = [],
@@ -124,10 +128,10 @@ final class LiveContractService: ContractService {
             }
         }
 
-        guard let token = authManager.accessToken else { throw ContractServiceError.unauthorized }
+        guard let token = await currentAccessToken() else { throw ContractServiceError.unauthorized }
         var (data, response) = try await attempt(token: token)
         if response.statusCode == 401 {
-            guard await authManager.refreshToken(), let fresh = authManager.accessToken else {
+            guard await authManager.refreshToken(), let fresh = await currentAccessToken() else {
                 throw ContractServiceError.unauthorized
             }
             (data, response) = try await attempt(token: fresh)

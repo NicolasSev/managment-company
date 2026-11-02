@@ -68,9 +68,20 @@ enum LeaseDay {
         return String(format: "%04d-%02d-%02d", comps.year ?? 1970, comps.month ?? 1, day)
     }
 
-    /// Short Russian form for rows, e.g. `15 мар. 2026`.
+    private static let displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = AppFormatting.displayLocale
+        formatter.calendar = calendar
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "d MMM yyyy"
+        return formatter
+    }()
+
+    /// Russian form for rows and key-value lines, e.g. `14 окт 2026` (abbreviation dots are
+    /// dropped: `окт.` -> `окт`). Unparsable input is shown as is.
     static func display(_ day: String?) -> String {
         guard let day, !day.isEmpty else { return "-" }
-        return AppFormatting.dateString(from: day) ?? day
+        guard let date = date(day) else { return day }
+        return displayFormatter.string(from: date).replacingOccurrences(of: ".", with: "")
     }
 }

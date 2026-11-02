@@ -105,5 +105,6 @@ struct PayChargeSheet: View {
                 }
             }
         }
+        .presentationDetents([.medium, .large])
     }
 }

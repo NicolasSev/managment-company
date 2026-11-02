@@ -116,12 +116,12 @@ struct RentPreviewSheet: View {
                 currency: reminder.currency,
                 auth: authManager
             )
-            statusMessage = "✅ Транзакция записана"
+            statusMessage = "Транзакция записана"
             try? await Task.sleep(nanoseconds: 800_000_000)
             onPaid()
             onClose()
         } catch {
-            statusMessage = "❌ Ошибка: \(error.localizedDescription)"
+            statusMessage = "Ошибка: \(error.localizedDescription)"
         }
     }
 }

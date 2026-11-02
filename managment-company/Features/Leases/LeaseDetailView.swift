@@ -9,6 +9,7 @@ import SwiftUI
 struct LeaseDetailView: View {
     @StateObject private var viewModel: LeaseDetailViewModel
     @State private var showAllEvents = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         leaseId: String,
@@ -32,11 +33,16 @@ struct LeaseDetailView: View {
         .navigationTitle("Договор")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("lease.detail.screen")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { actionsMenu }
+        }
         .task { await viewModel.load() }
         .refreshable { await viewModel.reload() }
         .sheet(item: $viewModel.activeSheet) { sheet in
             sheetView(sheet)
         }
+        .sensoryFeedback(.success, trigger: viewModel.paidSignal)
+        .sensoryFeedback(.error, trigger: viewModel.errorSignal)
     }
 
     @ViewBuilder
@@ -62,10 +68,9 @@ struct LeaseDetailView: View {
                         bannerView(banner)
                     }
                     headerCard(lease)
-                    actionsCard
                     balanceCard(lease)
-                    termsCard(lease)
                     chargesCard(lease)
+                    termsCard(lease)
                     paymentsCard(lease)
                     depositCard(lease)
                     if !lease.amendments.isEmpty { amendmentsCard(lease) }
@@ -121,40 +126,63 @@ struct LeaseDetailView: View {
         }
     }
 
+    /// The pay button under the balance replaces the menu entry while there is something to pay.
+    private func canPayNow(_ lease: LeaseAggregate) -> Bool {
+        viewModel.actionButtons.contains { $0.action == .recordPayment } && !lease.payableCharges.isEmpty
+    }
+
+    /// Every lease action except the ones that live elsewhere on the screen (return deposit sits
+    /// in the deposit card, pay under the balance). Destructive actions are separated and
+    /// carry `role: .destructive`.
     @ViewBuilder
-    private var actionsCard: some View {
-        let buttons = viewModel.actionButtons.filter { $0.action != .returnDeposit }
-        if case .loaded(let lease) = viewModel.state {
-            LeaseSectionCard(title: "Действия", identifier: "lease.detail.actions") {
-                VStack(spacing: AppTheme.Spacing.sm) {
-                    ForEach(buttons) { button in
-                        actionButton(button)
+    private var actionsMenu: some View {
+        if let lease = viewModel.lease {
+            let hidden: Set<LeaseAction> = canPayNow(lease) ? [.returnDeposit, .recordPayment] : [.returnDeposit]
+            let buttons = viewModel.actionButtons.filter { !hidden.contains($0.action) }
+            let regular = buttons.filter { !$0.isDestructive }
+            let destructive = buttons.filter(\.isDestructive)
+            if !buttons.isEmpty {
+                Menu {
+                    ForEach(regular) { button in
+                        menuButton(button)
                     }
-                    ContractLeaseButton(lease: lease)
+                    if !regular.isEmpty && !destructive.isEmpty {
+                        Divider()
+                    }
+                    ForEach(destructive) { button in
+                        menuButton(button)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Действия")
+                .accessibilityIdentifier("lease.detail.actions")
             }
         }
     }
 
-    private func actionButton(_ button: LeaseActionButton) -> some View {
-        let tint = button.isDestructive ? AppTheme.Colors.danger : AppTheme.Colors.accent
-        return Button {
+    private func menuButton(_ button: LeaseActionButton) -> some View {
+        Button(role: button.isDestructive ? .destructive : nil) {
             viewModel.perform(button.action)
         } label: {
-            HStack(spacing: AppTheme.Spacing.sm) {
-                Image(systemName: button.systemImage)
-                Text(button.title).fontWeight(.semibold)
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-            .foregroundStyle(tint)
-            .padding(.vertical, AppTheme.Spacing.md)
-            .padding(.horizontal, AppTheme.Spacing.md)
-            .background(tint.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Label(button.title, systemImage: button.systemImage)
         }
-        .buttonStyle(.plain)
         .accessibilityIdentifier("lease.detail.action.\(button.action.rawValue)")
+    }
+
+    /// The one prominent action of the screen, right under the balance.
+    private var payButton: some View {
+        Button {
+            viewModel.perform(.recordPayment)
+        } label: {
+            Label("Принять оплату", systemImage: "banknote")
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .tint(AppTheme.Colors.accent)
+        .accessibilityIdentifier("lease.detail.action.\(LeaseAction.recordPayment.rawValue)")
     }
 
     private func bannerView(_ message: String) -> some View {
@@ -172,6 +200,7 @@ struct LeaseDetailView: View {
 
     private func balanceCard(_ lease: LeaseAggregate) -> some View {
         let balance = lease.balance
+        let hasOverdue = balance.overdue.isPositive
         return LeaseSectionCard(title: "Баланс", identifier: "lease.detail.balance") {
             VStack(spacing: AppTheme.Spacing.sm) {
                 HStack(spacing: AppTheme.Spacing.sm) {
@@ -179,13 +208,21 @@ struct LeaseDetailView: View {
                         title: "К оплате",
                         value: balance.outstanding.formatted(),
                         color: balance.outstanding.isPositive ? AppTheme.Colors.textPrimary : AppTheme.Colors.success,
-                        identifier: "lease.detail.balance.outstanding"
+                        identifier: "lease.detail.balance.outstanding",
+                        size: .large,
+                        systemImage: balance.outstanding.isPositive ? nil : "checkmark.circle.fill",
+                        numericValue: NSDecimalNumber(decimal: balance.outstanding.major).doubleValue,
+                        successTrigger: viewModel.paidSignal
                     )
                     LeaseMetricTile(
                         title: balance.overdueCharges > 0 ? "Просрочено (\(balance.overdueCharges))" : "Просрочено",
                         value: balance.overdue.formatted(),
-                        color: balance.overdue.isPositive ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary,
-                        identifier: "lease.detail.balance.overdue"
+                        color: hasOverdue ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary,
+                        identifier: "lease.detail.balance.overdue",
+                        size: .large,
+                        tint: hasOverdue ? AppTheme.Colors.danger : nil,
+                        systemImage: hasOverdue ? "exclamationmark.circle.fill" : nil,
+                        numericValue: NSDecimalNumber(decimal: balance.overdue.major).doubleValue
                     )
                 }
                 HStack(spacing: AppTheme.Spacing.sm) {
@@ -205,6 +242,10 @@ struct LeaseDetailView: View {
                         label: "Ближайший платёж",
                         value: "\(next.outstanding.formatted()) до \(LeaseDay.short(next.dueDate))"
                     )
+                }
+                if canPayNow(lease) {
+                    payButton
+                        .padding(.top, AppTheme.Spacing.sm)
                 }
             }
         }
@@ -275,6 +316,7 @@ struct LeaseDetailView: View {
                     }
                     ForEach(queue, id: \.rowKey) { charge in
                         chargeRow(charge, in: lease, isPreview: false)
+                            .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
                     }
                     if !settled.isEmpty {
                         DisclosureGroup("Закрытые начисления (\(settled.count))") {
@@ -290,6 +332,12 @@ struct LeaseDetailView: View {
                     }
                 }
             }
+            // Rows leave and amounts change as soon as the new state is applied, whether it came
+            // from the server response, a reload after the offline queue delivered, or a refresh.
+            .animation(
+                AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                value: queue.map { "\($0.rowKey)|\($0.outstanding.minor)" }
+            )
         }
     }
 
@@ -315,7 +363,8 @@ struct LeaseDetailView: View {
                         .foregroundStyle(charge.isOverdue ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary)
                         .accessibilityIdentifier("lease.detail.charge.\(key).outstanding")
                     if !isPreview {
-                        Text(chargeCaption(charge))
+                        Label(chargeCaption(charge), systemImage: chargeCaptionIcon(charge))
+                            .labelStyle(.inlineIcon)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(chargeCaptionColor(charge))
                     }
@@ -338,7 +387,7 @@ struct LeaseDetailView: View {
             }
         }
         .padding(AppTheme.Spacing.sm)
-        .background(Color.white.opacity(0.58))
+        .background(AppTheme.Colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lease.detail.charge.\(key)")
@@ -350,6 +399,16 @@ struct LeaseDetailView: View {
             return "оплачено \(charge.allocated.formatted()) из \(charge.amount.formatted())"
         }
         return charge.paymentStatus.title
+    }
+
+    /// Shape next to the colour, so overdue / paid / partial differ without colour vision.
+    private func chargeCaptionIcon(_ charge: LeaseCharge) -> String {
+        if charge.isOverdue { return "exclamationmark.circle.fill" }
+        switch charge.paymentStatus {
+        case .paid, .waived: return "checkmark.circle.fill"
+        case .partial: return "circle.lefthalf.filled"
+        default: return "clock"
+        }
     }
 
     private func chargeCaptionColor(_ charge: LeaseCharge) -> Color {
@@ -385,7 +444,8 @@ struct LeaseDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LeaseDay.display(payment.receivedOn))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .foregroundStyle(payment.isReversed ? AppTheme.Colors.textTertiary : AppTheme.Colors.textPrimary)
+                        .strikethrough(payment.isReversed)
                     Text(paymentMeta(payment))
                         .font(.caption)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
@@ -397,13 +457,13 @@ struct LeaseDetailView: View {
                     .strikethrough(payment.isReversed)
             }
             if payment.isReversed {
-                Text("Отменён\(payment.reverseReason.map { ": \($0)" } ?? "")")
+                Label("Отменён\(payment.reverseReason.map { ": \($0)" } ?? "")", systemImage: "arrow.uturn.backward")
                     .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.danger)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
             } else {
                 ForEach(payment.allocations, id: \.chargeId) { allocation in
                     HStack {
-                        Text("-> \(allocationLabel(allocation, in: lease))")
+                        Label(allocationLabel(allocation, in: lease), systemImage: "arrow.turn.down.right")
                             .font(.caption)
                             .foregroundStyle(AppTheme.Colors.textSecondary)
                         Spacer()
@@ -414,7 +474,7 @@ struct LeaseDetailView: View {
                 }
                 if payment.unallocated.isPositive {
                     HStack {
-                        Text("-> Кредит арендатора")
+                        Label("Кредит арендатора", systemImage: "arrow.turn.down.right")
                             .font(.caption)
                             .foregroundStyle(AppTheme.Colors.success)
                         Spacer()
@@ -427,12 +487,11 @@ struct LeaseDetailView: View {
             if let notes = payment.notes, !notes.isEmpty {
                 Text(notes)
                     .font(.caption)
-                    .italic()
                     .foregroundStyle(AppTheme.Colors.textSecondary)
             }
         }
         .padding(AppTheme.Spacing.sm)
-        .background(Color.white.opacity(0.58))
+        .background(AppTheme.Colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lease.detail.payment.\(payment.id)")
@@ -545,8 +604,7 @@ struct LeaseDetailView: View {
                         if let note = amendment.note, !note.isEmpty {
                             Text(note)
                                 .font(.caption)
-                                .italic()
-                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                                            .foregroundStyle(AppTheme.Colors.textSecondary)
                         }
                     }
                 }
@@ -554,17 +612,15 @@ struct LeaseDetailView: View {
         }
     }
 
-    @ViewBuilder
     private func documentsCard(_ lease: LeaseAggregate) -> some View {
-        if !lease.documents.files.isEmpty {
-            LeaseSectionCard(title: "Документы", identifier: "lease.detail.documents") {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                    ForEach(lease.documents.files) { file in
-                        Label(file.filename, systemImage: file.id == lease.documents.signedFile?.id ? "checkmark.seal" : "doc")
-                            .font(.subheadline)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                    }
+        LeaseSectionCard(title: "Документы", identifier: "lease.detail.documents") {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                ForEach(lease.documents.files) { file in
+                    Label(file.filename, systemImage: file.id == lease.documents.signedFile?.id ? "checkmark.seal" : "doc")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
                 }
+                ContractLeaseButton(lease: lease)
             }
         }
     }

@@ -72,6 +72,11 @@ final class LeaseDetailViewModel: ObservableObject {
     @Published var sheetError: String?
     /// Informational line on the screen (queued payment, nothing to pay).
     @Published var banner: String?
+    /// Bumped once per accepted payment: applied by the server, or parked in
+    /// `PendingMutationQueue` (the local application). Drives haptics and success motion.
+    @Published private(set) var paidSignal = 0
+    /// Bumped once per command the server or transport refused. Drives the error haptic.
+    @Published private(set) var errorSignal = 0
 
     let leaseId: String
     private let service: LeaseV2Service
@@ -290,7 +295,7 @@ final class LeaseDetailViewModel: ObservableObject {
         let sheet = LeaseSheet.payCharge(chargeId: chargeId)
         let key = idempotencyKey(for: sheet)
         let request = PayChargeRequest(amount: amount?.major, receivedOn: receivedOn, method: method.rawValue, notes: notes)
-        return await run(sheet, onTransportFailure: { [weak self] lease in
+        let accepted = await run(sheet, onTransportFailure: { [weak self] lease in
             guard let self, let queue = self.paymentQueue else { return false }
             do {
                 try queue.enqueueLeaseChargePayment(chargeId: chargeId, leaseId: lease.id, body: request, idempotencyKey: key)
@@ -302,6 +307,8 @@ final class LeaseDetailViewModel: ObservableObject {
         }) { lease in
             try await self.service.payCharge(leaseId: lease.id, chargeId: chargeId, request: request, idempotencyKey: key)
         }
+        if accepted { paidSignal += 1 }
+        return accepted
     }
 
     @discardableResult
@@ -350,12 +357,14 @@ final class LeaseDetailViewModel: ObservableObject {
                 return true
             }
             sheetError = error.userMessage
+            errorSignal += 1
             if case .versionMismatch = error { await reload() }
             return false
         } catch {
             sheetError = PendingMutationQueue.isRetryableTransportError(error)
                 ? LeaseV2Error.transport.userMessage
                 : LeaseV2Error.unknown.userMessage
+            errorSignal += 1
             return false
         }
     }

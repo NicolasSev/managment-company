@@ -35,32 +35,20 @@ extension View {
 }
 
 /// Status pill with lease-specific Russian labels (the shared `StatusBadge` does not know
-/// `pending_signature`).
+/// `pending_signature`): a thin wrapper that only maps the lease status to a label and tone.
 struct LeaseStatusBadge: View {
     let status: LeaseStatus
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 6, height: 6)
-            Text(status.title)
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .tracking(0.4)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.14))
-        .foregroundStyle(color)
-        .overlay(Capsule().stroke(color.opacity(0.16), lineWidth: 1))
-        .clipShape(Capsule())
+        StatusBadge(label: status.title, tone: tone)
     }
 
-    private var color: Color {
+    private var tone: StatusTone {
         switch status {
-        case .active: return AppTheme.Colors.success
-        case .draft, .pendingSignature: return AppTheme.Colors.warning
-        case .terminated, .cancelled: return AppTheme.Colors.danger
-        case .ended, .unknown: return AppTheme.Colors.textSecondary
+        case .active: return .success
+        case .draft, .pendingSignature: return .warning
+        case .terminated, .cancelled: return .danger
+        case .ended, .unknown: return .neutral
         }
     }
 }
@@ -107,31 +95,71 @@ struct LeaseKeyValueRow: View {
     }
 }
 
-/// Small metric tile used in the balance block.
+/// Small metric tile used in the balance block and on lease cards.
 struct LeaseMetricTile: View {
+    enum Size {
+        case regular
+        /// Headline figures of the balance («К оплате», «Просрочено»).
+        case large
+    }
+
     let title: String
     let value: String
     var color: Color = AppTheme.Colors.textPrimary
     var identifier: String?
+    var size: Size = .regular
+    /// Quiet background tint (e.g. danger for overdue). Plain secondary surface when `nil`.
+    var tint: Color?
+    var systemImage: String?
+    /// Numeric value behind `value`, so changing digits roll in the right direction.
+    var numericValue: Double?
+    /// Bounces the icon whenever this changes (payment accepted). Ignored under Reduce Motion.
+    var successTrigger: Int = 0
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textSecondary)
+            HStack(spacing: 4) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(color)
+                        .symbolEffect(.bounce, value: reduceMotion ? 0 : successTrigger)
+                }
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(size == .large ? .title2.weight(.semibold) : .subheadline.weight(.semibold))
                 .foregroundStyle(color)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
+                .moneyText(value: numericValue)
+                .animation(AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion), value: value)
                 .leaseIdentifier(identifier)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.sm)
-        .background(Color.white.opacity(0.58))
+        .padding(.vertical, size == .large ? AppTheme.Spacing.md : AppTheme.Spacing.sm)
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .background(tint.map { $0.opacity(0.08) } ?? AppTheme.Colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
+}
+
+/// Symbol and title in one tight row (small captions beside amounts).
+struct InlineIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 3) {
+            configuration.icon
+            configuration.title
+        }
+    }
+}
+
+extension LabelStyle where Self == InlineIconLabelStyle {
+    static var inlineIcon: InlineIconLabelStyle { InlineIconLabelStyle() }
 }
 
 extension ChargeKind {

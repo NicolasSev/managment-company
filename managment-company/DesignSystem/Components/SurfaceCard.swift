@@ -1,30 +1,23 @@
 import SwiftUI
 
+/// The one card surface: solid fill, hairline border, a single faint shadow.
+/// No glass and no gradient on content (glass belongs to the navigation layer).
 struct SurfaceCard<Content: View>: View {
     var padding: CGFloat = AppTheme.Spacing.lg
     @ViewBuilder var content: () -> Content
+
+    private static var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+    }
 
     var body: some View {
         content()
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.92),
-                                AppTheme.Colors.background.opacity(0.92)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
+            .background(AppTheme.Colors.background, in: Self.shape)
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.85), lineWidth: 1)
+                Self.shape.stroke(AppTheme.Colors.border.opacity(0.6), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.08), radius: 28, x: 0, y: 18)
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
 }

@@ -50,6 +50,7 @@ struct LeaseSheetContainer<Content: View>: View {
         }
         .accessibilityIdentifier(prefix)
         .interactiveDismissDisabled(isSubmitting)
+        .presentationDragIndicator(.visible)
     }
 }
 
