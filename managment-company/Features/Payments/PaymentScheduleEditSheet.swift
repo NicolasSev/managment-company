@@ -29,7 +29,7 @@ struct PaymentScheduleEditSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.propertyName)

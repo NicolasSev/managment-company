@@ -60,7 +60,7 @@ struct LeaseFormSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Арендатор") {
                     Picker("Арендатор", selection: $tenantId) {
                         Text("Выберите арендатора").tag("")

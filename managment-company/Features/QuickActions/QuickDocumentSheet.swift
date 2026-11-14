@@ -19,7 +19,7 @@ struct QuickDocumentSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Куда прикрепить") {
                     Picker("Тип", selection: $viewModel.targetType) {
                         ForEach(DocumentTargetType.allCases) { type in

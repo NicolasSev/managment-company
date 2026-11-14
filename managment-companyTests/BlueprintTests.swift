@@ -74,6 +74,26 @@ struct BlueprintTests {
         #expect(StatusBadge.tone("paid") == .success)
     }
 
+    private func point(month: Int? = nil, quarter: Int? = nil, season: String? = nil, label: String = "Jun 2026") throws -> ProfitabilityPoint {
+        var object: [String: Any] = [
+            "period_key": "k", "period_label": label, "period_year": 2026,
+            "total_income": 0, "total_expense": 0, "utility_expense": 0,
+            "operating_cost": 0, "net_cashflow": 0, "profit_margin_pct": 0,
+        ]
+        if let month { object["period_month"] = month }
+        if let quarter { object["period_quarter"] = quarter }
+        if let season { object["period_season"] = season }
+        let data = try JSONSerialization.data(withJSONObject: object)
+        return try JSONDecoder().decode(ProfitabilityPoint.self, from: data)
+    }
+
+    @Test func periodTitlesAreBuiltInRussian() throws {
+        #expect(DashboardAnalyticsLogic.periodTitle(try point(month: 6)) == "Июнь 2026")
+        #expect(DashboardAnalyticsLogic.periodTitle(try point(quarter: 2)) == "2 кв. 2026")
+        #expect(DashboardAnalyticsLogic.periodTitle(try point(season: "autumn")) == "Осень 2026")
+        #expect(DashboardAnalyticsLogic.periodTitle(try point(label: "2026")) == "2026")
+    }
+
     @Test func compactChartLabels() {
         #expect(BlueprintChartFormat.compact(0) == "0")
         #expect(BlueprintChartFormat.compact(243_000) == "243 тыс")

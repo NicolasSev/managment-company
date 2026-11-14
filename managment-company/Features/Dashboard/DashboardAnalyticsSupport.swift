@@ -365,6 +365,29 @@ enum DashboardAnalyticsLogic {
         return formatter.string(from: date).capitalized
     }
 
+    /// Russian title of a profitability period, built from its date parts on the client
+    /// (the server label follows the server locale). Falls back to the server label.
+    static func periodTitle(_ point: ProfitabilityPoint) -> String {
+        if let month = point.periodMonth, (1...12).contains(month) {
+            return monthTitle(year: point.periodYear, month: month)
+        }
+        if let quarter = point.periodQuarter, (1...4).contains(quarter) {
+            return "\(quarter) кв. \(point.periodYear)"
+        }
+        if let season = point.periodSeason?.lowercased(), !season.isEmpty {
+            let names = [
+                "winter": "Зима", "spring": "Весна", "summer": "Лето",
+                "autumn": "Осень", "fall": "Осень",
+            ]
+            if let name = names[season] { return "\(name) \(point.periodYear)" }
+        }
+        if point.periodYear > 0, point.periodMonth == nil, point.periodQuarter == nil,
+           (point.periodSeason ?? "").isEmpty {
+            return String(point.periodYear)
+        }
+        return point.periodLabel.isEmpty ? point.periodKey : point.periodLabel
+    }
+
     static func isoDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)

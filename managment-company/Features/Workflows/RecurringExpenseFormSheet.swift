@@ -42,7 +42,7 @@ struct RecurringExpenseFormSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Объект") {
                     Picker("Объект", selection: $propertyId) {
                         Text("Не выбрано").tag("")

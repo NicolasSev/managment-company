@@ -26,7 +26,7 @@ enum QuickActionKind: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .payment: return "wallet.bullet"
+        case .payment: return "checkmark.circle"
         case .expense: return "banknote"
         case .receipt: return "doc.text.viewfinder"
         case .task: return "checklist"
@@ -100,18 +100,33 @@ struct QuickActionLauncher: View {
         Button {
             controller.presentMenu()
         } label: {
-            Image(systemName: "plus")
-                .font(.title3.weight(.medium))
-                .foregroundStyle(AppTheme.Colors.onAccent)
-                .rotationEffect(.degrees(controller.isMenuPresented ? 45 : 0))
-                .frame(width: 52, height: 52)
-                .background(
-                    AppTheme.Colors.accent,
-                    in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous)
-                )
-                .shadow(color: AppTheme.Colors.accent.opacity(0.28), radius: 10, y: 4)
-                .animation(AppTheme.Motion.normal, value: controller.isMenuPresented)
+            HStack(spacing: AppTheme.Spacing.sm) {
+                Image(systemName: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.onAccent)
+                    .rotationEffect(.degrees(controller.isMenuPresented ? 45 : 0))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        AppTheme.Colors.accent,
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .animation(AppTheme.Motion.normal, value: controller.isMenuPresented)
+                Text("Быстрое действие")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Text("Оплата · Расход")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .lineLimit(1)
+                    .layoutPriority(-1)
+            }
+            .padding(.horizontal, AppTheme.Spacing.md)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: controller.isMenuPresented)
         .accessibilityLabel("Быстрое действие")
         .accessibilityHint("Открывает меню быстрых действий")
@@ -128,7 +143,7 @@ struct QuickActionLauncher: View {
 
     private var menu: some View {
         NavigationStack {
-            List {
+            BlueprintList {
                 ForEach(QuickActionsController.orderedActions) { action in
                     let prerequisite = QuickActionsController.prerequisite(for: action, hasProperties: hasProperties)
                     Button {

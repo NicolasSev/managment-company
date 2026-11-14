@@ -29,7 +29,7 @@ struct NotificationsInboxView: View {
                         icon: "bell.slash"
                     )
                 } else {
-                    List {
+                    BlueprintList {
                         ForEach(items) { row in
                             notificationRow(row)
                                 .listRowBackground(AppTheme.Colors.backgroundSecondary.opacity(0.5))

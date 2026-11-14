@@ -13,35 +13,53 @@ struct IsometricStreet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isBuilt = false
 
-    private var shown: [IsometricBuildingSpec] { Array(buildings.prefix(limit)) }
-    private var overflow: Int { max(0, buildings.count - limit) }
+    /// As tall as the tallest building, so a low street leaves no empty band above it.
+    private var rowHeight: CGFloat {
+        buildings.prefix(limit).map { Self.height(of: $0, height: height) }.max() ?? height * 0.5
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .bottom, spacing: 6) {
-                ForEach(Array(shown.enumerated()), id: \.offset) { index, spec in
-                    IsometricBuilding(spec: spec, progress: (isBuilt || reduceMotion) ? 1 : 0)
-                        .frame(width: Self.width(of: spec, height: height), height: Self.height(of: spec, height: height))
-                        .animation(
-                            AppTheme.Motion.build.delay(AppTheme.Motion.buildDelay(index: index, reduceMotion: reduceMotion)),
-                            value: isBuilt
-                        )
+            // The widest row that fits: buildings that do not fit are summarised as "+N".
+            ViewThatFits(in: .horizontal) {
+                ForEach(candidateCounts, id: \.self) { count in
+                    row(count: count)
                 }
-                if overflow > 0 {
-                    Text("+\(overflow)")
-                        .font(AppTheme.Typography.label)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                        .padding(.bottom, 6)
-                }
-                Spacer(minLength: 0)
             }
-            .frame(height: height, alignment: .bottom)
+            .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .bottomLeading)
 
-            DimensionRule(ticks: max(2, shown.count + 1))
+            DimensionRule(ticks: max(2, min(buildings.count, limit) + 1))
                 .padding(.top, 4)
         }
         .onAppear { isBuilt = true }
         .accessibilityHidden(true)
+    }
+
+    private var candidateCounts: [Int] {
+        let top = min(buildings.count, limit)
+        return Array(stride(from: top, through: min(top, 2), by: -1))
+    }
+
+    private func row(count: Int) -> some View {
+        let overflow = buildings.count - count
+        return HStack(alignment: .bottom, spacing: 6) {
+            ForEach(Array(buildings.prefix(count).enumerated()), id: \.offset) { index, spec in
+                IsometricBuilding(spec: spec, progress: (isBuilt || reduceMotion) ? 1 : 0)
+                    .frame(width: Self.width(of: spec, height: height), height: Self.height(of: spec, height: height))
+                    .animation(
+                        AppTheme.Motion.build.delay(AppTheme.Motion.buildDelay(index: index, reduceMotion: reduceMotion)),
+                        value: isBuilt
+                    )
+            }
+            if overflow > 0 {
+                Text("+\(overflow)")
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .fixedSize()
+                    .padding(.bottom, 6)
+            }
+        }
+        .frame(height: rowHeight, alignment: .bottom)
     }
 
     /// Lower kinds get a shorter frame so that every glyph is drawn at a comparable scale.

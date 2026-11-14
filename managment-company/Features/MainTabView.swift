@@ -73,15 +73,15 @@ struct MainTabView: View {
                 .environmentObject(authManager)
                 .environmentObject(notificationRouter)
         }
-        .tint(AppTheme.Colors.accent)
-
+        // The quick-action launcher is docked above the tab bar as its accessory: the system
+        // insets every tab's content for it, so nothing scrolls underneath a floating button.
+        .tabViewBottomAccessory {
             QuickActionLauncher()
                 .environmentObject(authManager)
                 .environmentObject(quickActions)
                 .environmentObject(notificationRouter)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, AppTheme.Spacing.lg)
-                .padding(.bottom, 64)
+        }
+        .tint(AppTheme.Colors.accent)
 
             if pendingMutations.pendingCount > 0 {
                 HStack(spacing: AppTheme.Spacing.sm) {

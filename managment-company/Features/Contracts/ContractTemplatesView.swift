@@ -165,7 +165,7 @@ private struct ContractTemplateUploadSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Файл") {
                     Text(viewModel.draft?.fileName ?? "")
                         .accessibilityIdentifier("settings.templates.upload.file")

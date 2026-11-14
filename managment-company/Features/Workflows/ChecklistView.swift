@@ -50,7 +50,7 @@ struct ChecklistView: View {
             .padding(AppTheme.Spacing.lg)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List {
+            BlueprintList {
                 Section {
                     let p = viewModel.progress
                     HStack {

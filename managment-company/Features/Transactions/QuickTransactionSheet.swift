@@ -36,7 +36,7 @@ struct QuickTransactionSheet: View {
     
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 if transaction == nil, let props = properties {
                     Section("Объект") {
                         Picker("Объект", selection: $selectedPropertyId) {

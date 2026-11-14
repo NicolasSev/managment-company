@@ -37,7 +37,7 @@ struct PropertyFormView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Основное") {
                     AppTextField(title: "Название", text: $name, placeholder: "Название объекта")
                     Picker("Тип", selection: $propertyType) {

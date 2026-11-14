@@ -23,7 +23,7 @@ struct RecurringExpensesView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            BlueprintList {
                 let due = viewModel.dueTemplates(today: today)
                 if !due.isEmpty {
                     Section("Требуют подтверждения") {

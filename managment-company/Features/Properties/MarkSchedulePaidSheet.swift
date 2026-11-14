@@ -41,7 +41,7 @@ struct MarkSchedulePaidSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section {
                     Text("Срок платежа \(AppFormatting.dateString(from: schedule.dueDate) ?? schedule.dueDate)")
                         .font(.subheadline)

@@ -1443,7 +1443,7 @@ private struct MaintenanceFormSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Заявка") {
                     AppTextField(title: "Название", text: $title, placeholder: "Что нужно сделать?")
                     Picker("Категория", selection: $category) {

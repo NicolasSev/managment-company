@@ -22,7 +22,7 @@ struct DepositView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            BlueprintList {
                 if let summary = viewModel.summary {
                     Section("Баланс") {
                         row("Ожидается", summary.expected, summary.currency)
@@ -148,7 +148,7 @@ private struct DepositEventSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Picker("Тип", selection: $type) {
                     ForEach(types, id: \.self) { Text(DepositViewModel.eventTypeLabel($0)).tag($0) }
                 }

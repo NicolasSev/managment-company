@@ -8,7 +8,7 @@ enum AppAppearance {
     static func apply() {
         let ink = UIColor(AppTheme.Colors.textPrimary)
         let large = UIFont.systemFont(ofSize: 32, weight: .light, width: .expanded)
-        let inline = UIFont.systemFont(ofSize: 16, weight: .medium, width: .expanded)
+        let inline = UIFont.systemFont(ofSize: 16, weight: .semibold)
         let bar = UINavigationBar.appearance()
         bar.largeTitleTextAttributes = [
             .font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large, maximumPointSize: 44),

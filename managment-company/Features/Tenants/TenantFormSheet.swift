@@ -18,7 +18,7 @@ struct TenantFormSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Имя") {
                     AppTextField(title: "Имя", text: $viewModel.form.firstName, placeholder: "Имя", identifier: "tenants.form.firstName")
                     AppTextField(title: "Фамилия", text: $viewModel.form.lastName, placeholder: "Необязательно")

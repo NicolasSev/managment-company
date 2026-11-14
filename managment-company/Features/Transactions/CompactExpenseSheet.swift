@@ -21,7 +21,7 @@ struct CompactExpenseSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 amountSection
                 categorySection
                 propertySection

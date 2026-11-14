@@ -30,7 +30,7 @@ struct TerminateLeaseSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section {
                     Text(tenant?.displayName.isEmpty == false ? tenant!.displayName : "Арендатор")
                         .font(.headline)

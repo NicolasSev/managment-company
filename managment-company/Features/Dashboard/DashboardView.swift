@@ -299,7 +299,7 @@ struct DashboardView: View {
         return SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Чистый cashflow")
+                    Text("Чистый денежный поток")
                         .sectionLabelStyle()
                     Spacer()
                     Text(dashboard?.periodLabel ?? period.title)
@@ -317,7 +317,6 @@ struct DashboardView: View {
 
                 if !properties.isEmpty {
                     IsometricStreet(buildings: properties.map(IsometricBuildingSpec.init(property:)), height: 92)
-                        .padding(.top, AppTheme.Spacing.xs)
                 }
 
                 HStack(spacing: 0) {
@@ -461,7 +460,7 @@ struct DashboardView: View {
         let months = Array(trend.months.suffix(12))
         return SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                SectionHeader(title: "Cashflow за 12 месяцев", subtitle: nil) {
+                SectionHeader(title: "Денежный поток за 12 месяцев", subtitle: nil) {
                     HStack(spacing: AppTheme.Spacing.md) {
                         legendMark("Доход", color: AppTheme.Colors.accent)
                         legendMark("Расход", color: AppTheme.Colors.textTertiary)
@@ -531,7 +530,7 @@ struct DashboardView: View {
                     ForEach(rows, id: \.periodKey) { row in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(alignment: .firstTextBaseline) {
-                                Text(row.periodLabel.isEmpty ? row.periodKey : row.periodLabel)
+                                Text(DashboardAnalyticsLogic.periodTitle(row))
                                     .font(.subheadline)
                                     .foregroundStyle(AppTheme.Colors.textPrimary)
                                 Spacer(minLength: 8)

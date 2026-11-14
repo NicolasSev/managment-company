@@ -24,7 +24,7 @@ struct TaskFormView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Задача") {
                     AppTextField(title: "Имя", text: $title, placeholder: "Название задачи")
                     AppTextField(

@@ -16,7 +16,7 @@ struct DocumentHubView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            BlueprintList {
                 searchSection
                 if showFilters {
                     filterSection

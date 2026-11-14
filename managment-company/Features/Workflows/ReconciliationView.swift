@@ -18,7 +18,7 @@ struct ReconciliationView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            BlueprintList {
                 if let result = viewModel.lastImport {
                     Section {
                         Text("Импортировано: \(result.insertedRows), дубликатов пропущено: \(result.duplicateRows)")
@@ -96,7 +96,7 @@ struct ReconciliationView: View {
 
     private var importPreview: some View {
         NavigationStack {
-            List {
+            BlueprintList {
                 Section {
                     Text("Распознано строк: \(previewRows.count). Формат: дата,сумма,валюта,описание.")
                         .font(.caption)
@@ -199,7 +199,7 @@ private struct ReconciliationDecisionSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 Section("Строка") {
                     Text(row.description).font(.subheadline)
                     Text("\(row.transactionDate) · \(AppFormatting.currency(row.amount, currency: row.currency))")

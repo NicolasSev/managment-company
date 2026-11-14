@@ -19,7 +19,7 @@ struct LeaseSheetContainer<Content: View>: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            BlueprintForm {
                 content()
 
                 if let errorMessage {
