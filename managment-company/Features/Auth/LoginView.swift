@@ -12,6 +12,7 @@ struct LoginView: View {
     @State private var showPasswordRecovery = false
     @State private var mfaToken: String?
     @State private var mfaCode = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
         NavigationStack {
@@ -19,34 +20,8 @@ struct LoginView: View {
                 AppScreenBackground()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: AppTheme.Spacing.lg) {
-                        SurfaceCard {
-                            VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
-                                Label("Рабочее пространство владельца", systemImage: "sparkles")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(AppTheme.Colors.accent)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(AppTheme.Colors.accent.opacity(0.12))
-                                    .clipShape(Capsule())
-
-                                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                                    Text("PropManager")
-                                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                                    Text("Управление недвижимостью без хаоса.")
-                                        .font(.title3.weight(.semibold))
-                                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                                    Text("Ведите объекты, задачи и денежный поток в одном спокойном рабочем пространстве.")
-                                        .font(.body)
-                                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                                        .lineSpacing(3)
-                                }
-                            }
-                        }
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
+                        masthead
 
                         SurfaceCard {
                             VStack(spacing: AppTheme.Spacing.md) {
@@ -56,26 +31,34 @@ struct LoginView: View {
                                         text: $email,
                                         placeholder: "name@example.com",
                                         keyboardType: .emailAddress,
-                                        autocapitalization: .never
+                                        autocapitalization: .never,
+                                        contentType: .username
                                     )
 
-                                    passwordField
+                                    AppTextField(
+                                        title: "Пароль",
+                                        text: $password,
+                                        placeholder: "Ваш пароль",
+                                        isSecure: true,
+                                        contentType: .password
+                                    )
                                 } else {
-                                    mfaCodeField
+                                    AppTextField(
+                                        title: "Код 2FA",
+                                        text: $mfaCode,
+                                        placeholder: "000000 или резервный код",
+                                        autocapitalization: .never,
+                                        contentType: .oneTimeCode
+                                    )
+                                    .autocorrectionDisabled()
                                 }
 
                                 if let msg = apiStatusMessage {
-                                    Text(msg)
-                                        .font(.footnote)
-                                        .foregroundStyle(AppTheme.Colors.danger)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    errorLine(msg)
                                 }
 
                                 if let msg = errorMessage {
-                                    Text(msg)
-                                        .font(.footnote)
-                                        .foregroundStyle(AppTheme.Colors.danger)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    errorLine(msg)
                                 }
 
                                 PrimaryButton(
@@ -94,28 +77,35 @@ struct LoginView: View {
                                     }
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(AppTheme.Colors.accent)
+                                    .frame(minHeight: 44)
                                 }
                             }
+                            .animation(
+                                AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                                value: mfaToken
+                            )
                         }
 
-                        VStack(spacing: AppTheme.Spacing.sm) {
-                            Button("Забыли пароль?") {
-                                showPasswordRecovery = true
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.accent)
-
+                        HStack {
                             Button("Создать аккаунт") {
                                 showRegister = true
                             }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.accent)
+                            Spacer()
+                            Button("Забыли пароль?") {
+                                showPasswordRecovery = true
+                            }
                         }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.accent)
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, AppTheme.Spacing.xs)
                         .padding(.bottom, AppTheme.Spacing.lg)
                     }
                     .padding(.horizontal, AppTheme.Spacing.md)
-                    .padding(.vertical, AppTheme.Spacing.xxl)
+                    .padding(.top, AppTheme.Spacing.xl)
+                    .padding(.bottom, AppTheme.Spacing.xxl)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .sheet(isPresented: $showRegister) {
                 RegisterView()
@@ -147,62 +137,48 @@ struct LoginView: View {
         return email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty
     }
 
-    private var passwordField: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Text("Пароль")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .textCase(.uppercase)
-                .tracking(1.2)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
+    /// Masthead: the product as a street of line-drawn buildings above the wordmark.
+    private var masthead: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            IsometricStreet(buildings: Self.mastheadStreet, height: 120)
 
-            SecureField("Ваш пароль", text: $password)
-                .textFieldStyle(.plain)
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .tint(AppTheme.Colors.accent)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.md)
-                .background(Color.white.opacity(0.82))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppTheme.Colors.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.04), radius: 16, x: 0, y: 10)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Text("Рабочее пространство владельца")
+                    .sectionLabelStyle(AppTheme.Colors.accent)
+
+                Text("PropManager")
+                    .font(.system(size: 40, weight: .light).width(.expanded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .accessibilityAddTraits(.isHeader)
+
+                Text("Объекты, арендаторы и платежи — на одном рабочем листе.")
+                    .font(.body)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .padding(.horizontal, AppTheme.Spacing.xs)
     }
 
-    private var mfaCodeField: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Text("Код 2FA")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .textCase(.uppercase)
-                .tracking(1.2)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
+    /// Decorative street of the masthead (art, not portfolio data).
+    private static let mastheadStreet: [IsometricBuildingSpec] = [
+        .init(kind: .house, isOccupied: false),
+        .init(kind: .tower, floors: 8, unitFloor: 5, windows: 2, isOccupied: true),
+        .init(kind: .commercial, isOccupied: false),
+        .init(kind: .tower, floors: 5, unitFloor: 2, windows: 3, isOccupied: true),
+        .init(kind: .land, isOccupied: false),
+    ]
 
-            TextField("000000 или резервный код", text: $mfaCode)
-                .textFieldStyle(.plain)
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .tint(AppTheme.Colors.accent)
-                .keyboardType(.default)
-                .textContentType(.oneTimeCode)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.md)
-                .background(Color.white.opacity(0.82))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppTheme.Colors.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.04), radius: 16, x: 0, y: 10)
-        }
+    private func errorLine(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.circle")
+            .font(.footnote)
+            .foregroundStyle(AppTheme.Colors.danger)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
-    
+
     private func doLogin() async {
         isLoading = true
         errorMessage = nil
@@ -366,27 +342,7 @@ private struct PasswordRecoverySheet: View {
     }
 
     private func secureRecoveryField(_ title: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .textCase(.uppercase)
-                .tracking(1.2)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-
-            SecureField(title, text: text)
-                .textFieldStyle(.plain)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.md)
-                .background(Color.white.opacity(0.82))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppTheme.Colors.border, lineWidth: 1)
-                )
-        }
+        AppTextField(title: title, text: text, isSecure: true, contentType: .newPassword)
     }
 
     private func statusMessage(_ text: String, color: Color) -> some View {
@@ -397,7 +353,7 @@ private struct PasswordRecoverySheet: View {
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private func requestReset() async {

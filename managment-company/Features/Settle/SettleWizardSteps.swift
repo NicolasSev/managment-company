@@ -298,7 +298,7 @@ struct SettleTenantStep: View {
         }
         .padding(AppTheme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.Colors.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(AppTheme.Colors.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settle.reasons")
     }

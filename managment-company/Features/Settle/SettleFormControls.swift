@@ -165,7 +165,7 @@ struct SettleNotice: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(AppTheme.Spacing.md)
-        .background(tone.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(tone.color.opacity(0.08), in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)
     }
@@ -186,12 +186,12 @@ struct SettleSourceButtonLabel: View {
         .foregroundStyle(AppTheme.Colors.accent)
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(AppTheme.Colors.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
                 .stroke(AppTheme.Colors.accent.opacity(0.25), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }
 
@@ -213,12 +213,12 @@ struct SettleChoiceRow<Content: View>: View {
                     .accessibilityHidden(true)
             }
             .padding(AppTheme.Spacing.md)
-            .background(AppTheme.Colors.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(AppTheme.Colors.background, in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
                     .stroke(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.border, lineWidth: isSelected ? 1.5 : 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])

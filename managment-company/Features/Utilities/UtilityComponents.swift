@@ -56,9 +56,9 @@ struct UtilitySecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(tone)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(tone.opacity(configuration.isPressed ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(tone.opacity(configuration.isPressed ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
                     .stroke(tone.opacity(0.25), lineWidth: 1)
             )
     }

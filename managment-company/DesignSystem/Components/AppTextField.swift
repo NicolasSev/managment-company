@@ -8,32 +8,68 @@ struct AppTextField: View {
     var autocapitalization: TextInputAutocapitalization = .sentences
     /// Accessibility identifier of the text field itself (not of the title and container).
     var identifier: String?
-    
+    /// Masks the input (passwords).
+    var isSecure: Bool = false
+    var contentType: UITextContentType?
+
+    @FocusState private var isFocused: Bool
+
     var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs + 2) {
             Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .textCase(.uppercase)
-                .tracking(1.2)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            TextField(placeholder.isEmpty ? title : placeholder, text: $text)
+                .sectionLabelStyle()
+            field
                 .textFieldStyle(.plain)
                 .foregroundStyle(AppTheme.Colors.textPrimary)
                 .tint(AppTheme.Colors.accent)
+                .textContentType(contentType)
+                .focused($isFocused)
+                .optionalIdentifier(identifier)
+                .appFieldChrome(isFocused: isFocused)
+        }
+    }
+
+    @ViewBuilder
+    private var field: some View {
+        if isSecure {
+            SecureField(placeholder.isEmpty ? title : placeholder, text: $text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        } else {
+            TextField(placeholder.isEmpty ? title : placeholder, text: $text)
                 .keyboardType(keyboardType)
                 .textInputAutocapitalization(autocapitalization)
-                .optionalIdentifier(identifier)
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.md)
-                .background(Color.white.opacity(0.82))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppTheme.Colors.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.04), radius: 16, x: 0, y: 10)
+                .autocorrectionDisabled(keyboardType == .emailAddress)
         }
+    }
+}
+
+/// Chrome of every input: inset fill, hairline edge that turns cobalt on focus, 48 pt tall.
+struct AppFieldChrome: ViewModifier {
+    var isFocused: Bool = false
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+        content
+            .padding(.horizontal, AppTheme.Spacing.md)
+            .frame(minHeight: 48)
+            .background(AppTheme.Colors.backgroundSecondary, in: shape)
+            .overlay(
+                shape.strokeBorder(
+                    isFocused ? AppTheme.Colors.accent : AppTheme.Colors.border,
+                    lineWidth: isFocused ? 1.5 : 1
+                )
+            )
+            .animation(AppTheme.Motion.resolved(AppTheme.Motion.fast, reduceMotion: reduceMotion), value: isFocused)
+    }
+}
+
+extension View {
+    /// Field chrome shared by `AppTextField` and hand-built inputs.
+    func appFieldChrome(isFocused: Bool = false) -> some View {
+        modifier(AppFieldChrome(isFocused: isFocused))
     }
 }
 
@@ -46,4 +82,19 @@ private extension View {
             self
         }
     }
+}
+
+#Preview("AppTextField") {
+    struct Demo: View {
+        @State private var email = ""
+        @State private var password = "secret"
+        var body: some View {
+            VStack(spacing: 16) {
+                AppTextField(title: "Email", text: $email, placeholder: "name@example.com")
+                AppTextField(title: "Пароль", text: $password, isSecure: true)
+            }
+            .padding()
+        }
+    }
+    return Demo()
 }

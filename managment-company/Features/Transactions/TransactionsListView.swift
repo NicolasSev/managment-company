@@ -93,6 +93,8 @@ struct TransactionsListView: View {
     @State private var searchText = ""
     @State private var exportDocument: TransactionExportDocument?
     @State private var exportErrorMessage: String?
+    @State private var rowsVisible = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var propertiesList: [Property] {
         Array(propertiesById.values).sorted { $0.name < $1.name }
@@ -184,11 +186,11 @@ struct TransactionsListView: View {
     @ViewBuilder
     private var core: some View {
             ZStack {
-                AppScreenBackground()
+                if !embedded { AppScreenBackground() }
 
                 content
             }
-            .navigationTitle("Операции")
+            .navigationTitle(embedded ? "Деньги" : "Операции")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -214,7 +216,7 @@ struct TransactionsListView: View {
                     Button {
                         showAddTransactionSheet = true
                     } label: {
-                        Image(systemName: "plus.circle.fill")
+                        Image(systemName: "plus")
                     }
                     .accessibilityLabel("Добавить операцию")
                 }
@@ -222,7 +224,7 @@ struct TransactionsListView: View {
                     Button {
                         showReceiptSheet = true
                     } label: {
-                        Label("Квитанция", systemImage: "doc.text.fill")
+                        Label("Квитанция", systemImage: "doc.text.viewfinder")
                     }
                 }
             }
@@ -296,8 +298,7 @@ struct TransactionsListView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading && rows.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingSkeleton
         } else if let errorMessage, rows.isEmpty {
             EmptyStateView(
                 title: "Операции недоступны",
@@ -326,12 +327,14 @@ struct TransactionsListView: View {
                         }
                     }
 
+                    totalsHero
+
                     reportingControls
 
                     if let exportErrorMessage {
                         SurfaceCard(padding: AppTheme.Spacing.md) {
                             HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-                                Image(systemName: "exclamationmark.triangle.fill")
+                                Image(systemName: "exclamationmark.triangle")
                                     .foregroundStyle(AppTheme.Colors.warning)
                                 Text(exportErrorMessage)
                                     .font(.subheadline)
@@ -339,8 +342,6 @@ struct TransactionsListView: View {
                             }
                         }
                     }
-
-                    utilityReceiptBanner
 
                     if filteredRows.isEmpty {
                         EmptyStateView(
@@ -351,67 +352,125 @@ struct TransactionsListView: View {
                             icon: "line.3.horizontal.decrease.circle"
                         )
                     } else {
-                        LazyVStack(spacing: AppTheme.Spacing.sm) {
-                            ForEach(filteredRows) { row in
-                                Button {
-                                    selectedTransaction = TransactionDetailRoute(
-                                        id: row.transaction.id,
-                                        propertyName: row.propertyName
-                                    )
-                                } label: {
-                                    ListedTransactionCard(
-                                        row: row,
-                                        baseCurrency: authManager.user?.baseCurrency ?? "KZT"
-                                    )
+                        SurfaceCard(padding: AppTheme.Spacing.md) {
+                            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                                SectionHeader("Журнал")
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(filteredRows.enumerated()), id: \.element.id) { index, row in
+                                        Button {
+                                            selectedTransaction = TransactionDetailRoute(
+                                                id: row.transaction.id,
+                                                propertyName: row.propertyName
+                                            )
+                                        } label: {
+                                            ListedTransactionCard(
+                                                row: row,
+                                                baseCurrency: authManager.user?.baseCurrency ?? "KZT"
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .appearStagger(index: index, isVisible: rowsVisible)
+
+                                        if row.id != filteredRows.last?.id {
+                                            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+                                        }
+                                    }
                                 }
-                                .buttonStyle(.plain)
+                                .animation(
+                                    AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                                    value: filteredRows.map(\.id)
+                                )
                             }
                         }
+                        .onAppear { rowsVisible = true }
 
                         propertySummarySection
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
+                .padding(.top, AppTheme.Spacing.sm)
+                .padding(.bottom, AppTheme.Spacing.xxl + AppTheme.Spacing.xl)
             }
+        }
+    }
+
+    /// Skeleton in the shape of the ledger.
+    private var loadingSkeleton: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: AppTheme.Spacing.md) {
+                SurfaceCard {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                        Text("Чистый итог").sectionLabelStyle()
+                        Text("000 000 ₸").font(AppTheme.Typography.masthead)
+                        Text("Доходы и расходы").font(.caption)
+                    }
+                }
+                SurfaceCard(padding: AppTheme.Spacing.md) {
+                    VStack(spacing: AppTheme.Spacing.md) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Название объекта").font(.subheadline)
+                                    Text("1 января 2026 · категория").font(.caption)
+                                }
+                                Spacer()
+                                Text("000 000 ₸").font(AppTheme.Typography.moneyRow)
+                            }
+                        }
+                    }
+                }
+            }
+            .shimmerPlaceholder(true)
+            .padding(.horizontal, AppTheme.Spacing.md)
+            .padding(.top, AppTheme.Spacing.sm)
+        }
+        .accessibilityLabel("Загружаем операции")
+    }
+
+    /// Hero of the ledger: net of the visible selection with income and expense beside it.
+    private var totalsHero: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Чистый итог").sectionLabelStyle()
+                    Spacer()
+                    Text(periodFilter.title).sectionLabelStyle(AppTheme.Colors.accent)
+                }
+                Text(AppFormatting.currency(totals.netBase, currency: baseCurrency))
+                    .font(AppTheme.Typography.masthead)
+                    .monospacedDigit()
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .contentTransition(reduceMotion ? .opacity : .numericText(value: totals.netBase))
+                HStack(spacing: 0) {
+                    MetricTile(title: "Операций", value: "\(totals.count)")
+                    MetricTile(
+                        title: "Доходы",
+                        value: AppFormatting.currency(totals.incomeBase, currency: baseCurrency),
+                        tint: AppTheme.Colors.income
+                    )
+                    MetricTile(
+                        title: "Расходы",
+                        value: AppFormatting.currency(totals.expenseBase, currency: baseCurrency)
+                    )
+                }
+                .padding(.top, AppTheme.Spacing.xs)
+            }
+            .animation(
+                AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                value: totals.netBase
+            )
         }
     }
 
     private var reportingControls: some View {
         SurfaceCard(padding: AppTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Отчетная выборка")
-                            .font(.headline)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                        Text("Фильтры, итоговые суммы и экспорт считают только видимые операции.")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-
-                    Spacer()
-
-                    Menu {
-                        Button {
-                            exportTransactions(as: .csv)
-                        } label: {
-                            Label("CSV", systemImage: "tablecells")
-                        }
-                        .disabled(filteredRows.isEmpty)
-
-                        Button {
-                            exportTransactions(as: .pdf)
-                        } label: {
-                            Label("PDF", systemImage: "doc.richtext")
-                        }
-                        .disabled(filteredRows.isEmpty)
-                    } label: {
-                        Label("Экспорт", systemImage: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
-                }
+                SectionHeader(
+                    "Выборка",
+                    subtitle: "Фильтры, итоги и экспорт считают только видимые операции."
+                )
 
                 HStack(spacing: AppTheme.Spacing.sm) {
                     Image(systemName: "magnifyingglass")
@@ -420,12 +479,16 @@ struct TransactionsListView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, 11)
-                .background(AppTheme.Colors.backgroundSecondary.opacity(0.85))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .appFieldChrome()
 
-                VStack(spacing: AppTheme.Spacing.sm) {
+                Picker("Тип", selection: $typeFilter) {
+                    ForEach(TransactionTypeFilter.allCases) { filter in
+                        Text(filter.title).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                HStack(spacing: AppTheme.Spacing.sm) {
                     Picker("Объект", selection: $selectedPropertyId) {
                         Text("Все объекты").tag("")
                         ForEach(propertiesList) { property in
@@ -433,7 +496,8 @@ struct TransactionsListView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Spacer(minLength: 0)
 
                     Picker("Период", selection: $periodFilter) {
                         ForEach(TransactionPeriodFilter.allCases) { filter in
@@ -441,44 +505,17 @@ struct TransactionsListView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Picker("Тип", selection: $typeFilter) {
-                        ForEach(TransactionTypeFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
-                        }
-                    }
-                    .pickerStyle(.segmented)
                 }
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppTheme.Spacing.sm) {
-                    transactionMetric(title: "Операций", value: "\(totals.count)", color: AppTheme.Colors.accent)
-                    transactionMetric(
-                        title: "Доходы",
-                        value: AppFormatting.compactAmount(totals.incomeBase, currency: baseCurrency),
-                        color: AppTheme.Colors.success
-                    )
-                    transactionMetric(
-                        title: "Расходы",
-                        value: AppFormatting.compactAmount(totals.expenseBase, currency: baseCurrency),
-                        color: AppTheme.Colors.danger
-                    )
-                    transactionMetric(
-                        title: "Чистое",
-                        value: AppFormatting.compactAmount(totals.netBase, currency: baseCurrency),
-                        color: totals.netBase >= 0 ? AppTheme.Colors.success : AppTheme.Colors.danger
-                    )
-                }
+                .padding(.horizontal, -12)
             }
         }
     }
 
     private var propertySummarySection: some View {
-        SurfaceCard(padding: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("Динамика по объектам")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
+        let maximum = propertySummaries.map { abs($0.net) }.max() ?? 0
+        return SurfaceCard(padding: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                SectionHeader("Динамика по объектам")
 
                 if propertySummaries.isEmpty {
                     Text("Сводка появится после операций в текущей выборке.")
@@ -486,75 +523,31 @@ struct TransactionsListView: View {
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                 } else {
                     ForEach(propertySummaries) { summary in
-                        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-                            VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline) {
                                 Text(summary.propertyName)
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundStyle(AppTheme.Colors.textPrimary)
-                                Text("Операций в выборке: \(summary.count)")
-                                    .font(.caption)
-                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(AppFormatting.currency(summary.net, currency: baseCurrency))
+                                    .font(AppTheme.Typography.moneyRow)
+                                    .foregroundStyle(AppTheme.Colors.amount(summary.net))
                             }
-
-                            Spacer()
-
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text(AppFormatting.compactAmount(summary.net, currency: baseCurrency))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(summary.net >= 0 ? AppTheme.Colors.success : AppTheme.Colors.danger)
-                                Text("\(AppFormatting.compactAmount(summary.income, currency: baseCurrency)) / \(AppFormatting.compactAmount(summary.expense, currency: baseCurrency))")
-                                    .font(.caption2)
-                                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                            }
+                            ProportionBar(value: summary.net, maximum: maximum)
+                            Text("Операций: \(summary.count) · \(AppFormatting.currency(summary.income, currency: baseCurrency)) доход · \(AppFormatting.currency(summary.expense, currency: baseCurrency)) расход")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(AppTheme.Colors.textSecondary)
                         }
-                        .padding(.vertical, 6)
-                        Divider().opacity(0.35)
+                        .accessibilityElement(children: .combine)
                     }
                 }
             }
         }
     }
 
-    private var utilityReceiptBanner: some View {
-        SurfaceCard(padding: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("Квитанция по коммуналке")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                Text("Загрузите PDF или фото: суммы попадут в счета объекта после вашего подтверждения.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                PrimaryButton(
-                    title: "Загрузить квитанцию о ком. услугах",
-                    action: { showReceiptSheet = true },
-                    systemImage: "arrow.up.doc"
-                )
-            }
-        }
-    }
-
     private var baseCurrency: String {
         authManager.user?.baseCurrency ?? "KZT"
-    }
-
-    private func transactionMetric(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     @MainActor
@@ -837,54 +830,55 @@ private struct ListedTransactionCard: View {
     let row: ListedTransaction
     let baseCurrency: String
 
+    private var isIncome: Bool { row.transaction.type.lowercased() == "income" }
+
+    private var detail: String {
+        var parts = [AppFormatting.dateString(from: row.transaction.transactionDate) ?? row.transaction.transactionDate]
+        if let category = row.transaction.categoryName, !category.isEmpty { parts.append(category) }
+        if let description = row.transaction.description, !description.isEmpty { parts.append(description) }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
+            Image(systemName: isIncome ? "arrow.down.left" : "arrow.up.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(isIncome ? AppTheme.Colors.accent : AppTheme.Colors.textSecondary)
+                .frame(width: 20)
+                .accessibilityLabel(isIncome ? "Доход" : "Расход")
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(row.propertyName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
 
-                Text(AppFormatting.dateString(from: row.transaction.transactionDate) ?? row.transaction.transactionDate)
+                Text(detail)
                     .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textTertiary)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .lineLimit(2)
+            }
 
-                HStack(spacing: 8) {
-                    StatusBadge(status: row.transaction.type)
+            Spacer(minLength: AppTheme.Spacing.sm)
 
-                    if let category = row.transaction.categoryName, !category.isEmpty {
-                        Text(category)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
+            VStack(alignment: .trailing, spacing: 3) {
+                Text((isIncome ? "+" : "−") + AppFormatting.currency(row.transaction.amount, currency: row.transaction.currency))
+                    .font(AppTheme.Typography.moneyRow)
+                    .foregroundStyle(isIncome ? AppTheme.Colors.income : AppTheme.Colors.expense)
 
-                    if let description = row.transaction.description, !description.isEmpty {
-                        Text(description)
-                            .font(.subheadline)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                            .lineLimit(2)
-                    }
+                if row.transaction.currency.uppercased() != baseCurrency.uppercased() {
+                    Text("База \(AppFormatting.currency(row.transaction.amountBase, currency: baseCurrency))")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
             }
 
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(AppFormatting.compactAmount(row.transaction.amount, currency: row.transaction.currency))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(row.transaction.type == "income" ? AppTheme.Colors.success : AppTheme.Colors.danger)
-
-                Text("База \(AppFormatting.currency(row.transaction.amountBase, currency: baseCurrency))")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-            }
-
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(AppTheme.Colors.textTertiary)
         }
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.85))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(minHeight: 52)
+        .padding(.vertical, AppTheme.Spacing.xs)
+        .contentShape(Rectangle())
     }
 }

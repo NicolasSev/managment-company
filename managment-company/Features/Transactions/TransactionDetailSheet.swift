@@ -59,7 +59,7 @@ struct TransactionDetailSheet: View {
 
                                     Text("\(transaction.type == "income" ? "+" : "-")\(AppFormatting.currency(transaction.amount, currency: transaction.currency))")
                                         .font(.title2.weight(.semibold))
-                                        .foregroundStyle(transaction.type == "income" ? AppTheme.Colors.success : AppTheme.Colors.danger)
+                                        .foregroundStyle(transaction.type == "income" ? AppTheme.Colors.income : AppTheme.Colors.expense)
                                 }
 
                                 Spacer()

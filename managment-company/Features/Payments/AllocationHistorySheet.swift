@@ -208,7 +208,7 @@ struct AllocationHistorySheet: View {
         }
         .padding(AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private var fullRestoreSection: some View {
@@ -240,10 +240,10 @@ struct AllocationHistorySheet: View {
         .padding(AppTheme.Spacing.md)
         .background(AppTheme.Colors.danger.opacity(0.06))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
                 .stroke(AppTheme.Colors.danger.opacity(0.25))
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     // MARK: - Network
@@ -293,6 +293,6 @@ struct AllocationHistorySheet: View {
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(AppTheme.Colors.danger.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }

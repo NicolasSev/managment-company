@@ -35,9 +35,12 @@ struct TenantDetailView: View {
         .accessibilityIdentifier("tenants.detail.screen")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Редактировать") {
+                Button {
                     Task { editingTenant = await viewModel.tenantForEditing() }
+                } label: {
+                    Image(systemName: "pencil")
                 }
+                .accessibilityLabel("Редактировать")
                 .disabled(viewModel.overview == nil)
                 .accessibilityIdentifier("tenants.detail.edit")
             }
@@ -279,7 +282,7 @@ struct TenantDetailView: View {
         }
         .padding(AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
 
         if let leaseId = month.leaseId {
             LeaseNavigationLink(leaseId: leaseId, identifier: "tenants.detail.month.\(month.period)") { line }
@@ -402,7 +405,7 @@ struct TenantDetailView: View {
         }
         .padding(AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     // MARK: Pieces
@@ -432,7 +435,7 @@ struct TenantDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppTheme.Spacing.md)
             .background(AppTheme.Colors.warning.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     // MARK: Formatting

@@ -341,7 +341,7 @@ struct UtilitiesSettingsSection: View {
                     .foregroundStyle(AppTheme.Colors.accent)
                     .padding(.vertical, AppTheme.Spacing.md)
                     .padding(.horizontal, AppTheme.Spacing.md)
-                    .background(AppTheme.Colors.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(AppTheme.Colors.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.notifications.open")

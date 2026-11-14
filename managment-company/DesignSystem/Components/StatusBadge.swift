@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Meaning of a status, shared by every badge. Colour alone is not enough (grayscale,
-/// Increase Contrast), so each tone also has its own symbol.
+/// Increase Contrast), so each tone also has its own symbol. Positive and informational
+/// tones share cobalt: the palette has one chromatic accent.
 enum StatusTone: Equatable {
     case success
     case warning
@@ -17,6 +18,11 @@ enum StatusTone: Equatable {
         case .info: return AppTheme.Colors.info
         case .neutral: return AppTheme.Colors.textSecondary
         }
+    }
+
+    /// Fill behind the label: neutral stamps are outlined only.
+    var fill: Color {
+        self == .neutral ? Color.clear : color.opacity(0.1)
     }
 
     var systemImage: String {
@@ -54,18 +60,20 @@ struct StatusBadge: View {
                 .accessibilityHidden(true)
 
             Text(label)
-                .font(.caption2)
-                .fontWeight(.semibold)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(tone.color.opacity(0.14))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
         .foregroundStyle(tone.color)
-        .overlay(
-            Capsule()
-                .stroke(tone.color.opacity(0.16), lineWidth: 1)
-        )
-        .clipShape(Capsule())
+        .background(tone.fill, in: Self.shape)
+        .overlay(Self.shape.strokeBorder(tone.color.opacity(tone == .neutral ? 0.35 : 0.3), lineWidth: 1))
+        .animation(AppTheme.Motion.fast, value: tone)
+    }
+
+    /// A stamp, not a pill: small radius, hairline edge.
+    private static var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: AppTheme.Radius.stamp, style: .continuous)
     }
 
     private static func normalize(_ status: String) -> String {
@@ -109,7 +117,8 @@ struct StatusBadge: View {
         switch normalizedStatus {
         case "occupied", "completed", "done", "income", "active", "paid":
             return .success
-        case "vacant", "expense", "urgent", "cancelled", "terminated", "expired", "overdue":
+        // Red is reserved for attention: an empty unit, an expense or an ended lease is neutral.
+        case "urgent", "overdue":
             return .danger
         case "renovation", "in_progress", "pending", "todo", "high":
             return .warning

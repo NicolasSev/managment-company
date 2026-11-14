@@ -16,22 +16,26 @@ struct RegisterView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: AppTheme.Spacing.lg) {
-                        SurfaceCard {
-                            VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
-                                Text("Создайте рабочее пространство")
-                                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                            Text("Новый аккаунт")
+                                .sectionLabelStyle(AppTheme.Colors.accent)
 
-                                Text("Настройте аккаунт и переходите к объектам, задачам и аналитике.")
-                                    .font(.body)
-                                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                                    .lineSpacing(3)
-                            }
+                            Text("Создайте рабочее пространство")
+                                .font(AppTheme.Typography.masthead)
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Text("Настройте аккаунт и переходите к объектам, задачам и аналитике.")
+                                .font(.body)
+                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                                .lineSpacing(3)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, AppTheme.Spacing.xs)
 
                         SurfaceCard {
                             VStack(spacing: AppTheme.Spacing.md) {
-                                AppTextField(title: "Имя", text: $name, placeholder: "Alex Morgan")
+                                AppTextField(title: "Имя", text: $name, placeholder: "Как к вам обращаться", contentType: .name)
                                 AppTextField(
                                     title: "Email",
                                     text: $email,
@@ -39,10 +43,16 @@ struct RegisterView: View {
                                     keyboardType: .emailAddress,
                                     autocapitalization: .never
                                 )
-                                passwordField
+                                AppTextField(
+                                    title: "Пароль",
+                                    text: $password,
+                                    placeholder: "Придумайте пароль",
+                                    isSecure: true,
+                                    contentType: .newPassword
+                                )
 
                                 if let msg = errorMessage {
-                                    Text(msg)
+                                    Label(msg, systemImage: "exclamationmark.circle")
                                         .font(.footnote)
                                         .foregroundStyle(AppTheme.Colors.danger)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -53,7 +63,7 @@ struct RegisterView: View {
                                     action: { Task { await doRegister() } },
                                     isLoading: isLoading,
                                     isDisabled: email.isEmpty || password.isEmpty,
-                                    systemImage: "person.crop.circle.badge.plus"
+                                    systemImage: "arrow.right"
                                 )
                             }
                         }
@@ -72,33 +82,6 @@ struct RegisterView: View {
         }
     }
 
-    private var passwordField: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Text("Пароль")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .textCase(.uppercase)
-                .tracking(1.2)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-
-            SecureField("Придумайте пароль", text: $password)
-                .textFieldStyle(.plain)
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .tint(AppTheme.Colors.accent)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.md)
-                .background(Color.white.opacity(0.82))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppTheme.Colors.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.04), radius: 16, x: 0, y: 10)
-        }
-    }
-    
     private func doRegister() async {
         isLoading = true
         errorMessage = nil

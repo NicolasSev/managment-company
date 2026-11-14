@@ -52,7 +52,7 @@ struct LandlordProfileView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(AppTheme.Spacing.md)
                         .background(AppTheme.Colors.warning.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                         .accessibilityIdentifier("settings.landlord.missing_banner")
                 }
 
@@ -117,7 +117,7 @@ struct LandlordProfileView: View {
         }
         .padding(highlighted ? AppTheme.Spacing.sm : 0)
         .background(highlighted ? AppTheme.Colors.danger.opacity(0.08) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous))
     }
 
     private var genderView: some View {
@@ -150,7 +150,7 @@ struct LandlordProfileView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppTheme.Spacing.md)
             .background(color.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
             .accessibilityIdentifier(identifier)
     }
 

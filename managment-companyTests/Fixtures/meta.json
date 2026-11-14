@@ -266,6 +266,22 @@
         }
       },
       {
+        "code": "period_mismatch",
+        "labels": {
+          "ru": "Период в документе не совпадает с указанным",
+          "kk": "Құжаттағы кезең көрсетілгенмен сәйкес келмейді",
+          "en": "The period in the document differs from the one given"
+        }
+      },
+      {
+        "code": "not_utility_document",
+        "labels": {
+          "ru": "Это не квитанция за коммунальные услуги",
+          "kk": "Бұл коммуналдық қызмет түбіртегі емес",
+          "en": "Not a utility document"
+        }
+      },
+      {
         "code": "missing",
         "labels": {
           "ru": "Поле не найдено в документе",

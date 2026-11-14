@@ -29,22 +29,28 @@ struct MoneyHubView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Раздел денег", selection: $segment) {
-                    ForEach(MoneySegment.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
+                SlidingSegmentedControl(
+                    items: MoneySegment.allCases,
+                    title: { $0.title },
+                    selection: $segment
+                )
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.top, AppTheme.Spacing.sm)
+                .padding(.top, AppTheme.Spacing.xs)
+                .padding(.bottom, AppTheme.Spacing.sm)
 
-                switch segment {
-                case .payments:
-                    PaymentsQueueView(authManager: authManager, embedded: true)
-                case .operations:
-                    TransactionsListView(embedded: true)
-                case .personal:
-                    PersonalFinanceView(embedded: true)
+                Group {
+                    switch segment {
+                    case .payments:
+                        PaymentsQueueView(authManager: authManager, embedded: true)
+                    case .operations:
+                        TransactionsListView(embedded: true)
+                    case .personal:
+                        PersonalFinanceView(embedded: true)
+                    }
                 }
+                .transition(.opacity)
             }
+            .background { AppScreenBackground() }
         }
         .onChange(of: notificationRouter.pendingRoute) { _, route in
             // A transaction deep link should land on the operations ledger.

@@ -28,7 +28,7 @@ struct PersonalFinanceView: View {
 
     private var content: some View {
         ZStack {
-            AppScreenBackground()
+            if !embedded { AppScreenBackground() }
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: AppTheme.Spacing.lg) {
@@ -42,7 +42,7 @@ struct PersonalFinanceView: View {
                 .padding(.vertical, AppTheme.Spacing.lg)
             }
         }
-        .navigationTitle("Личные финансы")
+        .navigationTitle(embedded ? "Деньги" : "Личные финансы")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -109,7 +109,7 @@ struct PersonalFinanceView: View {
                             .padding(.vertical, AppTheme.Spacing.sm)
                             .background(AppTheme.Colors.accent.opacity(0.1))
                             .foregroundStyle(AppTheme.Colors.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -208,10 +208,10 @@ struct PersonalFinanceView: View {
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.md)
-                .background(Color.white.opacity(0.82))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(AppTheme.Colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
                         .stroke(AppTheme.Colors.border, lineWidth: 1)
                 )
             }
@@ -269,8 +269,8 @@ struct PersonalFinanceView: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.horizontal, AppTheme.Spacing.xs)
                 .background(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.accent.opacity(0.1))
-                .foregroundStyle(isSelected ? .white : AppTheme.Colors.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .foregroundStyle(isSelected ? AppTheme.Colors.onAccent : AppTheme.Colors.accent)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -287,7 +287,7 @@ struct PersonalFinanceView: View {
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }
 

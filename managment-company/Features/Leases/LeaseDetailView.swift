@@ -192,7 +192,7 @@ struct LeaseDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppTheme.Spacing.md)
             .background(AppTheme.Colors.warning.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
             .accessibilityIdentifier("lease.detail.banner")
     }
 
@@ -388,7 +388,7 @@ struct LeaseDetailView: View {
         }
         .padding(AppTheme.Spacing.sm)
         .background(AppTheme.Colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lease.detail.charge.\(key)")
     }
@@ -492,7 +492,7 @@ struct LeaseDetailView: View {
         }
         .padding(AppTheme.Spacing.sm)
         .background(AppTheme.Colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lease.detail.payment.\(payment.id)")
     }
@@ -575,7 +575,7 @@ struct LeaseDetailView: View {
                             .padding(.vertical, AppTheme.Spacing.md)
                             .background(AppTheme.Colors.accent.opacity(0.12))
                             .foregroundStyle(AppTheme.Colors.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("lease.detail.deposit.return")

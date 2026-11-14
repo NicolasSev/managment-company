@@ -17,6 +17,8 @@ struct TenantsListView: View {
     @State private var showCreateSheet = false
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @Namespace private var zoomNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var filteredTenants: [Tenant] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -85,6 +87,7 @@ struct TenantsListView: View {
             }
             .navigationTitle("Арендаторы")
             .accessibilityIdentifier("tenants.list.screen")
+            .searchable(text: $searchText, prompt: "Имя, телефон, email или заметка")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -110,8 +113,27 @@ struct TenantsListView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading && tenants.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                    summarySection
+                    ForEach(0..<3, id: \.self) { _ in
+                        SurfaceCard(padding: AppTheme.Spacing.md) {
+                            HStack(spacing: AppTheme.Spacing.md) {
+                                RoundedRectangle(cornerRadius: 6).fill(AppTheme.Colors.backgroundSecondary)
+                                    .frame(width: 44, height: 44)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Имя арендатора").font(.headline)
+                                    Text("Телефон и почта").font(.caption)
+                                }
+                            }
+                        }
+                    }
+                }
+                .shimmerPlaceholder(true)
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.top, AppTheme.Spacing.sm)
+            }
+            .accessibilityLabel("Загружаем арендаторов")
         } else if let errorMessage, tenants.isEmpty {
             EmptyStateView(
                 title: "Арендаторы недоступны",
@@ -122,9 +144,8 @@ struct TenantsListView: View {
             )
         } else {
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                     summarySection
-                    searchSection
 
                     if let errorMessage {
                         statusBanner(errorMessage)
@@ -149,7 +170,12 @@ struct TenantsListView: View {
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
+                .padding(.top, AppTheme.Spacing.sm)
+                .padding(.bottom, AppTheme.Spacing.xxl + AppTheme.Spacing.xl)
+                .animation(
+                    AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                    value: filteredTenants.map(\.id)
+                )
             }
         }
     }
@@ -157,33 +183,18 @@ struct TenantsListView: View {
     private var summarySection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                Text("Директория арендаторов")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                Text("Директория")
+                    .sectionLabelStyle()
 
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    metricCard(title: "Всего", value: "\(tenants.count)")
-                    metricCard(title: "С почтой", value: "\(tenants.filter { $0.email?.isEmpty == false }.count)")
-                    metricCard(title: "Контакты", value: "\(contactCoverage)%")
+                HStack(spacing: 0) {
+                    MetricTile(title: "Всего", value: "\(tenants.count)")
+                    MetricTile(
+                        title: "Заселены",
+                        value: "\(Set(leases.filter { $0.status.lowercased() == "active" }.map(\.tenantId)).count)",
+                        tint: AppTheme.Colors.accent
+                    )
+                    MetricTile(title: "Контакты", value: "\(contactCoverage)%")
                 }
-
-                PrimaryButton(
-                    title: "Добавить арендатора",
-                    action: { showCreateSheet = true },
-                    systemImage: "plus"
-                )
-            }
-        }
-    }
-
-    private var searchSection: some View {
-        SurfaceCard(padding: AppTheme.Spacing.md) {
-            HStack(spacing: AppTheme.Spacing.sm) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                TextField("Поиск по имени, email, телефону или заметкам", text: $searchText)
-                    .textInputAutocapitalization(.never)
-                    .disableAutocorrection(true)
             }
         }
     }
@@ -195,6 +206,7 @@ struct TenantsListView: View {
                     tenantGroupSection(
                         title: group.property.name,
                         subtitle: "\(group.cards.count) арендат.",
+                        property: group.property,
                         cards: group.cards
                     )
                 }
@@ -204,132 +216,156 @@ struct TenantsListView: View {
                 tenantGroupSection(
                     title: "Не заселены",
                     subtitle: "\(unassignedCards.count) арендат.",
+                    property: nil,
                     cards: unassignedCards
                 )
             }
         }
     }
 
-    private func tenantGroupSection(title: String, subtitle: String, cards: [TenantLeaseCard]) -> some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.headline)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-                    Spacer()
+    private func tenantGroupSection(
+        title: String,
+        subtitle: String,
+        property: Property?,
+        cards: [TenantLeaseCard]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            HStack(alignment: .bottom, spacing: AppTheme.Spacing.sm) {
+                if let property {
+                    PropertyGlyph(property: property, height: 36)
                 }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(subtitle)
+                        .sectionLabelStyle()
+                }
+                Spacer()
+            }
+            .padding(.horizontal, AppTheme.Spacing.xs)
 
-                LazyVStack(spacing: AppTheme.Spacing.sm) {
-                    ForEach(cards) { card in
-                        NavigationLink {
-                            TenantDetailView(tenantId: card.tenant.id, authManager: authManager) {
-                                await loadData()
-                            }
-                            .environmentObject(authManager)
-                        } label: {
-                            tenantCard(card)
+            LazyVStack(spacing: AppTheme.Spacing.sm) {
+                ForEach(cards) { card in
+                    NavigationLink {
+                        TenantDetailView(tenantId: card.tenant.id, authManager: authManager) {
+                            await loadData()
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("tenants.row.\(card.tenant.id)")
+                        .environmentObject(authManager)
+                        .navigationTransition(.zoom(sourceID: card.id, in: zoomNamespace))
+                    } label: {
+                        tenantCard(card)
                     }
+                    .buttonStyle(.plain)
+                    .matchedTransitionSource(id: card.id, in: zoomNamespace)
+                    .accessibilityIdentifier("tenants.row.\(card.tenant.id)")
                 }
             }
         }
     }
 
     private func tenantCard(_ card: TenantLeaseCard) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(card.tenant.displayName.isEmpty ? "Без имени" : card.tenant.displayName)
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
+        let contacts = [card.tenant.phone, card.tenant.email]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return SurfaceCard(padding: AppTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                    Text(Self.initials(of: card.tenant.displayName))
+                        .font(.system(.subheadline, weight: .medium).width(.expanded))
+                        .foregroundStyle(AppTheme.Colors.accent)
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: AppTheme.Radius.stamp, style: .continuous)
+                                .strokeBorder(AppTheme.Colors.accent.opacity(0.45), lineWidth: 1)
+                        )
+                        .accessibilityHidden(true)
 
-                    Text(card.tenant.notes?.isEmpty == false ? card.tenant.notes! : "Заметок пока нет")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(card.tenant.displayName.isEmpty ? "Без имени" : card.tenant.displayName)
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                        Text(contacts.isEmpty ? "Контакты не указаны" : contacts.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                            .lineLimit(1)
+
+                        if let cohabitants = card.tenant.cohabitants, !cohabitants.isEmpty {
+                            Label(cohabitants, systemImage: "person.2")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                                .lineLimit(1)
+                        }
+                        if let notes = card.tenant.notes, !notes.isEmpty {
+                            Text(notes)
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.Colors.textTertiary)
+                                .lineLimit(2)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+
+                    if let lease = card.lease {
+                        StatusBadge(status: lease.status)
+                    } else {
+                        Image(systemName: "arrow.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.accent)
+                    }
                 }
-
-                Spacer()
 
                 if let lease = card.lease {
-                    StatusBadge(status: lease.status)
-                }
-            }
+                    HStack(spacing: 0) {
+                        MetricTile(
+                            title: "Аренда",
+                            value: AppFormatting.currency(lease.rentAmount, currency: lease.rentCurrency)
+                        )
+                        MetricTile(
+                            title: "Заезд",
+                            value: AppFormatting.dateString(from: lease.moveInDate ?? lease.startDate) ?? lease.startDate
+                        )
+                        MetricTile(
+                            title: "Оплата",
+                            value: paymentWindow(lease)
+                        )
+                    }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Label(card.tenant.phone?.isEmpty == false ? card.tenant.phone! : "Телефон не указан", systemImage: "phone")
-                Label(card.tenant.email?.isEmpty == false ? card.tenant.email! : "Почта не указана", systemImage: "envelope")
-                Label(card.tenant.cohabitants?.isEmpty == false ? card.tenant.cohabitants! : "Состав проживающих не указан", systemImage: "person.2")
-            }
-            .font(.caption)
-            .foregroundStyle(AppTheme.Colors.textSecondary)
-
-            if let lease = card.lease {
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    metricCard(
-                        title: "Аренда",
-                        value: AppFormatting.compactAmount(lease.rentAmount, currency: lease.rentCurrency)
-                    )
-                    metricCard(
-                        title: "Заезд",
-                        value: AppFormatting.dateString(from: lease.moveInDate ?? lease.startDate) ?? lease.startDate
-                    )
-                    metricCard(
-                        title: "Оплата",
-                        value: paymentWindow(lease)
-                    )
+                    if isLeaseEarlyMoveOut(lease) {
+                        Label("Выехал раньше срока", systemImage: "exclamationmark.triangle")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.warning)
+                    }
+                } else {
+                    Text("Этот арендатор пока не привязан к объекту.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
-
-                if isLeaseEarlyMoveOut(lease) {
-                    Label("Выехал раньше срока", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.warning)
-                }
-            } else {
-                Text("Этот арендатор пока не привязан к объекту.")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
             }
         }
-        .padding(AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(Rectangle())
     }
 
-    private func metricCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.sm)
-        .background(Color.white.opacity(0.58))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    private static func initials(of name: String) -> String {
+        let letters = name
+            .split(separator: " ")
+            .prefix(2)
+            .compactMap { $0.first }
+            .map { String($0).uppercased() }
+        return letters.isEmpty ? "—" : letters.joined()
     }
 
     private func statusBanner(_ message: String) -> some View {
-        Text(message)
+        Label(message, systemImage: "exclamationmark.triangle")
             .font(.footnote.weight(.medium))
             .foregroundStyle(AppTheme.Colors.warning)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppTheme.Spacing.md)
             .background(AppTheme.Colors.warning.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     @MainActor
@@ -377,7 +413,7 @@ struct TenantsListView: View {
     private func paymentWindow(_ lease: Lease) -> String {
         let start = lease.paymentWindowStartDay ?? lease.paymentDay ?? 1
         let end = lease.paymentWindowEndDay ?? lease.paymentDueDay ?? lease.paymentDay ?? start
-        return "\(start)-\(end)"
+        return start == end ? "\(start) числа" : "\(start)–\(end)"
     }
 
     private func isLeaseEarlyMoveOut(_ lease: Lease) -> Bool {

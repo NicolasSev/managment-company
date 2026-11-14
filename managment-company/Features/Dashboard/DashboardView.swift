@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 import UIKit
 
@@ -18,6 +19,8 @@ struct DashboardView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject private var rentPreviewRouter: RentPreviewRouter
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismiss) private var dismiss
 
     enum Period: String, CaseIterable, Identifiable {
         case all, month, season, quarter, year
@@ -31,6 +34,8 @@ struct DashboardView: View {
             case .year: return "Год"
             }
         }
+        /// Label that fits a five-segment control.
+        var shortTitle: String { self == .all ? "Всё" : title }
     }
 
     @State private var period: Period = .month
@@ -193,8 +198,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading && dashboard == nil {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingSkeleton
         } else if let errorMessage, dashboard == nil {
             EmptyStateView(
                 title: "Дашборд недоступен",
@@ -205,16 +209,15 @@ struct DashboardView: View {
             )
         } else {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: AppTheme.Spacing.lg) {
-                    periodSelector
+                VStack(spacing: AppTheme.Spacing.md) {
+                    masthead
                     if let errorMessage { infoBanner(errorMessage) }
                     kpiSection
-                    occupancySection
-                    analyticsControls
                     if let overdue { overdueSection(overdue) }
                     if let cashflowTrend, !cashflowTrend.months.isEmpty {
                         cashflowSection(cashflowTrend)
                     }
+                    analyticsControls
                     if !profitabilityTotals.isEmpty {
                         profitabilitySection
                     }
@@ -230,30 +233,37 @@ struct DashboardView: View {
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
+                .padding(.top, AppTheme.Spacing.sm)
+                .padding(.bottom, AppTheme.Spacing.xl)
             }
         }
+    }
+
+    /// Skeleton in the shape of the loaded screen: masthead and the four figure tiles.
+    private var loadingSkeleton: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: AppTheme.Spacing.md) {
+                masthead
+                kpiSection
+            }
+            .shimmerPlaceholder(true)
+            .padding(.horizontal, AppTheme.Spacing.md)
+            .padding(.top, AppTheme.Spacing.sm)
+        }
+        .accessibilityLabel("Загружаем дашборд")
     }
 
     private var notificationButton: some View {
         Button {
             showNotifications = true
         } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                if notificationUnreadCount > 0 {
-                    Text(notificationUnreadCount > 99 ? "99+" : "\(notificationUnreadCount)")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(AppTheme.Colors.danger.clipShape(Capsule()))
-                        .offset(x: 10, y: -10)
-                }
-            }
-            .frame(minWidth: 36, minHeight: 36)
+            Image(systemName: notificationUnreadCount > 0 ? "bell.badge" : "bell")
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(
+                    notificationUnreadCount > 0 ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary,
+                    AppTheme.Colors.textPrimary
+                )
+                .contentTransition(.symbolEffect(.replace))
         }
         .accessibilityLabel(
             notificationUnreadCount > 0
@@ -276,23 +286,53 @@ struct DashboardView: View {
             }
         } label: {
             Image(systemName: "square.and.arrow.up")
-                .foregroundStyle(AppTheme.Colors.textPrimary)
         }
         .disabled(profitabilityReport == nil)
         .accessibilityLabel("Экспорт аналитики")
     }
 
-    private var periodSelector: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("Период сводки")
-                    .font(.caption.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(1.2)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
+    // MARK: - Masthead
+
+    /// Hero of the screen: net cashflow of the period above the portfolio drawn as a street.
+    private var masthead: some View {
+        let net = dashboard?.netCashflow ?? 0
+        return SurfaceCard {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Чистый cashflow")
+                        .sectionLabelStyle()
+                    Spacer()
+                    Text(dashboard?.periodLabel ?? period.title)
+                        .sectionLabelStyle(AppTheme.Colors.accent)
+                }
+
+                Text(money(net))
+                    .font(AppTheme.Typography.masthead)
+                    .monospacedDigit()
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .contentTransition(reduceMotion ? .opacity : .numericText(value: net))
+                    .animation(AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion), value: net)
+
+                if !properties.isEmpty {
+                    IsometricStreet(buildings: properties.map(IsometricBuildingSpec.init(property:)), height: 92)
+                        .padding(.top, AppTheme.Spacing.xs)
+                }
+
+                HStack(spacing: 0) {
+                    MetricTile(title: "Занято", value: "\(occupancy?.occupied ?? 0)", tint: AppTheme.Colors.accent)
+                    MetricTile(title: "Всего", value: "\(occupancy?.total ?? 0)")
+                    MetricTile(title: "Доля", value: "\(occupancy?.ratePct ?? 0)%")
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(
+                    "Заселённость: занято \(occupancy?.occupied ?? 0) из \(occupancy?.total ?? 0)"
+                )
+
                 Picker("Период", selection: $period) {
                     ForEach(Period.allCases) { option in
-                        Text(option.title).tag(option)
+                        Text(option.shortTitle).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -303,68 +343,55 @@ struct DashboardView: View {
     private var kpiSection: some View {
         let d = dashboard
         return LazyVGrid(
-            columns: [GridItem(.flexible()), GridItem(.flexible())],
-            spacing: AppTheme.Spacing.md
+            columns: [
+                GridItem(.flexible(), spacing: AppTheme.Spacing.sm),
+                GridItem(.flexible(), spacing: AppTheme.Spacing.sm)
+            ],
+            spacing: AppTheme.Spacing.sm
         ) {
             KPICard(
                 title: "Полученный доход",
                 value: money(d?.totalIncome ?? 0),
-                icon: "arrow.down.circle",
-                color: AppTheme.Colors.success,
+                icon: "arrow.down.left",
+                color: AppTheme.Colors.accent,
                 subtitle: d.map { "Депозиты: \(money($0.depositIncome))" } ?? " "
             )
             KPICard(
                 title: "Расходы",
                 value: money(d?.totalExpense ?? 0),
-                icon: "arrow.up.circle",
-                color: AppTheme.Colors.danger,
+                icon: "arrow.up.right",
+                color: AppTheme.Colors.textSecondary,
                 subtitle: "Операционные траты владельца."
             )
             KPICard(
                 title: "Аренда к получению",
                 value: money(d?.rentOutstanding ?? 0),
-                icon: "banknote",
+                icon: (d?.rentOutstanding ?? 0) > 0 ? "clock" : "checkmark",
                 color: (d?.rentOutstanding ?? 0) > 0
                     ? AppTheme.Colors.warning
-                    : AppTheme.Colors.success,
+                    : AppTheme.Colors.accent,
                 subtitle: d.map {
                     "Начислено \(money($0.expectedRent)), оплачено \(money($0.rentReceived))."
                 } ?? " "
             )
             KPICard(
-                title: "Чистый cashflow",
-                value: money(d?.netCashflow ?? 0),
-                icon: "chart.line.uptrend.xyaxis",
-                color: (d?.netCashflow ?? 0) >= 0
-                    ? AppTheme.Colors.success
-                    : AppTheme.Colors.danger,
-                subtitle: d?.periodLabel ?? period.title
+                title: "Оплачено аренды",
+                value: money(d?.rentReceived ?? 0),
+                icon: "banknote",
+                color: AppTheme.Colors.accent,
+                subtitle: d.map { "Из начисленных \(money($0.expectedRent))." } ?? " "
             )
         }
-    }
-
-    private var occupancySection: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading("Заселенность", subtitle: "Занятые объекты портфеля.")
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    metric(title: "Занято", value: "\(occupancy?.occupied ?? 0)")
-                    metric(title: "Всего", value: "\(occupancy?.total ?? 0)")
-                    metric(title: "Доля", value: "\(occupancy?.ratePct ?? 0)%")
-                }
-            }
-        }
+        .animation(AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion), value: dashboard?.totalIncome)
     }
 
     private var analyticsControls: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                HStack {
-                    sectionHeading(
-                        "Аналитика прибыльности",
-                        subtitle: "Диапазон и группировка применяются ко всем строкам ниже."
-                    )
-                    Spacer()
+                SectionHeader(
+                    title: "Аналитика прибыльности",
+                    subtitle: "Диапазон и группировка применяются ко всем строкам ниже."
+                ) {
                     if isAnalyticsLoading { ProgressView().controlSize(.small) }
                 }
                 Picker("Диапазон", selection: $analyticsRange) {
@@ -373,98 +400,162 @@ struct DashboardView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                Picker("Группировка", selection: $analyticsGroup) {
-                    ForEach(DashboardAnalyticsGroup.allCases) { option in
-                        Text(option.title).tag(option)
+                HStack {
+                    Text("Группировка")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                    Spacer()
+                    Picker("Группировка", selection: $analyticsGroup) {
+                        ForEach(DashboardAnalyticsGroup.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
                     }
+                    .pickerStyle(.menu)
                 }
-                .pickerStyle(.menu)
             }
         }
     }
 
     private func overdueSection(_ payload: OverduePaymentsPayload) -> some View {
-        SurfaceCard {
-            HStack(spacing: AppTheme.Spacing.md) {
-                Image(systemName: payload.overdueCount > 0 ? "clock.badge.exclamationmark" : "checkmark.circle")
-                    .font(.title2)
-                    .foregroundStyle(payload.overdueCount > 0 ? AppTheme.Colors.warning : AppTheme.Colors.success)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Просроченные платежи")
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                    Text(payload.overdueCount == 0
-                         ? "Просроченных начислений нет."
-                         : "Требуют внимания: \(payload.overdueCount)")
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
+        let hasOverdue = payload.overdueCount > 0
+        return Button {
+            notificationRouter.selectTab = .payments
+            dismiss()
+        } label: {
+            SurfaceCard(padding: AppTheme.Spacing.md) {
+                HStack(spacing: AppTheme.Spacing.md) {
+                    Text("\(payload.overdueCount)")
+                        .font(AppTheme.Typography.masthead)
+                        .monospacedDigit()
+                        .foregroundStyle(hasOverdue ? AppTheme.Colors.danger : AppTheme.Colors.accent)
+                        .contentTransition(.numericText())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Просроченные платежи")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                        Text(hasOverdue
+                             ? "Требуют внимания. Открыть очередь."
+                             : "Просроченных начислений нет.")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    if hasOverdue {
+                        Image(systemName: "arrow.right")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.danger)
+                    } else {
+                        Image(systemName: "checkmark")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.Colors.accent)
+                    }
                 }
-                Spacer()
-                Text("\(payload.overdueCount)")
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(payload.overdueCount > 0 ? AppTheme.Colors.warning : AppTheme.Colors.success)
             }
         }
+        .buttonStyle(.plain)
+        .disabled(!hasOverdue)
+        .accessibilityElement(children: .combine)
     }
 
     private func cashflowSection(_ trend: CashflowTrendBody) -> some View {
-        SurfaceCard {
+        let months = Array(trend.months.suffix(12))
+        return SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading("Cashflow за 12 месяцев", subtitle: "Последние доступные месяцы.")
-                ForEach(Array(trend.months.suffix(6).reversed())) { month in
-                    HStack {
-                        Text(monthLabel(year: month.year, month: month.month))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(money(month.netCashflow))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(month.netCashflow >= 0
-                                                 ? AppTheme.Colors.success
-                                                 : AppTheme.Colors.danger)
-                            Text("\(money(month.totalIncome)) доход · \(money(month.totalExpense)) расход")
-                                .font(.caption2)
-                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                SectionHeader(title: "Cashflow за 12 месяцев", subtitle: nil) {
+                    HStack(spacing: AppTheme.Spacing.md) {
+                        legendMark("Доход", color: AppTheme.Colors.accent)
+                        legendMark("Расход", color: AppTheme.Colors.textTertiary)
+                    }
+                }
+
+                ChartDrawIn { factor in
+                    Chart {
+                        ForEach(months) { month in
+                            BarMark(
+                                x: .value("Месяц", Self.shortMonth(month.month)),
+                                y: .value("Доход", month.totalIncome * factor),
+                                width: .ratio(0.5)
+                            )
+                            .foregroundStyle(AppTheme.Colors.accent)
+                            .cornerRadius(1.5)
+                            BarMark(
+                                x: .value("Месяц", Self.shortMonth(month.month)),
+                                y: .value("Расход", -month.totalExpense * factor),
+                                width: .ratio(0.5)
+                            )
+                            .foregroundStyle(AppTheme.Colors.textTertiary.opacity(0.75))
+                            .cornerRadius(1.5)
+                        }
+                        RuleMark(y: .value("Ноль", 0))
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                            .foregroundStyle(AppTheme.Colors.textSecondary.opacity(0.6))
+                    }
+                    .blueprintChartAxes(xLabelStride: months.count > 8 ? 2 : 1) { BlueprintChartFormat.compact($0) }
+                    .frame(height: 170)
+                }
+                .accessibilityLabel("График дохода и расхода по месяцам")
+
+                VStack(spacing: 0) {
+                    ForEach(Array(months.suffix(6).reversed())) { month in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(monthLabel(year: month.year, month: month.month))
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.Colors.textPrimary)
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(money(month.netCashflow))
+                                    .font(AppTheme.Typography.moneyRow)
+                                    .foregroundStyle(AppTheme.Colors.amount(month.netCashflow))
+                                Text("\(money(month.totalIncome)) доход · \(money(month.totalExpense)) расход")
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                            }
+                        }
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                        .overlay(alignment: .top) {
+                            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
                         }
                     }
-                    .padding(.vertical, AppTheme.Spacing.xs)
                 }
             }
         }
     }
 
     private var profitabilitySection: some View {
-        SurfaceCard {
+        let rows = Array(profitabilityTotals.suffix(8).reversed())
+        let maximum = rows.map { abs($0.netCashflow) }.max() ?? 0
+        return SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading("Прибыльность по периодам", subtitle: "Доход, расход и чистый поток.")
-                ForEach(Array(profitabilityTotals.suffix(8).reversed()), id: \.periodKey) { row in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(row.periodLabel.isEmpty ? row.periodKey : row.periodLabel)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                        Spacer(minLength: 8)
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(money(row.netCashflow))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(row.netCashflow >= 0
-                                                 ? AppTheme.Colors.success
-                                                 : AppTheme.Colors.danger)
+                SectionHeader("Прибыльность по периодам", subtitle: "Доход, расход и чистый поток.")
+                VStack(spacing: AppTheme.Spacing.md) {
+                    ForEach(rows, id: \.periodKey) { row in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(row.periodLabel.isEmpty ? row.periodKey : row.periodLabel)
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                                Spacer(minLength: 8)
+                                Text(money(row.netCashflow))
+                                    .font(AppTheme.Typography.moneyRow)
+                                    .foregroundStyle(AppTheme.Colors.amount(row.netCashflow))
+                            }
+                            ProportionBar(value: row.netCashflow, maximum: maximum)
                             Text("\(money(row.totalIncome)) доход · \(money(row.totalExpense)) расход")
-                                .font(.caption2)
+                                .font(.caption2.monospacedDigit())
                                 .foregroundStyle(AppTheme.Colors.textSecondary)
                         }
+                        .accessibilityElement(children: .combine)
                     }
-                    .padding(.vertical, AppTheme.Spacing.xs)
                 }
             }
         }
     }
 
     private var comparisonSection: some View {
-        SurfaceCard {
+        let maximum = comparisonRows.map { abs($0.netCashflow) }.max() ?? 0
+        return SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading("Сравнение объектов", subtitle: "Нажмите объект, чтобы включить или исключить его.")
+                SectionHeader("Сравнение объектов", subtitle: "Нажмите объект, чтобы включить или исключить его.")
                 if !properties.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: AppTheme.Spacing.sm) {
@@ -472,48 +563,64 @@ struct DashboardView: View {
                                 let selected = selectedPropertyIds.isEmpty
                                     || selectedPropertyIds.contains(property.id)
                                 Button {
-                                    toggleProperty(property.id)
+                                    withAnimation(AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion)) {
+                                        toggleProperty(property.id)
+                                    }
                                 } label: {
                                     Label(
                                         property.name,
-                                        systemImage: selected ? "checkmark.circle.fill" : "circle"
+                                        systemImage: selected ? "checkmark" : "plus"
                                     )
                                     .font(.caption.weight(.medium))
                                     .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
+                                    .frame(minHeight: 36)
                                     .foregroundStyle(selected
                                                      ? AppTheme.Colors.accent
                                                      : AppTheme.Colors.textSecondary)
-                                    .background(AppTheme.Colors.backgroundSecondary.opacity(0.85))
-                                    .clipShape(Capsule())
+                                    .background(
+                                        selected ? AppTheme.Colors.accent.opacity(0.08) : Color.clear,
+                                        in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+                                            .strokeBorder(
+                                                selected ? AppTheme.Colors.accent.opacity(0.4) : AppTheme.Colors.border,
+                                                lineWidth: 1
+                                            )
+                                    )
+                                    .contentTransition(.symbolEffect(.replace))
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityAddTraits(selected ? .isSelected : [])
                             }
                         }
                     }
                 }
-                ForEach(comparisonRows) { row in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(row.propertyName)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppTheme.Colors.textPrimary)
-                            Spacer()
-                            Text(money(row.netCashflow))
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(row.netCashflow >= 0
-                                                 ? AppTheme.Colors.success
-                                                 : AppTheme.Colors.danger)
+                VStack(spacing: AppTheme.Spacing.md) {
+                    ForEach(comparisonRows) { row in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(row.propertyName)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(money(row.netCashflow))
+                                    .font(AppTheme.Typography.moneyRow)
+                                    .foregroundStyle(AppTheme.Colors.amount(row.netCashflow))
+                            }
+                            ProportionBar(value: row.netCashflow, maximum: maximum)
+                            Text(
+                                "\(money(row.income)) доход · "
+                                + "\(money(row.operatingCost)) расходы · "
+                                + "\(money(row.utilityExpense)) ком. услуги"
+                            )
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
                         }
-                        Text(
-                            "\(money(row.income)) доход · "
-                            + "\(money(row.operatingCost)) расходы · "
-                            + "\(money(row.utilityExpense)) ком. услуги"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .accessibilityElement(children: .combine)
+                        .transition(.opacity)
                     }
-                    .padding(.vertical, AppTheme.Spacing.xs)
                 }
             }
         }
@@ -522,14 +629,14 @@ struct DashboardView: View {
     private var recentTransactionsSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading(
+                SectionHeader(
                     "Последние операции",
                     subtitle: "Движение денег по всему портфелю."
                 )
 
                 if recentTransactionsLoadFailed {
                     HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "exclamationmark.triangle")
                             .foregroundStyle(AppTheme.Colors.warning)
                         Text(
                             recentTransactions.isEmpty
@@ -541,36 +648,40 @@ struct DashboardView: View {
                     }
                     .padding(AppTheme.Spacing.sm)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.Colors.warning.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(AppTheme.Colors.warning.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                 }
 
                 if recentTransactions.isEmpty, !recentTransactionsLoadFailed {
                     Text("Операций пока нет.")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, AppTheme.Spacing.lg)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, AppTheme.Spacing.sm)
                 } else {
-                    ForEach(visibleRecentTransactions) { row in
-                        Button {
-                            notificationRouter.open(
-                                NotificationRoute(kind: .transaction(row.id))
-                            )
-                        } label: {
-                            recentTransactionRow(row)
-                        }
-                        .buttonStyle(.plain)
+                    VStack(spacing: 0) {
+                        ForEach(visibleRecentTransactions) { row in
+                            Button {
+                                notificationRouter.open(
+                                    NotificationRoute(kind: .transaction(row.id))
+                                )
+                            } label: {
+                                recentTransactionRow(row)
+                            }
+                            .buttonStyle(.plain)
 
-                        if row.id != visibleRecentTransactions.last?.id {
-                            Divider()
+                            if row.id != visibleRecentTransactions.last?.id {
+                                Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+                            }
                         }
                     }
                 }
 
                 if let recentTransactionsAction {
                     Button {
-                        handleRecentTransactionsAction(recentTransactionsAction)
+                        withAnimation(AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion)) {
+                            handleRecentTransactionsAction(recentTransactionsAction)
+                        }
                     } label: {
                         Label(
                             recentTransactionsAction == .expand
@@ -580,11 +691,8 @@ struct DashboardView: View {
                                 ? "chevron.down"
                                 : "arrow.right"
                         )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(AppTheme.Colors.accent)
+                    .buttonStyle(QuietActionButtonStyle())
                 }
             }
         }
@@ -594,54 +702,55 @@ struct DashboardView: View {
         _ row: DashboardRecentTransactionRow
     ) -> some View {
         HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
-            VStack(alignment: .leading, spacing: 4) {
+            Image(systemName: row.isIncome ? "arrow.down.left" : "arrow.up.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(row.isIncome ? AppTheme.Colors.accent : AppTheme.Colors.textSecondary)
+                .frame(width: 20)
+                .accessibilityLabel(row.isIncome ? "Доход" : "Расход")
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(row.propertyName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
                     .lineLimit(1)
 
-                HStack(spacing: 4) {
-                    Text(
-                        AppFormatting.dateString(
-                            from: row.transactionDate,
-                            dateStyle: .medium,
-                            timeStyle: DateFormatter.Style.none
-                        ) ?? row.transactionDate
-                    )
-                    if let category = row.categoryName?
-                        .trimmingCharacters(in: .whitespacesAndNewlines),
-                       !category.isEmpty {
-                        Text("· \(category)")
-                            .lineLimit(1)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                    }
-                    if let description = row.description?
-                        .trimmingCharacters(in: .whitespacesAndNewlines),
-                       !description.isEmpty {
-                        Text("· \(description)")
-                            .lineLimit(1)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
+                Text(Self.recentDetail(row))
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: AppTheme.Spacing.sm)
 
-            VStack(alignment: .trailing, spacing: 6) {
-                StatusBadge(status: row.type)
-                Text(
-                    "\(row.amountSign)"
-                    + AppFormatting.currency(abs(row.amount), currency: row.currency)
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(
-                    row.isIncome ? AppTheme.Colors.success : AppTheme.Colors.danger
-                )
-            }
+            Text(
+                "\(row.amountSign)"
+                + AppFormatting.currency(abs(row.amount), currency: row.currency)
+            )
+            .font(AppTheme.Typography.moneyRow)
+            .foregroundStyle(
+                row.isIncome ? AppTheme.Colors.income : AppTheme.Colors.expense
+            )
         }
         .contentShape(Rectangle())
+        .frame(minHeight: 44)
         .padding(.vertical, AppTheme.Spacing.xs)
+    }
+
+    private static func recentDetail(_ row: DashboardRecentTransactionRow) -> String {
+        var parts = [
+            AppFormatting.dateString(
+                from: row.transactionDate,
+                dateStyle: .medium,
+                timeStyle: DateFormatter.Style.none
+            ) ?? row.transactionDate
+        ]
+        if let category = row.categoryName?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty {
+            parts.append(category)
+        }
+        if let description = row.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+            parts.append(description)
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func handleRecentTransactionsAction(
@@ -658,36 +767,39 @@ struct DashboardView: View {
     private var calendarSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading(
-                    "Покрытие аренды по дням",
-                    subtitle: "Один месяц без тяжёлой годовой сетки."
-                )
+                SectionHeader(title: "Покрытие аренды по дням", subtitle: nil) {
+                    Text("\(coverageSummary.coveragePct)%")
+                        .font(AppTheme.Typography.moneyRow)
+                        .foregroundStyle(AppTheme.Colors.accent)
+                        .contentTransition(.numericText())
+                }
                 HStack {
-                    Picker("Год", selection: $calendarYear) {
-                        ForEach(availableYears, id: \.self) { year in
-                            Text(String(year)).tag(year)
-                        }
-                    }
                     Picker("Месяц", selection: $calendarMonth) {
                         ForEach(1...12, id: \.self) { month in
                             Text(monthLabel(year: calendarYear, month: month)).tag(month)
                         }
                     }
+                    Picker("Год", selection: $calendarYear) {
+                        ForEach(availableYears, id: \.self) { year in
+                            Text(String(year)).tag(year)
+                        }
+                    }
                     Spacer()
-                    Text("\(coverageSummary.coveragePct)%")
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.accent)
                 }
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    metric(title: "Дней аренды", value: "\(coverageSummary.rentDays)")
-                    metric(title: "Оплачено", value: "\(coverageSummary.paidDays)")
-                    metric(title: "Без оплаты", value: "\(coverageSummary.unpaidDays)")
+                .padding(.leading, -12)
+                HStack(spacing: 0) {
+                    MetricTile(title: "Дней", value: "\(coverageSummary.rentDays)")
+                    MetricTile(title: "Оплачено", value: "\(coverageSummary.paidDays)", tint: AppTheme.Colors.accent)
+                    MetricTile(
+                        title: "Без оплаты",
+                        value: "\(coverageSummary.unpaidDays)",
+                        tint: coverageSummary.unpaidDays > 0 ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary
+                    )
                 }
                 LazyVGrid(columns: calendarColumns, spacing: 6) {
                     ForEach(weekdays, id: \.self) { weekday in
                         Text(weekday)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                            .sectionLabelStyle()
                             .frame(maxWidth: .infinity)
                     }
                     ForEach(
@@ -697,23 +809,25 @@ struct DashboardView: View {
                         ),
                         id: \.self
                     ) { _ in
-                        Color.clear.frame(height: 38)
+                        Color.clear.frame(height: 40)
                     }
                     ForEach(calendarDays) { day in
                         calendarCell(day)
                     }
                 }
+                .animation(AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion), value: calendarMonth)
                 HStack(spacing: 12) {
-                    legendDot("Оплачено", color: AppTheme.Colors.success)
-                    legendDot("Частично", color: AppTheme.Colors.warning)
-                    legendDot("Не оплачено", color: AppTheme.Colors.danger)
+                    legendMark("Оплачено", color: AppTheme.Colors.accent)
+                    legendMark("Частично", color: AppTheme.Colors.accent.opacity(0.35))
+                    legendMark("Не оплачено", color: AppTheme.Colors.danger, outlined: true)
                 }
             }
         }
     }
 
     private func calendarCell(_ day: DashboardCalendarDay) -> some View {
-        Button {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        return Button {
             selectedCalendarDay = DashboardAnalyticsLogic.calendarDayDetail(
                 date: day.date,
                 properties: properties,
@@ -726,20 +840,25 @@ struct DashboardView: View {
         } label: {
             Text(String(day.day))
                 .font(.caption.weight(day.isToday || day.dueScheduleCount > 0 ? .bold : .medium))
-                .foregroundStyle(day.state == .noLease
-                                 ? AppTheme.Colors.textSecondary
-                                 : Color.white)
-                .frame(maxWidth: .infinity, minHeight: 38)
-                .background(coverageColor(day.state))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .monospacedDigit()
+                .foregroundStyle(coverageInk(day.state))
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(coverageColor(day.state), in: shape)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(
-                            day.isToday
-                                ? AppTheme.Colors.accent
-                                : (day.dueScheduleCount > 0 ? AppTheme.Colors.warning : Color.clear),
-                            lineWidth: day.isToday ? 2.5 : 1.5
-                        )
+                    shape.strokeBorder(
+                        day.isToday
+                            ? AppTheme.Colors.textPrimary
+                            : (day.state == .unpaid ? AppTheme.Colors.danger.opacity(0.55) : Color.clear),
+                        lineWidth: day.isToday ? 2 : 1
+                    )
+                }
+                .overlay(alignment: .bottom) {
+                    if day.dueScheduleCount > 0 {
+                        Circle()
+                            .fill(coverageInk(day.state))
+                            .frame(width: 4, height: 4)
+                            .padding(.bottom, 4)
+                    }
                 }
         }
         .buttonStyle(.plain)
@@ -747,39 +866,50 @@ struct DashboardView: View {
         .accessibilityHint("Открывает детали аренды за этот день")
     }
 
-    private func legendDot(_ title: String, color: Color) -> some View {
-        Label {
-            Text(title).font(.caption2)
-        } icon: {
-            Circle().fill(color).frame(width: 8, height: 8)
+    private func legendMark(_ title: String, color: Color, outlined: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(outlined ? color.opacity(0.1) : color)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .strokeBorder(outlined ? color : Color.clear, lineWidth: 1)
+                )
+                .frame(width: 10, height: 10)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(AppTheme.Colors.textSecondary)
         }
-        .foregroundStyle(AppTheme.Colors.textSecondary)
     }
 
     private var utilitiesSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                sectionHeading("История ком. услуг", subtitle: "Начисления арендаторов по объектам.")
-                ForEach(Array(utilities.prefix(12))) { utility in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(utility.propertyName ?? "Объект")
-                                .font(.subheadline.weight(.medium))
+                SectionHeader("История ком. услуг", subtitle: "Начисления арендаторов по объектам.")
+                VStack(spacing: 0) {
+                    ForEach(Array(utilities.prefix(12))) { utility in
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(utility.propertyName ?? "Объект")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                                    .lineLimit(1)
+                                Text(
+                                    "\(utilityTypeLabel(utility.utilityType)) · "
+                                    + "\(String(format: "%02d.%d", utility.periodMonth, utility.periodYear))"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                            }
+                            Spacer(minLength: 8)
+                            Text(AppFormatting.currency(utility.amount, currency: utility.currency))
+                                .font(AppTheme.Typography.moneyRow)
                                 .foregroundStyle(AppTheme.Colors.textPrimary)
-                                .lineLimit(1)
-                            Text(
-                                "\(utilityTypeLabel(utility.utilityType)) · "
-                                + "\(String(format: "%02d.%d", utility.periodMonth, utility.periodYear))"
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
                         }
-                        Spacer(minLength: 8)
-                        Text(AppFormatting.currency(utility.amount, currency: utility.currency))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                        .overlay(alignment: .top) {
+                            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+                        }
                     }
-                    .padding(.vertical, AppTheme.Spacing.xs)
                 }
             }
         }
@@ -787,43 +917,33 @@ struct DashboardView: View {
 
     // MARK: - Small building blocks
 
-    private func sectionHeading(_ title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-        }
-    }
-
-    private func metric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-            Text(value)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private func infoBanner(_ message: String) -> some View {
         SurfaceCard(padding: AppTheme.Spacing.md) {
             HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: "exclamationmark.triangle")
                     .foregroundStyle(AppTheme.Colors.warning)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                 Text(message)
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
             }
+        }
+    }
+
+    private static let shortMonths = [
+        "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"
+    ]
+
+    private static func shortMonth(_ month: Int) -> String {
+        shortMonths.indices.contains(month - 1) ? shortMonths[month - 1] : String(month)
+    }
+
+    private func coverageInk(_ state: DashboardCoverageState) -> Color {
+        switch state {
+        case .noLease: return AppTheme.Colors.textSecondary
+        case .paid: return AppTheme.Colors.onAccent
+        case .partial: return AppTheme.Colors.textPrimary
+        case .unpaid: return AppTheme.Colors.danger
         }
     }
 
@@ -839,9 +959,9 @@ struct DashboardView: View {
     private func coverageColor(_ state: DashboardCoverageState) -> Color {
         switch state {
         case .noLease: return AppTheme.Colors.backgroundSecondary
-        case .paid: return AppTheme.Colors.success
-        case .partial: return AppTheme.Colors.warning
-        case .unpaid: return AppTheme.Colors.danger
+        case .paid: return AppTheme.Colors.accent
+        case .partial: return AppTheme.Colors.accent.opacity(0.35)
+        case .unpaid: return Color.clear
         }
     }
 
@@ -1302,11 +1422,11 @@ private struct DashboardCalendarDayDetailSheet: View {
                 Spacer()
                 Text("\(detail.coveragePct)%")
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.Colors.onAccent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(AppTheme.Colors.textPrimary)
-                    .clipShape(Capsule())
+                    .background(AppTheme.Colors.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.stamp, style: .continuous))
             }
         }
     }
@@ -1366,20 +1486,7 @@ private struct DashboardCalendarDayDetailSheet: View {
     }
 
     private func paymentBadge(_ isPaid: Bool) -> some View {
-        Text(isPaid ? "Оплачено" : "Без оплаты")
-            .font(.caption2.weight(.semibold))
-            .textCase(.uppercase)
-            .tracking(0.7)
-            .foregroundStyle(
-                isPaid ? AppTheme.Colors.success : AppTheme.Colors.danger
-            )
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                (isPaid ? AppTheme.Colors.success : AppTheme.Colors.danger)
-                    .opacity(0.12)
-            )
-            .clipShape(Capsule())
+        StatusBadge(label: isPaid ? "Оплачено" : "Без оплаты", tone: isPaid ? .success : .danger)
     }
 
     private func detailField(title: String, value: String) -> some View {

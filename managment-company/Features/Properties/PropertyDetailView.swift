@@ -74,13 +74,20 @@ struct PropertyDetailView: View {
             content
         }
         .navigationTitle(property.name)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Редактировать") { showEditForm = true }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showEditForm = true } label: {
+                    Image(systemName: "pencil")
+                }
+                .accessibilityLabel("Редактировать")
             }
             if !property.isArchived {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Добавить операцию") { showTransactionSheet = true }
+                    Button { showTransactionSheet = true } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Добавить операцию")
                 }
             }
         }
@@ -217,8 +224,21 @@ struct PropertyDetailView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
+                    heroSection
+                    SurfaceCard {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                            Text("Текущая аренда").font(.headline)
+                            Text("Арендатор и условия договора").font(.subheadline)
+                            Text("000 000 ₸ в месяц").font(.title3)
+                        }
+                    }
+                    .shimmerPlaceholder(true)
+                }
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.vertical, AppTheme.Spacing.lg)
+            }
         } else if let errorMessage, transactions.isEmpty, leases.isEmpty, maintenanceRequests.isEmpty {
             EmptyStateView(
                 title: "Не удалось загрузить активность объекта",
@@ -304,52 +324,48 @@ struct PropertyDetailView: View {
     private var heroSection: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(propertyTypeLabel(property.propertyType))
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .textCase(.uppercase)
-                            .tracking(1.2)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                        Text(property.name)
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                        if let addr = property.displayAddress {
-                            Label(addr, systemImage: "mappin.and.ellipse")
-                                .font(.subheadline)
-                                .foregroundStyle(AppTheme.Colors.textSecondary)
-                        } else {
-                            Text("Адрес объекта пока не указан.")
-                                .font(.subheadline)
-                                .foregroundStyle(AppTheme.Colors.textSecondary)
-                        }
+                HStack(alignment: .bottom, spacing: AppTheme.Spacing.md) {
+                    PropertyGlyph(property: property, height: 104)
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: AppTheme.Spacing.sm) {
+                        Text(property.typeTitle)
+                            .sectionLabelStyle()
+                        StatusBadge(status: property.status)
                     }
+                }
+                DimensionRule(ticks: 6)
 
-                    Spacer()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(property.name)
+                        .font(AppTheme.Typography.masthead)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
 
-                    StatusBadge(status: property.status)
+                    Text(property.displayAddress ?? "Адрес объекта пока не указан.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
 
-                HStack(spacing: AppTheme.Spacing.sm) {
+                HStack(spacing: 0) {
                     metricCard(
                         title: "Оценка",
-                        value: AppFormatting.currency(
-                            property.currentValue ?? property.purchasePrice ?? 0,
-                            currency: property.currentValueCurrency ?? property.purchaseCurrency ?? "KZT"
-                        ),
+                        value: property.currentValue == nil && property.purchasePrice == nil
+                            ? "—"
+                            : AppFormatting.currency(
+                                property.currentValue ?? property.purchasePrice ?? 0,
+                                currency: property.currentValueCurrency ?? property.purchaseCurrency ?? "KZT"
+                            ),
                         fallback: property.currentValue == nil && property.purchasePrice == nil
                     )
                     metricCard(
                         title: "Комнаты",
-                        value: property.rooms.map(String.init) ?? "N/A",
+                        value: property.rooms.map(String.init) ?? "—",
                         fallback: property.rooms == nil
                     )
                     metricCard(
                         title: "Площадь",
-                        value: property.areaSqm.map { "\(Int($0.rounded())) m²" } ?? "N/A",
+                        value: property.areaSqm.map { "\(Int($0.rounded())) м²" } ?? "—",
                         fallback: property.areaSqm == nil
                     )
                 }
@@ -716,7 +732,7 @@ struct PropertyDetailView: View {
         .padding(.vertical, AppTheme.Spacing.sm)
         .padding(.horizontal, AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private func maintenanceStatusPill(_ status: String) -> some View {
@@ -855,58 +871,46 @@ struct PropertyDetailView: View {
     }
 
     private func metricCard(title: String, value: String, fallback: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(fallback ? AppTheme.Colors.textSecondary : AppTheme.Colors.textPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        MetricTile(
+            title: title,
+            value: value,
+            tint: fallback ? AppTheme.Colors.textSecondary : AppTheme.Colors.textPrimary
+        )
     }
 
     private func detailRow(_ title: String, value: String) -> some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
             Text(title)
-                .font(.subheadline.weight(.medium))
+                .font(.subheadline)
                 .foregroundStyle(AppTheme.Colors.textSecondary)
-                .frame(width: 110, alignment: .leading)
+                .frame(width: 118, alignment: .leading)
 
             Text(value)
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.Colors.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(AppTheme.Colors.border).frame(height: 1).offset(y: AppTheme.Spacing.xs)
         }
     }
 
     private func sectionHeader(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-        }
+        SectionHeader(title, subtitle: subtitle)
     }
 
     private func sectionPlaceholder(title: String, message: String, icon: String) -> some View {
         HStack(spacing: AppTheme.Spacing.md) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(.body)
                 .foregroundStyle(AppTheme.Colors.accent)
                 .frame(width: 36, height: 36)
-                .background(AppTheme.Colors.accent.opacity(0.12))
-                .clipShape(Circle())
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.Radius.stamp, style: .continuous)
+                        .strokeBorder(AppTheme.Colors.accent.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -932,7 +936,7 @@ struct PropertyDetailView: View {
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private func loadData() async {
@@ -1646,56 +1650,68 @@ struct TransactionRow: View {
     var onEdit: () -> Void = {}
     var onDelete: () -> Void = {}
 
+    private var isIncome: Bool { transaction.type.lowercased() == "income" }
+
+    private var detail: String {
+        var parts = [AppFormatting.dateString(from: transaction.transactionDate) ?? transaction.transactionDate]
+        if let category = transaction.categoryName, !category.isEmpty { parts.append(category) }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(AppFormatting.dateString(from: transaction.transactionDate) ?? transaction.transactionDate)
+        HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
+            Image(systemName: isIncome ? "arrow.down.left" : "arrow.up.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(isIncome ? AppTheme.Colors.accent : AppTheme.Colors.textSecondary)
+                .frame(width: 20)
+                .accessibilityLabel(isIncome ? "Доход" : "Расход")
+
+            VStack(alignment: .leading, spacing: 3) {
+                if let description = transaction.description, !description.isEmpty {
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .lineLimit(2)
+                } else {
+                    Text(isIncome ? "Доход" : "Расход")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                }
+                Text(detail)
                     .font(.caption)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                HStack(spacing: 8) {
-                    StatusBadge(status: transaction.type)
-
-                    if let category = transaction.categoryName, !category.isEmpty {
-                        Text(category)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-
-                    if let description = transaction.description, !description.isEmpty {
-                        Text(description)
-                            .font(.subheadline)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                            .lineLimit(2)
-                    }
-                }
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: AppTheme.Spacing.sm)
 
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(AppFormatting.compactAmount(transaction.amount, currency: transaction.currency))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(transaction.type == "income" ? AppTheme.Colors.success : AppTheme.Colors.danger)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text((isIncome ? "+" : "−") + AppFormatting.currency(transaction.amount, currency: transaction.currency))
+                    .font(AppTheme.Typography.moneyRow)
+                    .foregroundStyle(isIncome ? AppTheme.Colors.income : AppTheme.Colors.expense)
 
-                Text("База \(AppFormatting.currency(transaction.amountBase, currency: baseCurrency))")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                if transaction.currency.uppercased() != baseCurrency.uppercased() {
+                    Text("База \(AppFormatting.currency(transaction.amountBase, currency: baseCurrency))")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
             }
 
             Menu {
                 Button("Редактировать", systemImage: "pencil", action: onEdit)
                 Button("Удалить", systemImage: "trash", role: .destructive, action: onDelete)
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
+                Image(systemName: "ellipsis")
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(AppTheme.Colors.textSecondary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("Действия с операцией")
         }
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(minHeight: 52)
+        .overlay(alignment: .top) {
+            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+        }
     }
 }

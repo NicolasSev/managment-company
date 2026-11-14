@@ -1,0 +1,44 @@
+{
+  "data": {
+    "channels": [
+      {
+        "event_type": "utility_bill_missing",
+        "channel": "push",
+        "enabled": true
+      },
+      {
+        "event_type": "utility_bill_missing",
+        "channel": "telegram",
+        "enabled": true
+      },
+      {
+        "event_type": "utility_bill_needs_review",
+        "channel": "push",
+        "enabled": true
+      },
+      {
+        "event_type": "utility_bill_needs_review",
+        "channel": "telegram",
+        "enabled": false
+      },
+      {
+        "event_type": "utility_upload_other",
+        "channel": "push",
+        "enabled": true
+      },
+      {
+        "event_type": "utility_upload_other",
+        "channel": "telegram",
+        "enabled": false
+      }
+    ],
+    "quiet_from": null,
+    "quiet_to": null,
+    "utility_reminder_day": 10,
+    "utility_reminder_repeat_days": 3,
+    "telegram": {
+      "linked": false,
+      "verified_at": null
+    }
+  }
+}

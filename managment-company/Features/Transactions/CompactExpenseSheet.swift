@@ -118,7 +118,7 @@ struct CompactExpenseSheet: View {
                 .padding(.horizontal, AppTheme.Spacing.sm)
                 .padding(.vertical, 6)
                 .background((selected ? AppTheme.Colors.accent : AppTheme.Colors.accent.opacity(0.12)))
-                .foregroundStyle(selected ? .white : AppTheme.Colors.accent)
+                .foregroundStyle(selected ? AppTheme.Colors.onAccent : AppTheme.Colors.accent)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

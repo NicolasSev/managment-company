@@ -37,6 +37,11 @@ struct PropertiesListView: View {
     @State private var selectedTransaction: PropertyTransactionDetailRoute?
     @State private var selectedReceipt: PropertyReceiptDetailRoute?
     @State private var propertyScope: PropertyScope = .active
+    @State private var rowsVisible = false
+    /// List ↔ grid formation of the cards, remembered per device.
+    @AppStorage("properties.layout.grid") private var isGridLayout = false
+    @Namespace private var zoomNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -51,13 +56,25 @@ struct PropertiesListView: View {
                 Task { await loadProperties() }
             }
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        AppHaptics.selection()
+                        isGridLayout.toggle()
+                    } label: {
+                        Image(systemName: isGridLayout ? "rectangle.grid.1x2" : "square.grid.2x2")
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .accessibilityLabel(isGridLayout ? "Показать списком" : "Показать плиткой")
+                    .accessibilityIdentifier("properties.layout.toggle")
+                }
                 if propertyScope == .active {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
                             showPropertyForm = true
                         } label: {
-                            Image(systemName: "plus.circle.fill")
+                            Image(systemName: "plus")
                         }
+                        .accessibilityLabel("Добавить объект")
                     }
                 }
             }
@@ -79,6 +96,7 @@ struct PropertiesListView: View {
             .navigationDestination(for: Property.self) { prop in
                 PropertyDetailView(property: prop)
                     .environmentObject(authManager)
+                    .navigationTransition(.zoom(sourceID: prop.id, in: zoomNamespace))
             }
             .sheet(isPresented: $showPropertyForm) {
                 PropertyFormView(property: nil) { await loadProperties() }
@@ -120,12 +138,28 @@ struct PropertiesListView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading {
-            VStack(spacing: AppTheme.Spacing.md) {
-                scopePicker
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: AppTheme.Spacing.md) {
+                    portfolioSummary
+                    ForEach(0..<3, id: \.self) { _ in
+                        SurfaceCard(padding: AppTheme.Spacing.md) {
+                            HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                                RoundedRectangle(cornerRadius: 4).fill(AppTheme.Colors.backgroundSecondary)
+                                    .frame(width: 48, height: 64)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Квартира").font(.caption2)
+                                    Text("Название объекта").font(.title3)
+                                    Text("Адрес объекта, город").font(.subheadline)
+                                }
+                            }
+                        }
+                    }
+                }
+                .shimmerPlaceholder(true)
+                .padding(.horizontal, AppTheme.Spacing.md)
+                .padding(.top, AppTheme.Spacing.sm)
             }
-            .padding(.horizontal, AppTheme.Spacing.md)
+            .accessibilityLabel("Загружаем объекты")
         } else if let errorMessage, properties.isEmpty {
             VStack(spacing: AppTheme.Spacing.md) {
                 scopePicker
@@ -168,10 +202,8 @@ struct PropertiesListView: View {
             .padding(.horizontal, AppTheme.Spacing.md)
         } else {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: AppTheme.Spacing.lg) {
-                    scopePicker
+                VStack(spacing: AppTheme.Spacing.md) {
                     portfolioSummary
-                    filterSummary
                     if let errorMessage, !properties.isEmpty {
                         statusBanner(errorMessage, color: AppTheme.Colors.warning)
                     }
@@ -179,13 +211,31 @@ struct PropertiesListView: View {
                         statusBanner(snippetWarning, color: AppTheme.Colors.warning)
                     }
 
-                    LazyVStack(spacing: AppTheme.Spacing.md) {
-                        ForEach(filteredProperties) { property in
+                    HStack {
+                        Text(filterSummaryText)
+                            .sectionLabelStyle()
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer()
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.xs)
+                    .padding(.top, AppTheme.Spacing.xs)
+
+                    // One grid for both formations: changing the column count lets every
+                    // card travel to its new slot on its own spring.
+                    LazyVGrid(
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.sm, alignment: .top),
+                            count: isGridLayout ? 2 : 1
+                        ),
+                        spacing: isGridLayout ? AppTheme.Spacing.sm : AppTheme.Spacing.md
+                    ) {
+                        ForEach(Array(filteredProperties.enumerated()), id: \.element.id) { index, property in
                             PropertyRowView(
                                 property: property,
                                 summary: snippetSummaries[property.id],
                                 isLoadingSummary: isLoadingSnippets
                                     && snippetSummaries[property.id] == nil,
+                                isCompact: isGridLayout,
                                 onOpenProperty: { navigationPath.append(property) },
                                 onOpenTenant: { tenantId in
                                     selectedTenant = PropertyTenantDetailRoute(id: tenantId)
@@ -200,11 +250,19 @@ struct PropertiesListView: View {
                                     selectedReceipt = PropertyReceiptDetailRoute(id: receiptId)
                                 }
                             )
+                            .matchedTransitionSource(id: property.id, in: zoomNamespace)
+                            .appearStagger(index: index, isVisible: rowsVisible)
                         }
                     }
+                    .animation(
+                        AppTheme.Motion.resolved(.spring(response: 0.46, dampingFraction: 0.86), reduceMotion: reduceMotion),
+                        value: isGridLayout
+                    )
+                    .onAppear { rowsVisible = true }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
+                .padding(.top, AppTheme.Spacing.sm)
+                .padding(.bottom, AppTheme.Spacing.xxl + AppTheme.Spacing.xl)
             }
         }
     }
@@ -226,6 +284,7 @@ struct PropertiesListView: View {
             let haystack = [
                 property.name,
                 property.propertyType,
+                property.typeTitle,
                 property.address,
                 property.city,
                 property.country,
@@ -239,75 +298,42 @@ struct PropertiesListView: View {
         }
     }
 
+    /// Hero: the portfolio drawn as a street, with its three counts and the scope switch.
     private var portfolioSummary: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                Text("Портфель")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .textCase(.uppercase)
-                    .tracking(1.2)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Портфель")
+                        .sectionLabelStyle()
+                    Spacer()
+                    Text(propertyScope == .active ? "В расчётах" : "Вне расчётов")
+                        .sectionLabelStyle(AppTheme.Colors.accent)
+                }
 
-                Text(propertyScope == .active
-                    ? "Чистый обзор активных объектов."
-                    : "Объекты вне расчётов и напоминаний.")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    portfolioMetric(title: "Всего", value: "\(properties.count)")
-                    portfolioMetric(
-                        title: "Занято",
-                        value: "\(properties.filter { $0.status == "occupied" }.count)"
+                if !properties.isEmpty {
+                    IsometricStreet(
+                        buildings: properties.map(IsometricBuildingSpec.init(property:)),
+                        height: 92
                     )
-                    portfolioMetric(
+                    .id(propertyScope)
+                }
+
+                HStack(spacing: 0) {
+                    MetricTile(title: "Всего", value: "\(properties.count)")
+                    MetricTile(
+                        title: "Занято",
+                        value: "\(properties.filter { $0.status == "occupied" }.count)",
+                        tint: AppTheme.Colors.accent
+                    )
+                    MetricTile(
                         title: "Свободно",
                         value: "\(properties.filter { $0.status == "vacant" }.count)"
                     )
                 }
+
+                scopePicker
             }
         }
-    }
-
-    private var filterSummary: some View {
-        SurfaceCard(padding: AppTheme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Текущий вид")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .textCase(.uppercase)
-                    .tracking(1.2)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                Text(filterSummaryText)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Поиск идет по названию, типу, адресу, району, городу и стране.")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                }
-            }
-        }
-    }
-
-    private func portfolioMetric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-
-            Text(value)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, AppTheme.Spacing.sm)
-        .padding(.horizontal, AppTheme.Spacing.md)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var filterSummaryText: String {
@@ -316,22 +342,22 @@ struct PropertiesListView: View {
 
         if query.isEmpty {
             return propertyScope == .active
-                ? "Показано активных объектов: \(count)."
-                : "Показано объектов в архиве: \(count)."
+                ? "Активные · \(count)"
+                : "Архив · \(count)"
         }
 
-        return "По запросу «\(query)» найдено объектов: \(count)."
+        return "По запросу «\(query)» · \(count)"
     }
 
     private func statusBanner(_ message: String, color: Color) -> some View {
-        Text(message)
+        Label(message, systemImage: "exclamationmark.triangle")
             .font(.footnote.weight(.medium))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
     
     private func loadProperties() async {
@@ -464,6 +490,8 @@ struct PropertyRowView: View {
     let property: Property
     let summary: PropertyListSnippetSummary?
     let isLoadingSummary: Bool
+    /// Grid formation: glyph, name and status only.
+    var isCompact: Bool = false
     let onOpenProperty: () -> Void
     let onOpenTenant: (String) -> Void
     let onOpenTransaction: (String) -> Void
@@ -473,83 +501,112 @@ struct PropertyRowView: View {
         SurfaceCard(padding: AppTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                 Button(action: onOpenProperty) {
-                    propertyOverview
+                    if isCompact { compactOverview } else { propertyOverview }
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("properties.row.\(property.id)")
 
-                Divider()
-
-                if isLoadingSummary {
-                    HStack(spacing: AppTheme.Spacing.sm) {
-                        ProgressView().controlSize(.small)
-                        Text("Загружаем краткую сводку...")
+                if !isCompact {
+                    if isLoadingSummary {
+                        snippetSkeleton
+                    } else if let summary {
+                        snippetSection(summary)
+                    } else {
+                        Text("Краткая сводка пока недоступна.")
                             .font(.caption)
                             .foregroundStyle(AppTheme.Colors.textSecondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else if let summary {
-                    snippetSection(summary)
-                } else {
-                    Text("Краткая сводка пока недоступна.")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
             }
         }
     }
 
+    private var compactOverview: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            HStack(alignment: .bottom) {
+                PropertyGlyph(property: property, height: 72)
+                Spacer(minLength: 0)
+            }
+            DimensionRule(ticks: 3)
+            Text(property.typeTitle)
+                .sectionLabelStyle()
+            Text(property.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .topLeading)
+            StatusBadge(status: property.status)
+        }
+        .contentShape(Rectangle())
+    }
+
     private var propertyOverview: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-            HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(propertyTypeText)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .textCase(.uppercase)
-                        .tracking(1.2)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
+        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+            PropertyGlyph(property: property, height: 72)
 
-                    Text(property.name)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                    if let addr = property.displayAddress {
-                        Label(addr, systemImage: "mappin.and.ellipse")
-                            .font(.subheadline)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.sm) {
+                    Text(property.typeTitle)
+                        .sectionLabelStyle()
                     if property.isArchived {
                         Text("Архив")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.warning)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppTheme.Colors.warning.opacity(0.12))
-                            .clipShape(Capsule())
+                            .sectionLabelStyle(AppTheme.Colors.warning)
                     }
+                    Spacer(minLength: 0)
                     StatusBadge(status: property.status)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textTertiary)
                 }
-            }
 
-            HStack(spacing: AppTheme.Spacing.sm) {
-                propertyFact(icon: "ruler", text: areaText)
-                propertyFact(icon: "bed.double", text: roomsText)
-                propertyFact(icon: "square.3.layers.3d", text: floorText)
+                Text(property.name)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let addr = property.displayAddress {
+                    Text(addr)
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Text(factsText)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.accent)
+                }
+                .padding(.top, 2)
             }
         }
         .contentShape(Rectangle())
     }
 
+    private var snippetSkeleton: some View {
+        VStack(spacing: 0) {
+            ForEach(["Арендатор", "Последняя оплата", "Коммуналка"], id: \.self) { title in
+                snippetMetricContent(
+                    icon: "circle",
+                    title: title,
+                    value: "Загружаем данные",
+                    detail: "",
+                    status: nil,
+                    statusColor: nil,
+                    showsChevron: false
+                )
+            }
+        }
+        .shimmerPlaceholder(true)
+        .accessibilityLabel("Загружаем краткую сводку")
+    }
+
     private func snippetSection(_ summary: PropertyListSnippetSummary) -> some View {
-        VStack(spacing: AppTheme.Spacing.sm) {
+        VStack(spacing: 0) {
             tenantSnippet(summary.tenant)
             paymentSnippet(summary.payment)
             utilitySnippet(summary.utility)
@@ -569,7 +626,7 @@ struct PropertyRowView: View {
                 AppFormatting.dateString(from: $0)
             }.map { "с \($0)" } ?? "активная аренда"
             status = "Проживает"
-            statusColor = AppTheme.Colors.success
+            statusColor = AppTheme.Colors.accent
         case .former:
             title = property.status.lowercased() == "vacant"
                 ? "Последний арендатор"
@@ -578,7 +635,7 @@ struct PropertyRowView: View {
                 AppFormatting.dateString(from: $0)
             }.map { "выехал \($0)" } ?? "дата выезда не указана"
             status = "Выехал"
-            statusColor = AppTheme.Colors.danger
+            statusColor = AppTheme.Colors.textSecondary
         case .none:
             title = property.status.lowercased() == "vacant" ? "Свободен" : "Арендатор"
             detail = "Аренда не создавалась"
@@ -600,7 +657,7 @@ struct PropertyRowView: View {
     private func paymentSnippet(_ payment: Transaction?) -> some View {
         guard let payment else {
             return snippetMetric(
-                icon: "wallet.pass",
+                icon: "banknote",
                 title: "Последняя оплата",
                 value: "Нет оплат",
                 detail: "Доходы не записаны",
@@ -610,9 +667,9 @@ struct PropertyRowView: View {
             )
         }
         return snippetMetric(
-            icon: "wallet.pass",
+            icon: "banknote",
             title: "Последняя оплата",
-            value: AppFormatting.compactAmount(payment.amount, currency: payment.currency),
+            value: AppFormatting.currency(payment.amount, currency: payment.currency),
             detail: AppFormatting.dateString(from: payment.transactionDate)
                 ?? payment.transactionDate,
             status: nil,
@@ -624,7 +681,7 @@ struct PropertyRowView: View {
     private func utilitySnippet(_ utility: PropertyUtilitySnippet?) -> some View {
         guard let utility else {
             return snippetMetric(
-                icon: "doc.text",
+                icon: "bolt",
                 title: "Коммуналка",
                 value: "Нет начислений",
                 detail: "Коммуналка не записана",
@@ -635,9 +692,9 @@ struct PropertyRowView: View {
         }
 
         return snippetMetric(
-            icon: "doc.text",
+            icon: "bolt",
             title: "Коммуналка",
-            value: AppFormatting.compactAmount(utility.amount, currency: utility.currency),
+            value: AppFormatting.currency(utility.amount, currency: utility.currency),
             detail: utility.detail,
             status: nil,
             statusColor: nil,
@@ -682,6 +739,7 @@ struct PropertyRowView: View {
         }
     }
 
+    /// One line of the card's fact table: hairline on top, label left, value right.
     private func snippetMetricContent(
         icon: String,
         title: String,
@@ -691,88 +749,57 @@ struct PropertyRowView: View {
         statusColor: Color?,
         showsChevron: Bool
     ) -> some View {
-        HStack(spacing: AppTheme.Spacing.sm) {
+        HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
             Image(systemName: icon)
-                .font(.body.weight(.medium))
-                .foregroundStyle(AppTheme.Colors.accent)
-                .frame(width: 24)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(showsChevron ? AppTheme.Colors.accent : AppTheme.Colors.textTertiary)
+                .frame(width: 20)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.caption2.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(AppTheme.Colors.textTertiary)
-                HStack(spacing: 8) {
-                    Text(value)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                        .lineLimit(1)
-                    if let status, let statusColor {
-                        Text(status)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(statusColor)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(statusColor.opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-                }
-                Text(detail)
                     .font(.caption)
                     .foregroundStyle(AppTheme.Colors.textSecondary)
-                    .lineLimit(1)
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.Colors.textTertiary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 6)
 
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.textTertiary)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(value)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(showsChevron ? AppTheme.Colors.textPrimary : AppTheme.Colors.textSecondary)
+                    .lineLimit(1)
+                if let status, let statusColor {
+                    Text(status)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(statusColor)
+                }
             }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.textTertiary)
+                .opacity(showsChevron ? 1 : 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        .overlay(alignment: .top) {
+            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+        }
         .contentShape(Rectangle())
     }
 
-    private var propertyTypeText: String {
-        property.propertyType.replacingOccurrences(of: "_", with: " ").capitalized
-    }
-
-    private var areaText: String {
-        guard let area = property.areaSqm else { return "Площадь не указана" }
-        return "\(Int(area.rounded())) m²"
-    }
-
-    private var roomsText: String {
-        guard let rooms = property.rooms else { return "Комнаты не указаны" }
-        return "\(rooms) rooms"
-    }
-
-    private var floorText: String {
-        guard let floor = property.floor else { return "Этаж не указан" }
-        return "Floor \(floor)"
-    }
-
-    private func propertyFact(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.accent)
-
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    /// Known facts only, in one line: "64 м² · 2 комн. · 6 этаж".
+    private var factsText: String {
+        var parts: [String] = []
+        if let area = property.areaSqm { parts.append("\(Int(area.rounded())) м²") }
+        if let rooms = property.rooms { parts.append("\(rooms) комн.") }
+        if let floor = property.floor { parts.append("\(floor) этаж") }
+        return parts.isEmpty ? "Параметры не указаны" : parts.joined(separator: " · ")
     }
 }
 

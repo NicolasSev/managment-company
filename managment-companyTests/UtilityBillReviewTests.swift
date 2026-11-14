@@ -108,9 +108,9 @@ struct UtilityBillReviewTests {
         #expect(labels.reasonText("item_invalid") == "Строка без суммы пропущена")
         #expect(labels.reasonText("amount_changed") == "Сумма изменилась после повторного распознавания")
         #expect(labels.reasonText("low_confidence") == "Низкая уверенность распознавания")
-        // The two codes the catalogue does not list yet have a text of their own.
-        #expect(labels.reasonText("period_mismatch") == "Период в документе отличается от выбранного")
-        #expect(labels.reasonText("not_utility_document") == "Файл не похож на коммунальную квитанцию")
+        // The catalogue lists these two codes since the meta of 9d3e639.
+        #expect(labels.reasonText("period_mismatch") == "Период в документе не совпадает с указанным")
+        #expect(labels.reasonText("not_utility_document") == "Это не квитанция за коммунальные услуги")
         // `<code>:<field>`: the label of the code and the field.
         #expect(labels.reasonText("low_confidence:provider") == "Низкая уверенность распознавания: поставщик")
         #expect(labels.reasonText("missing:total_due") == "Поле не найдено в документе: сумма к оплате")

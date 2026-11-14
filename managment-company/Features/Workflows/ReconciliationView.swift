@@ -88,7 +88,7 @@ struct ReconciliationView: View {
                 Spacer()
                 Text(AppFormatting.currency(row.amount, currency: row.currency))
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(row.amount >= 0 ? AppTheme.Colors.success : AppTheme.Colors.danger)
+                    .foregroundStyle(row.amount >= 0 ? AppTheme.Colors.income : AppTheme.Colors.expense)
             }
             Text(row.description).font(.caption).foregroundStyle(AppTheme.Colors.textSecondary).lineLimit(2)
         }

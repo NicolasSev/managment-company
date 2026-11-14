@@ -43,22 +43,24 @@ struct CurrentLeaseCard: View {
                         .accessibilityIdentifier("\(identifier).status")
                 }
 
-                HStack(spacing: AppTheme.Spacing.sm) {
-                    LeaseMetricTile(
-                        title: "Аренда",
-                        value: lease.currentRentAmount.formatted(),
-                        identifier: "\(identifier).rent"
-                    )
+                VStack(spacing: AppTheme.Spacing.sm) {
+                    HStack(spacing: AppTheme.Spacing.sm) {
+                        LeaseMetricTile(
+                            title: "Аренда",
+                            value: lease.currentRentAmount.formatted(),
+                            identifier: "\(identifier).rent"
+                        )
+                        LeaseMetricTile(
+                            title: "Долг",
+                            value: debt.formatted(),
+                            color: debt.isPositive ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary,
+                            identifier: "\(identifier).debt"
+                        )
+                    }
                     LeaseMetricTile(
                         title: "Ближайший платёж",
                         value: nextPaymentText,
                         identifier: "\(identifier).next"
-                    )
-                    LeaseMetricTile(
-                        title: "Долг",
-                        value: debt.formatted(),
-                        color: debt.isPositive ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary,
-                        identifier: "\(identifier).debt"
                     )
                 }
 

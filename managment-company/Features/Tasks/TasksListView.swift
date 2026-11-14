@@ -2,7 +2,7 @@ import SwiftUI
 
 private enum TaskScope: String, CaseIterable, Identifiable {
     case open = "Открыто"
-    case all = "All"
+    case all = "Все"
     case completed = "Завершено"
 
     var id: String { rawValue }
@@ -299,7 +299,7 @@ struct TasksListView: View {
         .padding(.vertical, AppTheme.Spacing.sm)
         .padding(.horizontal, AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private func taskSection(title: String, icon: String, items: [AppTask]) -> some View {
@@ -400,15 +400,20 @@ struct TasksListView: View {
     }
 
     private var filterSummaryText: String {
-        let scopeLabel = selectedScope.rawValue.lowercased()
         let count = scopedTasks.count
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if query.isEmpty {
-            return "Showing \(count) \(scopeLabel) task\(count == 1 ? "" : "s") across the mobile board."
+        let scopeLabel: String
+        switch selectedScope {
+        case .open: scopeLabel = "Открытых задач"
+        case .all: scopeLabel = "Всего задач"
+        case .completed: scopeLabel = "Завершённых задач"
         }
 
-        return "Showing \(count) \(scopeLabel) task\(count == 1 ? "" : "s") matching “\(query)”."
+        if query.isEmpty {
+            return "\(scopeLabel): \(count)."
+        }
+
+        return "\(scopeLabel) по запросу «\(query)»: \(count)."
     }
 
     private var activeBannerMessage: String? {
@@ -423,7 +428,7 @@ struct TasksListView: View {
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private func completeTask(_ task: AppTask) async {

@@ -170,7 +170,7 @@ struct ContractDocumentContent: View {
         .padding(AppTheme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppTheme.Colors.warning.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("contract.missing.group.\(group.entity.rawValue)")
     }
@@ -278,7 +278,7 @@ struct ContractDocumentContent: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(AppTheme.Spacing.md)
                 .background(AppTheme.Colors.danger.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                 .accessibilityIdentifier("contract.saved.error")
         }
     }
@@ -347,10 +347,10 @@ struct ContractDocumentContent: View {
                                 .frame(minHeight: 88)
                                 .scrollContentBackground(.hidden)
                                 .padding(AppTheme.Spacing.sm)
-                                .background(Color.white.opacity(0.82))
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .background(AppTheme.Colors.backgroundSecondary)
+                                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
                                         .stroke(AppTheme.Colors.border, lineWidth: 1)
                                 )
                                 .accessibilityIdentifier("contract.act.inventory")
@@ -407,7 +407,7 @@ struct ContractDocumentContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppTheme.Spacing.md)
             .background(AppTheme.Colors.warning.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
             .accessibilityIdentifier("contract.notice")
     }
 
@@ -449,6 +449,6 @@ struct ContractActionLabel: View {
         .frame(maxWidth: .infinity, minHeight: 64)
         .padding(.vertical, AppTheme.Spacing.sm)
         .background(AppTheme.Colors.accent.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }

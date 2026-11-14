@@ -1,17 +1,18 @@
 import SwiftUI
 
-/// Quiet, flat screen background: a faint vertical shift between the two surface tokens.
-/// No blurred shapes (they show through the translucent navigation bar and muddy it).
+/// Flat screen ground with a faint drafting grid behind the masthead that fades out before
+/// the content starts. No blurred shapes (they show through the translucent navigation bar).
 struct AppScreenBackground: View {
     var body: some View {
-        LinearGradient(
-            colors: [
-                AppTheme.Colors.background,
-                AppTheme.Colors.backgroundSecondary
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        AppTheme.Colors.ground
+            .overlay(alignment: .top) {
+                BlueprintHeroBackground()
+                    .frame(height: 300)
+            }
+            .ignoresSafeArea()
     }
+}
+
+#Preview("AppScreenBackground") {
+    AppScreenBackground()
 }

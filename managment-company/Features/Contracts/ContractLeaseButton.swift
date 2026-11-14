@@ -26,7 +26,7 @@ struct ContractLeaseButton: View {
             .padding(.vertical, AppTheme.Spacing.md)
             .padding(.horizontal, AppTheme.Spacing.md)
             .background(AppTheme.Colors.accent.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("contract.open")

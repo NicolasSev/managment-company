@@ -247,7 +247,7 @@ struct EntityFilesSection: View {
         .padding(.vertical, AppTheme.Spacing.sm)
         .padding(.horizontal, AppTheme.Spacing.md)
         .background(AppTheme.Colors.backgroundSecondary.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 
     private func loadFiles() async {

@@ -32,13 +32,13 @@ struct MainTabView: View {
                 .environmentObject(authManager)
                 .tag(AppTab.today)
                 .tabItem {
-                    Label("Сегодня", systemImage: "sun.max")
+                    Label("Сегодня", systemImage: "sun.horizon")
                 }
             MoneyHubView(authManager: authManager)
                 .environmentObject(authManager)
                 .tag(AppTab.money)
                 .tabItem {
-                    Label("Деньги", systemImage: "creditcard")
+                    Label("Деньги", systemImage: "banknote")
                 }
                 .badge(overdueBadge.count)
             PropertiesListView()
@@ -54,7 +54,6 @@ struct MainTabView: View {
                         .accessibilityIdentifier("tab.tenants")
                 }
         }
-        .tint(AppTheme.Colors.accent)
         .environmentObject(quickActions)
         // Secondary routes outside the primary bar: Dashboard (GAP-037), Tasks (moved out for the
         // «Арендаторы» tab, L13), Utilities (U9) and Settings stay reachable from the «Ещё» menu on «Сегодня».
@@ -74,6 +73,7 @@ struct MainTabView: View {
                 .environmentObject(authManager)
                 .environmentObject(notificationRouter)
         }
+        .tint(AppTheme.Colors.accent)
 
             QuickActionLauncher()
                 .environmentObject(authManager)
@@ -89,13 +89,20 @@ struct MainTabView: View {
                     Text("Ожидают отправки: \(pendingMutations.pendingCount)")
                         .font(.subheadline.weight(.medium))
                 }
-                .foregroundStyle(AppTheme.Colors.textPrimary)
+                .foregroundStyle(AppTheme.Colors.onAccent)
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.sm)
-                .frame(maxWidth: .infinity)
-                .background(AppTheme.Colors.accent.opacity(0.15))
+                .frame(minHeight: 32)
+                .background(
+                    AppTheme.Colors.accent,
+                    in: RoundedRectangle(cornerRadius: AppTheme.Radius.stamp, style: .continuous)
+                )
+                .padding(.top, AppTheme.Spacing.xs)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .accessibilityElement(children: .combine)
             }
         }
+        .animation(AppTheme.Motion.normal, value: pendingMutations.pendingCount > 0)
+        .sensoryFeedback(.selection, trigger: selectedTab)
         .onReceive(NotificationCenter.default.publisher(for: .openCompactExpense)) { _ in
             selectedTab = .today
             quickActions.open(.expense)
@@ -268,11 +275,12 @@ struct SettingsView: View {
                                     .foregroundStyle(AppTheme.Colors.textSecondary)
                                     .lineSpacing(3)
 
-                                PrimaryButton(
-                                    title: "Выйти",
-                                    action: { authManager.logout() },
-                                    systemImage: "rectangle.portrait.and.arrow.right"
-                                )
+                                Button {
+                                    authManager.logout()
+                                } label: {
+                                    Label("Выйти", systemImage: "rectangle.portrait.and.arrow.right")
+                                }
+                                .buttonStyle(QuietActionButtonStyle(tint: AppTheme.Colors.textPrimary))
                             }
                         }
                     }
@@ -350,7 +358,7 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(AppTheme.Spacing.sm)
                             .background(AppTheme.Colors.backgroundSecondary.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                     }
 
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
@@ -367,7 +375,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(AppTheme.Spacing.md)
                     .background(AppTheme.Colors.warning.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
 
                     AppTextField(
                         title: "Код подтверждения",
@@ -451,7 +459,7 @@ struct SettingsView: View {
                             .font(.caption.weight(.semibold))
                             .frame(width: 34, height: 34)
                             .background((on ? AppTheme.Colors.accent : AppTheme.Colors.accent.opacity(0.12)))
-                            .foregroundStyle(on ? .white : AppTheme.Colors.accent)
+                            .foregroundStyle(on ? AppTheme.Colors.onAccent : AppTheme.Colors.accent)
                             .clipShape(Circle())
                         }
                     }
@@ -539,6 +547,6 @@ struct SettingsView: View {
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }

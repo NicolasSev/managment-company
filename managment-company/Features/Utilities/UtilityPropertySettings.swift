@@ -210,7 +210,7 @@ struct UtilityPropertySettingsSection: View {
                 .font(.caption.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .foregroundStyle(selected ? .white : AppTheme.Colors.accent)
+                .foregroundStyle(selected ? AppTheme.Colors.onAccent : AppTheme.Colors.accent)
                 .background(selected ? AppTheme.Colors.accent : AppTheme.Colors.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)

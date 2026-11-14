@@ -19,6 +19,7 @@ private struct AppRootView: View {
                 LoginView()
             }
         }
+        .tint(AppTheme.Colors.accent)
         .sheet(isPresented: $notificationRouter.presentNotificationsInbox) {
             NotificationsInboxView(onDataChanged: { })
                 .environmentObject(authManager)
@@ -97,6 +98,10 @@ struct managment_companyApp: App {
     // DashboardView and TodayView read it from the environment: without it the
     // first one to render crashes the app.
     @StateObject private var rentPreviewRouter = RentPreviewRouter()
+
+    init() {
+        AppAppearance.apply()
+    }
 
     var body: some Scene {
         WindowGroup {

@@ -83,6 +83,8 @@ enum AppFormatting {
         guard let parsedDate = parsedDate(from: value) else { return value }
 
         let formatter = DateFormatter()
+        // The interface is Russian: dates follow it, not the device region.
+        formatter.locale = displayLocale
         formatter.dateStyle = dateStyle
         formatter.timeStyle = timeStyle ?? (value.contains("T") ? .short : .none)
         return formatter.string(from: parsedDate)

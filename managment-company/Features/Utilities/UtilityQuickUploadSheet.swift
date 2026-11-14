@@ -46,8 +46,8 @@ struct UtilityQuickUploadSheet: View {
                                         .font(.subheadline.weight(.semibold))
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 14)
-                                        .foregroundStyle(.white)
-                                        .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                        .foregroundStyle(AppTheme.Colors.onAccent)
+                                        .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                                 }
                                 if unreadable {
                                     UtilityBanner(text: "Не удалось прочитать файл. Выберите JPEG, PNG, HEIC или PDF.", identifier: "utilities.quick.unreadable")

@@ -563,8 +563,8 @@ struct UtilityBillReviewSheet: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .foregroundStyle(.white)
-                    .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .foregroundStyle(AppTheme.Colors.onAccent)
+                    .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
             }
             .disabled(viewModel.isBusy)
             if unreadable {
@@ -700,8 +700,8 @@ struct UtilityMarkPaidSheet: View {
                                             .font(.subheadline.weight(.semibold))
                                             .frame(maxWidth: .infinity)
                                             .padding(.vertical, 12)
-                                            .foregroundStyle(.white)
-                                            .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                            .foregroundStyle(AppTheme.Colors.onAccent)
+                                            .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                                     }
                                     .disabled(viewModel.isBusy)
                                 } else {
@@ -782,8 +782,8 @@ struct UtilityTenantMessageSheet: View {
                                 .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .foregroundStyle(.white)
-                                .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .foregroundStyle(AppTheme.Colors.onAccent)
+                                .background(AppTheme.Colors.accent, in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                         }
                         .accessibilityIdentifier("utilities.tenant_message.share")
                         Button {

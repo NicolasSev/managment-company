@@ -101,13 +101,18 @@ struct QuickActionLauncher: View {
             controller.presentMenu()
         } label: {
             Image(systemName: "plus")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(AppTheme.Colors.accent)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.12), radius: 6, y: 2)
+                .font(.title3.weight(.medium))
+                .foregroundStyle(AppTheme.Colors.onAccent)
+                .rotationEffect(.degrees(controller.isMenuPresented ? 45 : 0))
+                .frame(width: 52, height: 52)
+                .background(
+                    AppTheme.Colors.accent,
+                    in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous)
+                )
+                .shadow(color: AppTheme.Colors.accent.opacity(0.28), radius: 10, y: 4)
+                .animation(AppTheme.Motion.normal, value: controller.isMenuPresented)
         }
+        .sensoryFeedback(.selection, trigger: controller.isMenuPresented)
         .accessibilityLabel("Быстрое действие")
         .accessibilityHint("Открывает меню быстрых действий")
         .task { await loadProperties() }

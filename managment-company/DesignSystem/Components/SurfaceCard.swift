@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// The one card surface: solid fill, hairline border, a single faint shadow.
-/// No glass and no gradient on content (glass belongs to the navigation layer).
+/// The one card surface: a sheet of paper with a hairline edge. No shadow, no glass and no
+/// gradient on content (glass belongs to the navigation layer).
 struct SurfaceCard<Content: View>: View {
     var padding: CGFloat = AppTheme.Spacing.lg
     @ViewBuilder var content: () -> Content
 
     private static var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
+        RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous)
     }
 
     var body: some View {
@@ -16,8 +16,20 @@ struct SurfaceCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppTheme.Colors.background, in: Self.shape)
             .overlay(
-                Self.shape.stroke(AppTheme.Colors.border.opacity(0.6), lineWidth: 1)
+                Self.shape.strokeBorder(AppTheme.Colors.border, lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+}
+
+#Preview("SurfaceCard") {
+    ZStack {
+        AppScreenBackground()
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Портфель").sectionLabelStyle()
+                Text("380 000 ₸").font(AppTheme.Typography.moneyLarge)
+            }
+        }
+        .padding()
     }
 }

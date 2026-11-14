@@ -22,6 +22,10 @@ struct PaymentsQueueView: View {
     /// Lease opened from a queue row («Договор»); the queue reloads when it comes back.
     @State private var leaseRoute: QueueLeaseRoute?
     @State private var reloadOnReturn = false
+    /// Rows whose "paid" request is in flight: the check mark is already morphed.
+    @State private var payingIds: Set<String> = []
+    @State private var rowsVisible = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// When embedded inside another navigation container (the GAP-037 «Деньги»
     /// hub), the view skips its own `NavigationStack`.
@@ -45,10 +49,10 @@ struct PaymentsQueueView: View {
     @ViewBuilder
     private var core: some View {
             ZStack {
-                AppScreenBackground()
+                if !embedded { AppScreenBackground() }
                 content
             }
-            .navigationTitle("Оплата")
+            .navigationTitle(embedded ? "Деньги" : "Оплата")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     horizonMenu
@@ -160,53 +164,76 @@ struct PaymentsQueueView: View {
     @ViewBuilder
     private var content: some View {
         if viewModel.isLoading && viewModel.items.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingSkeleton
         } else {
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
-                    headerSection
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
                     segmentPicker
 
                     if let errorMessage = viewModel.errorMessage {
                         statusBanner(errorMessage)
                     }
 
-                    if viewModel.segment == .overdue, viewModel.overdueSummary.count > 0 {
-                        overdueSummaryCard
-                    }
-
                     let rows = viewModel.displayedItems(today: today)
+                    summaryCard(rows)
+
                     if rows.isEmpty {
                         emptyState
                     } else {
-                        summaryLine(rows)
-                        if viewModel.segment != .history,
-                           !viewModel.selectedRows(in: rows).isEmpty {
-                            selectionBar(rows)
+                        if viewModel.segment != .history {
+                            selectionHeader(rows)
+                            if !viewModel.selectedRows(in: rows).isEmpty {
+                                selectionBar(rows)
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
                         }
                         rowsSection(rows)
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
-                .padding(.vertical, AppTheme.Spacing.lg)
+                .padding(.top, AppTheme.Spacing.sm)
+                .padding(.bottom, AppTheme.Spacing.xxl + AppTheme.Spacing.xl)
+                .animation(
+                    AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                    value: viewModel.selectedIds.isEmpty
+                )
             }
         }
     }
 
-    private var headerSection: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("Расписание платежей")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                Text("Грядущая очередь по оплате — ровно та, что уходит в push-напоминания. Правка даты или суммы меняет договор арендатора и все будущие платежи.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                    .lineSpacing(3)
+    /// Skeleton in the shape of the queue: summary and three rows.
+    private var loadingSkeleton: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                segmentPicker
+                Group {
+                    SurfaceCard {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                            Text("К получению").sectionLabelStyle()
+                            Text("000 000 ₸").font(AppTheme.Typography.masthead)
+                            Text("0 платежей").font(.caption)
+                        }
+                    }
+                    ForEach(0..<3, id: \.self) { _ in
+                        SurfaceCard(padding: AppTheme.Spacing.md) {
+                            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                                HStack {
+                                    Text("1 января 2026").font(.headline)
+                                    Spacer()
+                                    Text("000 000 ₸").font(AppTheme.Typography.money)
+                                }
+                                Text("Название объекта").font(.subheadline)
+                                Text("Имя арендатора").font(.caption)
+                            }
+                        }
+                    }
+                }
+                .shimmerPlaceholder(true)
             }
+            .padding(.horizontal, AppTheme.Spacing.md)
+            .padding(.top, AppTheme.Spacing.sm)
         }
+        .accessibilityLabel("Загружаем платежи")
     }
 
     private var today: String {
@@ -222,55 +249,113 @@ struct PaymentsQueueView: View {
         .pickerStyle(.segmented)
     }
 
-    private var overdueSummaryCard: some View {
-        let summary = viewModel.overdueSummary
+    /// Hero of the segment: what is due (or recorded) in total, with the count beside it.
+    private func summaryCard(_ rows: [PaymentQueueItem]) -> some View {
+        let isHistory = viewModel.segment == .history
+        let isOverdue = viewModel.segment == .overdue
+        let overdue = viewModel.overdueSummary
+        let totals: [(currency: String, total: Double)] = isHistory
+            ? Self.recordedTotals(rows)
+            : PaymentsQueueViewModel.selectionTotals(items: rows)
+        let tint = isOverdue && !rows.isEmpty ? AppTheme.Colors.danger : AppTheme.Colors.textPrimary
         return SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                HStack {
-                    Text("\(summary.count) просрочено")
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.danger)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(isHistory ? "Записано" : (isOverdue ? "Долг" : "К получению"))
+                        .sectionLabelStyle(isOverdue && !rows.isEmpty ? AppTheme.Colors.danger : AppTheme.Colors.textSecondary)
                     Spacer()
-                    if summary.oldestDaysOverdue > 0 {
-                        Text("Старейший долг: \(summary.oldestDaysOverdue) дн.")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    Text("\(rows.count) \(Self.paymentsWord(rows.count))")
+                        .sectionLabelStyle()
+                        .contentTransition(.numericText())
+                }
+
+                if totals.isEmpty {
+                    Text(AppFormatting.currency(0, currency: authManager.user?.baseCurrency ?? "KZT"))
+                        .font(AppTheme.Typography.masthead)
+                        .monospacedDigit()
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                } else {
+                    ForEach(totals, id: \.currency) { entry in
+                        Text(AppFormatting.currency(entry.total, currency: entry.currency))
+                            .font(AppTheme.Typography.masthead)
+                            .monospacedDigit()
+                            .foregroundStyle(tint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .contentTransition(reduceMotion ? .opacity : .numericText(value: entry.total))
                     }
                 }
-                ForEach(summary.totalsByCurrency, id: \.currency) { entry in
-                    Text("Долг: \(AppFormatting.currency(entry.remaining, currency: entry.currency))")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                }
+
+                DimensionRule(ticks: 5)
+
+                Text(summaryNote(isHistory: isHistory, isOverdue: isOverdue, overdue: overdue))
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .animation(
+                AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+                value: rows.map(\.id)
+            )
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func summaryNote(isHistory: Bool, isOverdue: Bool, overdue: OverdueSummary) -> String {
+        if isHistory {
+            return "Оплаченные и пропущенные платежи за выбранный горизонт."
+        }
+        if isOverdue, overdue.oldestDaysOverdue > 0 {
+            return "Старейший долг: \(overdue.oldestDaysOverdue) дн. Очередь — ровно та, что уходит в push-напоминания."
+        }
+        return "Очередь — ровно та, что уходит в push-напоминания. Правка даты или суммы меняет договор и все будущие платежи."
+    }
+
+    private static func recordedTotals(_ rows: [PaymentQueueItem]) -> [(currency: String, total: Double)] {
+        var order: [String] = []
+        var sums: [String: Double] = [:]
+        for item in rows where PaymentsQueueViewModel.displayStatus(of: item, scope: .past) == "paid" {
+            if sums[item.currency] == nil { order.append(item.currency) }
+            sums[item.currency, default: 0] += item.actualAmount ?? item.expectedAmount
+        }
+        return order.map { ($0, sums[$0] ?? 0) }
+    }
+
+    private static func paymentsWord(_ count: Int) -> String {
+        let mod100 = count % 100
+        let mod10 = count % 10
+        if (11...14).contains(mod100) { return "платежей" }
+        switch mod10 {
+        case 1: return "платёж"
+        case 2, 3, 4: return "платежа"
+        default: return "платежей"
         }
     }
 
-    private func summaryLine(_ rows: [PaymentQueueItem]) -> some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            Text("\(rows.count)")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppTheme.Colors.textPrimary)
-            Text(viewModel.segment == .history ? "платежей в истории" : "платежей")
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
+    private func selectionHeader(_ rows: [PaymentQueueItem]) -> some View {
+        HStack {
+            Text("Очередь")
+                .sectionLabelStyle()
+                .accessibilityAddTraits(.isHeader)
             Spacer()
-            if viewModel.segment != .history {
-                Button {
-                    viewModel.toggleSelectAll(rows: rows)
-                } label: {
-                    Text(
-                        viewModel.selectedRows(in: rows).count == rows.count
-                            ? "Снять выбор"
-                            : "Выбрать все"
-                    )
-                    .font(.caption.weight(.semibold))
-                }
-                .disabled(viewModel.isBatchRunning)
-                .accessibilityLabel("Выбрать все платежи")
+            Button {
+                viewModel.toggleSelectAll(rows: rows)
+            } label: {
+                Text(
+                    viewModel.selectedRows(in: rows).count == rows.count
+                        ? "Снять выбор"
+                        : "Выбрать все"
+                )
+                .font(.footnote.weight(.semibold))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
+            .disabled(viewModel.isBatchRunning)
+            .accessibilityLabel("Выбрать все платежи")
         }
         .padding(.horizontal, AppTheme.Spacing.xs)
+        .padding(.vertical, -AppTheme.Spacing.sm)
     }
 
     /// Selection bar for batch mark-paid (GAP-050): count, per-currency
@@ -280,31 +365,35 @@ struct PaymentsQueueView: View {
         let totals = PaymentsQueueViewModel.selectionTotals(items: selected)
         return SurfaceCard(padding: AppTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                HStack {
+                HStack(alignment: .firstTextBaseline) {
                     Text("Выбрано: \(selected.count)")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .contentTransition(.numericText())
                     Spacer()
                     Button("Сбросить") {
                         viewModel.selectedIds = []
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .disabled(viewModel.isBatchRunning)
                 }
                 ForEach(totals, id: \.currency) { entry in
                     Text("К получению: \(AppFormatting.currency(entry.total, currency: entry.currency))")
-                        .font(.caption)
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(AppTheme.Colors.textSecondary)
                 }
-                rowActionButton(
+                PrimaryButton(
                     title: viewModel.isBatchRunning ? "Записываем…" : "Отметить оплаченными (\(selected.count))",
-                    systemImage: "checkmark.circle"
-                ) {
-                    batchConfirmPresented = true
-                }
-                .disabled(viewModel.isBatchRunning)
+                    action: { batchConfirmPresented = true },
+                    isLoading: viewModel.isBatchRunning,
+                    systemImage: "checkmark"
+                )
             }
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous)
+                .strokeBorder(AppTheme.Colors.accent.opacity(0.5), lineWidth: 1)
+        )
         .confirmationDialog(
             "Отметить оплаченными?",
             isPresented: $batchConfirmPresented,
@@ -332,7 +421,7 @@ struct PaymentsQueueView: View {
 
     private func rowsSection(_ rows: [PaymentQueueItem]) -> some View {
         LazyVStack(spacing: AppTheme.Spacing.sm) {
-            ForEach(rows) { item in
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
                 SurfaceCard(padding: AppTheme.Spacing.md) {
                     if viewModel.segment == .history {
                         pastRow(item)
@@ -340,80 +429,130 @@ struct PaymentsQueueView: View {
                         upcomingRow(item)
                     }
                 }
+                .overlay(alignment: .leading) {
+                    if item.isOverdue, viewModel.segment != .history {
+                        // Overdue marker: a red rule on the binding edge of the sheet.
+                        Rectangle()
+                            .fill(AppTheme.Colors.danger)
+                            .frame(width: 3)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous))
+                .appearStagger(index: index, isVisible: rowsVisible)
+                .transition(.asymmetric(
+                    insertion: .opacity,
+                    removal: reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)).combined(with: .move(edge: .trailing))
+                ))
+            }
+        }
+        .animation(
+            AppTheme.Motion.resolved(AppTheme.Motion.normal, reduceMotion: reduceMotion),
+            value: rows.map(\.id)
+        )
+        .onAppear { rowsVisible = true }
+    }
+
+    private func rowHeader(
+        date: String,
+        isDatePlaceholder: Bool = false,
+        amount: Double,
+        item: PaymentQueueItem,
+        scope: PaymentQueueScope
+    ) -> some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(date)
+                    .font(.headline)
+                    .foregroundStyle(isDatePlaceholder ? AppTheme.Colors.textSecondary : AppTheme.Colors.textPrimary)
+
+                Text("Период: \(PaymentsQueueViewModel.periodLabel(of: item))")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+
+                if scope == .upcoming, item.isOverdue, item.daysOverdue > 0 {
+                    Text("Просрочено на \(item.daysOverdue) дн.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.Colors.danger)
+                }
+            }
+
+            Spacer(minLength: AppTheme.Spacing.sm)
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(AppFormatting.currency(amount, currency: item.currency))
+                    .font(AppTheme.Typography.money)
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .contentTransition(.numericText())
+
+                if scope == .upcoming, let allocations = item.allocationCount, allocations > 0,
+                   item.outstandingAmount < item.expectedAmount {
+                    Text("из \(AppFormatting.currency(item.expectedAmount, currency: item.currency))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
+
+                StatusBadge(status: PaymentsQueueViewModel.displayStatus(of: item, scope: scope))
             }
         }
     }
 
     private func upcomingRow(_ item: PaymentQueueItem) -> some View {
         let isSelected = viewModel.selectedIds.contains(item.id)
+        let isPaying = payingIds.contains(item.id)
         return VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
                 Button {
+                    AppHaptics.selection()
                     viewModel.toggleSelection(item)
                 } label: {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                         .font(.title3)
-                        .foregroundStyle(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.textSecondary)
+                        .foregroundStyle(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.textTertiary)
+                        .contentTransition(.symbolEffect(.replace))
+                        .frame(width: 32, height: 44, alignment: .topLeading)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.isBatchRunning)
                 .accessibilityLabel("Выбрать платёж: \(item.propertyName)")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(AppFormatting.dateString(from: item.dueDate) ?? item.dueDate)
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                    Text("Период: \(PaymentsQueueViewModel.periodLabel(of: item))")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-
-                    if item.isOverdue, item.daysOverdue > 0 {
-                        Text("Просрочено на \(item.daysOverdue) дн.")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.Colors.danger)
-                    }
-
-                    propertyTenantBlock(item)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text(AppFormatting.currency(item.outstandingAmount, currency: item.currency))
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                    if let allocations = item.allocationCount, allocations > 0,
-                       item.outstandingAmount < item.expectedAmount {
-                        Text("из \(AppFormatting.currency(item.expectedAmount, currency: item.currency))")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
-
-                    StatusBadge(status: PaymentsQueueViewModel.displayStatus(of: item, scope: .upcoming))
-                }
+                rowHeader(
+                    date: AppFormatting.dateString(from: item.dueDate) ?? item.dueDate,
+                    amount: item.outstandingAmount,
+                    item: item,
+                    scope: .upcoming
+                )
             }
 
+            propertyTenantBlock(item)
+                .padding(.leading, 32 + AppTheme.Spacing.sm)
+
+            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+
             HStack(spacing: AppTheme.Spacing.sm) {
-                rowActionButton(title: "Изменить", systemImage: "pencil") {
-                    editingItem = item
-                }
-                if let count = item.allocationCount, count > 0 {
-                    rowActionButton(title: "Платежи (\(count))", systemImage: "list.bullet.clipboard") {
-                        allocationItem = item
+                Button {
+                    markPaid(item)
+                } label: {
+                    HStack(spacing: 6) {
+                        PaidCheckMark(isOn: isPaying, size: 16, haptic: false, onTint: AppTheme.Colors.onAccent, offTint: AppTheme.Colors.onAccent)
+                        Text("Оплачено")
+                            .lineLimit(1)
                     }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(AppTheme.Colors.onAccent)
+                    .padding(.horizontal, AppTheme.Spacing.sm)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(
+                        AppTheme.Colors.accent,
+                        in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+                    )
+                    .padding(.vertical, 3)
+                    .contentShape(Rectangle())
                 }
-                rowActionButton(title: "Оплачено", systemImage: "checkmark.circle") {
-                    Task {
-                        if await viewModel.markPaidToday(
-                            item,
-                            timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty"
-                        ) {
-                            AppHaptics.success()
-                        }
-                    }
-                }
+                .buttonStyle(.plain)
                 .contextMenu {
                     Button {
                         markPaidItem = item
@@ -421,38 +560,98 @@ struct PaymentsQueueView: View {
                         Label("Указать дату и сумму…", systemImage: "calendar")
                     }
                 }
-                rowActionButton(title: "Пропустить", systemImage: "forward.end") {
-                    skipCandidate = item
-                }
+                .accessibilityHint("Записывает оплату сегодняшней датой")
+
+                Button("Договор") { openLease(item) }
+                    .buttonStyle(QuietActionButtonStyle(fills: false))
+                    .accessibilityIdentifier("payments.row.\(item.id).lease")
+
+                rowMoreMenu(item)
             }
             .disabled(viewModel.isMutating)
+        }
+        .contextMenu { rowMenuItems(item) }
+    }
 
-            collectionActionsRow(item)
+    private func markPaid(_ item: PaymentQueueItem) {
+        payingIds.insert(item.id)
+        Task {
+            let paid = await viewModel.markPaidToday(
+                item,
+                timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty"
+            )
+            if paid {
+                AppHaptics.success()
+            } else {
+                AppHaptics.warning()
+            }
+            payingIds.remove(item.id)
         }
     }
 
-    /// Tenant contact + open-context actions (GAP-034). Contact buttons appear
-    /// only when the channel exists; open navigates to the property/tenant.
+    /// Secondary actions of an upcoming row: allocations, skip, tenant contact (GAP-034)
+    /// and the property. Contact entries appear only when the channel exists.
+    private func rowMoreMenu(_ item: PaymentQueueItem) -> some View {
+        Menu {
+            rowMenuItems(item)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(AppTheme.Colors.accent)
+                .frame(width: 44, height: 38)
+                .background(
+                    AppTheme.Colors.accent.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+                        .strokeBorder(AppTheme.Colors.accent.opacity(0.28), lineWidth: 1)
+                )
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Ещё действия: \(item.propertyName)")
+    }
+
     @ViewBuilder
-    private func collectionActionsRow(_ item: PaymentQueueItem) -> some View {
-        HStack(spacing: AppTheme.Spacing.sm) {
-            if let phone = item.tenantPhone, !phone.isEmpty,
-               let telURL = URL(string: "tel:\(phone.filter { !$0.isWhitespace })") {
-                rowActionButton(title: "Позвонить", systemImage: "phone") { openURL(telURL) }
-                if let smsURL = URL(string: "sms:\(phone.filter { !$0.isWhitespace })") {
-                    rowActionButton(title: "Написать", systemImage: "message") { openURL(smsURL) }
-                }
-            } else if let email = item.tenantEmail, !email.isEmpty,
-                      let mailURL = URL(string: "mailto:\(email)") {
-                rowActionButton(title: "Написать", systemImage: "envelope") { openURL(mailURL) }
+    private func rowMenuItems(_ item: PaymentQueueItem) -> some View {
+        Button {
+            editingItem = item
+        } label: {
+            Label("Изменить день или сумму", systemImage: "pencil")
+        }
+        Button {
+            markPaidItem = item
+        } label: {
+            Label("Оплачено: указать дату и сумму…", systemImage: "calendar")
+        }
+        if let count = item.allocationCount, count > 0 {
+            Button {
+                allocationItem = item
+            } label: {
+                Label("Платежи (\(count))", systemImage: "list.bullet.clipboard")
             }
-            rowActionButton(title: "Договор", systemImage: "doc.text") {
-                openLease(item)
+        }
+        if let phone = item.tenantPhone, !phone.isEmpty,
+           let telURL = URL(string: "tel:\(phone.filter { !$0.isWhitespace })") {
+            Button { openURL(telURL) } label: { Label("Позвонить", systemImage: "phone") }
+            if let smsURL = URL(string: "sms:\(phone.filter { !$0.isWhitespace })") {
+                Button { openURL(smsURL) } label: { Label("Написать", systemImage: "message") }
             }
-            .accessibilityIdentifier("payments.row.\(item.id).lease")
-            rowActionButton(title: "Открыть", systemImage: "arrow.up.right.square") {
-                notificationRouter.open(NotificationRoute(kind: .property(item.propertyId)))
-            }
+        } else if let email = item.tenantEmail, !email.isEmpty,
+                  let mailURL = URL(string: "mailto:\(email)") {
+            Button { openURL(mailURL) } label: { Label("Написать", systemImage: "envelope") }
+        }
+        Button {
+            notificationRouter.open(NotificationRoute(kind: .property(item.propertyId)))
+        } label: {
+            Label("Открыть объект", systemImage: "building.2")
+        }
+        Divider()
+        Button(role: .destructive) {
+            skipCandidate = item
+        } label: {
+            Label("Пропустить", systemImage: "forward.end")
         }
     }
 
@@ -462,61 +661,38 @@ struct PaymentsQueueView: View {
     }
 
     private func pastRow(_ item: PaymentQueueItem) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let recorded = PaymentsQueueViewModel.recordedDate(of: item) {
-                        Text(AppFormatting.dateString(from: recorded) ?? recorded)
-                            .font(.headline)
-                            .foregroundStyle(AppTheme.Colors.textPrimary)
-                    } else {
-                        Text("—")
-                            .font(.headline)
-                            .foregroundStyle(AppTheme.Colors.textSecondary)
-                    }
+        let recorded = PaymentsQueueViewModel.recordedDate(of: item)
+        return VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            rowHeader(
+                date: recorded.map { AppFormatting.dateString(from: $0) ?? $0 } ?? "—",
+                isDatePlaceholder: recorded == nil,
+                amount: item.actualAmount ?? item.expectedAmount,
+                item: item,
+                scope: .past
+            )
 
-                    Text("Период: \(PaymentsQueueViewModel.periodLabel(of: item))")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
+            propertyTenantBlock(item)
 
-                    propertyTenantBlock(item)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text(AppFormatting.currency(item.actualAmount ?? item.expectedAmount, currency: item.currency))
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-
-                    StatusBadge(status: PaymentsQueueViewModel.displayStatus(of: item, scope: .past))
-                }
-            }
+            Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
 
             HStack(spacing: AppTheme.Spacing.sm) {
-                rowActionButton(title: "Платежи", systemImage: "list.bullet.clipboard") {
-                    allocationItem = item
-                }
-                rowActionButton(title: "Договор", systemImage: "doc.text") {
-                    openLease(item)
-                }
-                .accessibilityIdentifier("payments.row.\(item.id).lease")
+                Button("Платежи") { allocationItem = item }
+                    .buttonStyle(QuietActionButtonStyle())
+                Button("Договор") { openLease(item) }
+                    .buttonStyle(QuietActionButtonStyle())
+                    .accessibilityIdentifier("payments.row.\(item.id).lease")
                 if PaymentsQueueViewModel.restoreRequiresConfirmation(for: item) {
-                    rowActionButton(
-                        title: "Отменить оплату",
-                        systemImage: "arrow.uturn.backward.circle",
-                        tint: AppTheme.Colors.danger
-                    ) {
-                        unpayCandidate = item
-                    }
+                    Button("Отменить оплату") { unpayCandidate = item }
+                        .buttonStyle(QuietActionButtonStyle(tint: AppTheme.Colors.danger))
                 } else {
-                    rowActionButton(title: "Вернуть в очередь", systemImage: "arrow.counterclockwise.circle") {
+                    Button("Вернуть в очередь") {
                         Task {
                             if await viewModel.restore(item) {
                                 AppHaptics.success()
                             }
                         }
                     }
+                    .buttonStyle(QuietActionButtonStyle())
                 }
             }
             .disabled(viewModel.isMutating)
@@ -530,44 +706,22 @@ struct PaymentsQueueView: View {
                 .foregroundStyle(AppTheme.Colors.textPrimary)
                 .lineLimit(1)
 
-            if let address = item.propertyAddress, !address.isEmpty {
-                Text(address)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                    .lineLimit(1)
-            }
-
-            Text(item.tenantName.isEmpty ? "—" : item.tenantName)
-                .font(.caption)
-                .foregroundStyle(AppTheme.Colors.textSecondary)
-                .lineLimit(1)
+            Text(
+                [item.tenantName.isEmpty ? "—" : item.tenantName, item.propertyAddress ?? ""]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " · ")
+            )
+            .font(.caption)
+            .foregroundStyle(AppTheme.Colors.textSecondary)
+            .lineLimit(1)
         }
-    }
-
-    private func rowActionButton(
-        title: String,
-        systemImage: String,
-        tint: Color = AppTheme.Colors.accent,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, AppTheme.Spacing.sm)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(tint.opacity(0.1))
-                .foregroundStyle(tint)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     private var emptyState: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
                 Text(viewModel.scope == .past ? "Прошлых платежей нет" : "Очередь пуста")
-                    .font(.headline)
+                    .font(AppTheme.Typography.display)
                     .foregroundStyle(AppTheme.Colors.textPrimary)
 
                 Text(
@@ -583,14 +737,14 @@ struct PaymentsQueueView: View {
     }
 
     private func statusBanner(_ message: String) -> some View {
-        Text(message)
+        Label(message, systemImage: "exclamationmark.triangle")
             .font(.footnote)
             .foregroundStyle(AppTheme.Colors.danger)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, AppTheme.Spacing.md)
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(AppTheme.Colors.danger.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }
 

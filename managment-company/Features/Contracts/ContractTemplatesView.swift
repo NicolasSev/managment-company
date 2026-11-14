@@ -84,7 +84,7 @@ struct ContractTemplatesView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(AppTheme.Spacing.md)
                         .background(AppTheme.Colors.warning.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
                         .accessibilityIdentifier("settings.templates.notice")
                 }
 

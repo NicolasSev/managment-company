@@ -87,8 +87,6 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations~ipad</key>

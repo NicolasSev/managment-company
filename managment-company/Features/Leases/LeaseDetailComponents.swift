@@ -144,7 +144,7 @@ struct LeaseMetricTile: View {
         .padding(.vertical, size == .large ? AppTheme.Spacing.md : AppTheme.Spacing.sm)
         .padding(.horizontal, AppTheme.Spacing.md)
         .background(tint.map { $0.opacity(0.08) } ?? AppTheme.Colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
     }
 }
 

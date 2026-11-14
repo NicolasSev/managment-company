@@ -82,7 +82,7 @@ struct RentPreviewSheet: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .tint(AppTheme.Colors.accent)
                         }
                     }
                 } else {
