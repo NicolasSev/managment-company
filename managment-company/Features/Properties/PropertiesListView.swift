@@ -250,6 +250,10 @@ struct PropertiesListView: View {
                                     selectedReceipt = PropertyReceiptDetailRoute(id: receiptId)
                                 }
                             )
+                            // The card resizes as one piece and clips its outgoing content,
+                            // so the formation change has no ghost outside the card.
+                            .geometryGroup()
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.surface, style: .continuous))
                             .matchedTransitionSource(id: property.id, in: zoomNamespace)
                             .appearStagger(index: index, isVisible: rowsVisible)
                         }
@@ -496,6 +500,8 @@ struct PropertyRowView: View {
     let onOpenTenant: (String) -> Void
     let onOpenTransaction: (String) -> Void
     let onOpenReceipt: (String) -> Void
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     var body: some View {
         SurfaceCard(padding: AppTheme.Spacing.md) {
@@ -575,7 +581,7 @@ struct PropertyRowView: View {
                     Text(factsText)
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(AppTheme.Colors.textSecondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.right")
                         .font(.caption.weight(.semibold))
@@ -749,43 +755,54 @@ struct PropertyRowView: View {
         statusColor: Color?,
         showsChevron: Bool
     ) -> some View {
-        HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
+        let isLargeText = dynamicTypeSize.isAccessibilitySize
+        // Large text: the value goes under its label instead of being cut beside it.
+        let layout = isLargeText
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: AppTheme.Spacing.sm))
+        return HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
             Image(systemName: icon)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(showsChevron ? AppTheme.Colors.accent : AppTheme.Colors.textTertiary)
                 .frame(width: 20)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.textSecondary)
-                if !detail.isEmpty {
-                    Text(detail)
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.Colors.textTertiary)
-                        .lineLimit(1)
+            layout {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                    if !detail.isEmpty {
+                        Text(detail)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.Colors.textTertiary)
+                            .lineLimit(isLargeText ? 2 : 1)
+                    }
+                }
+
+                if !isLargeText {
+                    Spacer(minLength: 6)
+                }
+
+                VStack(alignment: isLargeText ? .leading : .trailing, spacing: 2) {
+                    Text(value)
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(showsChevron ? AppTheme.Colors.textPrimary : AppTheme.Colors.textSecondary)
+                        .lineLimit(isLargeText ? 2 : 1)
+                    if let status, let statusColor {
+                        Text(status)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(statusColor)
+                    }
                 }
             }
-
-            Spacer(minLength: 6)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(value)
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(showsChevron ? AppTheme.Colors.textPrimary : AppTheme.Colors.textSecondary)
-                    .lineLimit(1)
-                if let status, let statusColor {
-                    Text(status)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(statusColor)
-                }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(AppTheme.Colors.textTertiary)
                 .opacity(showsChevron ? 1 : 0)
         }
+        .padding(.vertical, isLargeText ? AppTheme.Spacing.sm : 0)
         .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
         .overlay(alignment: .top) {
             Rectangle().fill(AppTheme.Colors.border).frame(height: 1)

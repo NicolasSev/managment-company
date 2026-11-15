@@ -10,21 +10,29 @@ struct SlidingSegmentedControl<Item: Hashable & Identifiable>: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var indicator
+    /// What the control shows. It moves first; the binding follows once the indicator has
+    /// travelled, so a heavy content switch does not swallow the slide.
+    @State private var displayed: Item?
+
+    private var current: Item { displayed ?? selection }
 
     var body: some View {
+        // Scrolls sideways when the labels do not fit (large text), instead of widening the screen.
+        ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: AppTheme.Spacing.lg) {
             ForEach(items) { item in
-                let isSelected = item == selection
+                let isSelected = item == current
                 Button {
                     guard !isSelected else { return }
                     AppHaptics.selection()
-                    withAnimation(AppTheme.Motion.resolved(.snappy(duration: 0.3), reduceMotion: reduceMotion)) {
-                        selection = item
-                    }
+                    select(item)
                 } label: {
                     Text(title(item))
                         .font(.system(.subheadline, weight: isSelected ? .semibold : .regular).width(.expanded))
                         .foregroundStyle(isSelected ? AppTheme.Colors.textPrimary : AppTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .frame(minHeight: 44)
                         .overlay(alignment: .bottom) {
                             if isSelected {
@@ -39,10 +47,33 @@ struct SlidingSegmentedControl<Item: Hashable & Identifiable>: View {
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
             }
-            Spacer(minLength: 0)
         }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {
             Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
+        }
+        .onChange(of: selection) { _, new in
+            // Selection changed from outside (deep link): follow it.
+            if displayed != new {
+                withAnimation(AppTheme.Motion.resolved(.snappy(duration: 0.28), reduceMotion: reduceMotion)) {
+                    displayed = new
+                }
+            }
+        }
+    }
+
+    private func select(_ item: Item) {
+        guard !reduceMotion else {
+            displayed = item
+            selection = item
+            return
+        }
+        withAnimation(.snappy(duration: 0.28)) { displayed = item }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard displayed == item else { return }
+            withAnimation(AppTheme.Motion.normal) { selection = item }
         }
     }
 }

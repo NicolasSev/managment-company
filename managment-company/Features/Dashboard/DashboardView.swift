@@ -21,6 +21,7 @@ struct DashboardView: View {
     @EnvironmentObject private var notificationRouter: NotificationDeepLinkRouter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum Period: String, CaseIterable, Identifiable {
         case all, month, season, quarter, year
@@ -341,11 +342,12 @@ struct DashboardView: View {
 
     private var kpiSection: some View {
         let d = dashboard
+        // Large text: one tile per row, two columns are too narrow for the figures.
         return LazyVGrid(
-            columns: [
-                GridItem(.flexible(), spacing: AppTheme.Spacing.sm),
-                GridItem(.flexible(), spacing: AppTheme.Spacing.sm)
-            ],
+            columns: Array(
+                repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.sm),
+                count: dynamicTypeSize.isAccessibilitySize ? 1 : 2
+            ),
             spacing: AppTheme.Spacing.sm
         ) {
             KPICard(

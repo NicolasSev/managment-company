@@ -63,6 +63,9 @@ extension View {
             .textCase(.uppercase)
             .tracking(1.4)
             .foregroundStyle(color)
+            // Wide caps are chrome: they follow Dynamic Type up to xxxLarge and stop there,
+            // otherwise a single word no longer fits a tile. Values keep scaling.
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
 
@@ -113,7 +116,7 @@ struct MetricTile: View {
             Text(title)
                 .sectionLabelStyle()
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.5)
             Text(value)
                 .font(AppTheme.Typography.money)
                 .foregroundStyle(tint)

@@ -26,6 +26,7 @@ struct PaymentsQueueView: View {
     @State private var payingIds: Set<String> = []
     @State private var rowsVisible = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// When embedded inside another navigation container (the GAP-037 «Деньги»
     /// hub), the view skips its own `NavigationStack`.
@@ -459,7 +460,11 @@ struct PaymentsQueueView: View {
         item: PaymentQueueItem,
         scope: PaymentQueueScope
     ) -> some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+        // Large text: the amount and the badge go under the date instead of beside it.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppTheme.Spacing.sm))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: AppTheme.Spacing.sm))
+        return layout {
             VStack(alignment: .leading, spacing: 4) {
                 Text(date)
                     .font(.headline)
@@ -476,9 +481,11 @@ struct PaymentsQueueView: View {
                 }
             }
 
-            Spacer(minLength: AppTheme.Spacing.sm)
+            if !dynamicTypeSize.isAccessibilitySize {
+                Spacer(minLength: AppTheme.Spacing.sm)
+            }
 
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 6) {
                 Text(AppFormatting.currency(amount, currency: item.currency))
                     .font(AppTheme.Typography.money)
                     .foregroundStyle(AppTheme.Colors.textPrimary)
@@ -532,7 +539,10 @@ struct PaymentsQueueView: View {
 
             Rectangle().fill(AppTheme.Colors.border).frame(height: 1)
 
-            HStack(spacing: AppTheme.Spacing.sm) {
+            // Large text: the primary action takes its own line.
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppTheme.Spacing.xs))
+                : AnyLayout(HStackLayout(spacing: AppTheme.Spacing.sm))) {
                 Button {
                     markPaid(item)
                 } label: {
@@ -541,18 +551,8 @@ struct PaymentsQueueView: View {
                         Text("Оплачено")
                             .lineLimit(1)
                     }
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(AppTheme.Colors.onAccent)
-                    .padding(.horizontal, AppTheme.Spacing.sm)
-                    .frame(maxWidth: .infinity, minHeight: 38)
-                    .background(
-                        AppTheme.Colors.accent,
-                        in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
-                    )
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MarkPaidButtonStyle(isPaying: isPaying))
                 .contextMenu {
                     Button {
                         markPaidItem = item
@@ -562,11 +562,13 @@ struct PaymentsQueueView: View {
                 }
                 .accessibilityHint("Записывает оплату сегодняшней датой")
 
-                Button("Договор") { openLease(item) }
-                    .buttonStyle(QuietActionButtonStyle(fills: false))
-                    .accessibilityIdentifier("payments.row.\(item.id).lease")
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    Button("Договор") { openLease(item) }
+                        .buttonStyle(QuietActionButtonStyle(fills: dynamicTypeSize.isAccessibilitySize))
+                        .accessibilityIdentifier("payments.row.\(item.id).lease")
 
-                rowMoreMenu(item)
+                    rowMoreMenu(item)
+                }
             }
             .disabled(viewModel.isMutating)
         }
@@ -576,6 +578,11 @@ struct PaymentsQueueView: View {
     private func markPaid(_ item: PaymentQueueItem) {
         payingIds.insert(item.id)
         Task {
+            // Let the ring finish its morph into the check before the row leaves the queue:
+            // on a fast connection the reload would otherwise remove it mid-animation.
+            if !reduceMotion {
+                try? await Task.sleep(for: .milliseconds(320))
+            }
             let paid = await viewModel.markPaidToday(
                 item,
                 timeZoneIdentifier: authManager.user?.timezone ?? "Asia/Almaty"
@@ -745,6 +752,28 @@ struct PaymentsQueueView: View {
             .padding(.vertical, AppTheme.Spacing.sm)
             .background(AppTheme.Colors.danger.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous))
+    }
+}
+
+/// Primary action of a queue row. While its own payment is being recorded the button stays
+/// solid, so the check morph is readable; other rows dim as disabled.
+private struct MarkPaidButtonStyle: ButtonStyle {
+    let isPaying: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(AppTheme.Colors.onAccent)
+            .padding(.horizontal, AppTheme.Spacing.sm)
+            .frame(maxWidth: .infinity, minHeight: 38)
+            .background(
+                AppTheme.Colors.accent,
+                in: RoundedRectangle(cornerRadius: AppTheme.Radius.inner, style: .continuous)
+            )
+            .opacity(isPaying ? 1 : (isEnabled ? (configuration.isPressed ? 0.86 : 1) : 0.45))
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
     }
 }
 
